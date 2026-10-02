@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Notes that learn you as you learn · Tutoring for NMU first-year CS</title>
+  <meta name="description" content="First-year Computer Science tutoring for Nelson Mandela University students. Modules across maths, applied maths, C#, MATLAB, fundamentals and statistics." />
+
+  <!-- Google Fonts: Playfair Display (italic for [learn you]) + Inter (body sans) + JetBrains Mono (code) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@1,500;1,600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
+  <style>
+    /* ============================================================
+       TOKENS
+       Edit anything here to retune the entire page.
+       ============================================================ */
+    :root {
+      /* — Core palette — */
+      --bg-0:           #000000;       /* pure black */
+      --bg-1:           #050608;       /* near-black for layered surfaces */
+      --bg-2:           #0A0D11;       /* card/section base where needed */
+
+      /* — Foreground — */
+      --fg:             #F2F4F7;       /* primary text */
+      --fg-muted:       #A8B0BB;       /* secondary text */
+      --fg-dim:         #6B7280;       /* tertiary text, captions */
+
+      /* — Accent (violet → cyan gradient identity) — */
+      --accent-a:       #8B0000;       /* violet */
+      --accent-b:       #fdd3aeff;       /* cyan (also matrix rain colour) */
+      --accent-soft-a:  rgba(196, 0, 13, 0.16);
+      --accent-soft-b:  rgba(255, 0, 0, 0.16);
+      --accent-glow-a:  rgba(172, 44, 172, 0.45);
+      --accent-glow-b:  rgba(255, 0, 153, 0.45);
+      --accent-line:    rgba(255, 208, 222, 0.27);
+      --auxillary: rgba(251, 194, 172, 1);
+
+      /* — Glass surfaces (iOS-style frosted glass; NO outer glow) — */
+      --glass-tint:     rgba(255, 255, 255, 0.06);
+      --glass-border:   rgba(255, 255, 255, 0.10);
+      --glass-border-strong: rgba(255, 255, 255, 0.16);
+      --glass-blur:     8px;
+      --glass-saturation: 90%;
+
+      /* — Matrix rain — */
+      --matrix-color:   var(--accent-b);
+      --matrix-trail:   rgba(0, 30, 38, 0.45);
+
+      /* — Dividers / masks — */
+      --mask-soft:      rgba(0, 0, 0, 0.0);
+      --mask-end:       rgba(0, 0, 0, 1.0);
+
+      /* — Hero media stack — */
+      --grid-line:        rgba(0, 229, 255, 0.05);
+      --grid-size:        56px;
+      --hero-glow-a:      var(--accent-soft-a);
+      --hero-glow-b:      var(--accent-soft-b);
+      --hero-video-alpha: 0.5;
+      --hero-mask-h:      22%;
+      --dur-glow:         14s;
+
+      /* — Typography — */
+      --font-sans:      "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --font-italic:    "Playfair Display", "Times New Roman", serif;
+      --font-mono:      "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+      --fs-eyebrow:     0.78rem;
+      --fs-body:        1rem;
+      --fs-body-lg:     1.08rem;
+      --fs-h1:          clamp(2.4rem, 6.5vw, 4.8rem);
+      --fs-h2:          clamp(1.6rem, 3.4vw, 2.4rem);
+      --fs-h3:          1.25rem;
+      --fs-module:      1.6rem;
+
+      --lh-tight:       1.08;
+      --lh-snug:        1.25;
+      --lh-body:        1.65;
+
+      --tracking-tight: -0.02em;
+      --tracking-wide:  0.18em;
+
+      /* — Spacing scale — */
+      --sp-1:  0.25rem;
+      --sp-2:  0.5rem;
+      --sp-3:  0.75rem;
+      --sp-4:  1rem;
+      --sp-5:  1.5rem;
+      --sp-6:  2rem;
+      --sp-7:  3rem;
+      --sp-8:  4.5rem;
+      --sp-9:  6rem;
+
+      /* — Radii — */
+      --r-sm:  8px;
+      --r-md:  14px;
+      --r-lg:  20px;
+      --r-xl:  28px;
+
+      /* — Motion — */
+      --ease-out:     cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-in-out:  cubic-bezier(0.65, 0, 0.35, 1);
+      --dur-fast:     180ms;
+      --dur-med:      320ms;
+      --dur-slow:     620ms;
+      --dur-marquee:  48s;
+      --dur-shimmer:  6.5s;
+
+      /* — Layout — */
+      --max-w:        1200px;
+      --max-w-narrow: 780px;
+    }
+
+    /* ============================================================
+       BASE
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    /* The black background lives on <html> so the fixed canvas at z-index:-1
+       stays visible — if <body> had the bg, it would paint over the canvas. */
+    html {
+      background: var(--bg-0);
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      color: var(--fg);
+      font-family: var(--font-sans);
+      font-size: var(--fs-body);
+      line-height: var(--lh-body);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* Invisible scrollbar (webkit + firefox) */
+    html { scrollbar-width: none; }
+    html::-webkit-scrollbar { width: 0; height: 0; display: none; }
+    body { overflow-x: hidden; }
+
+    a { color: inherit; text-decoration: none; }
+
+    ::selection {
+      background: var(--accent-soft-b);
+      color: var(--fg);
+    }
+
+    /* Respect reduced motion globally */
+    @media (prefers-reduced-motion: reduce) {
+      :root {
+        --dur-marquee: 0s;
+        --dur-shimmer: 0s;
+        --dur-fast: 0ms;
+        --dur-med: 0ms;
+        --dur-slow: 0ms;
+      }
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+
+    /* ============================================================
+       MATRIX BACKGROUND CANVAS
+       ============================================================ */
+    #matrix {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: -1;
+      pointer-events: none;
+      display: block;
+      background: var(--bg-0);
+    }
+
+    /* ============================================================
+       LAYOUT PRIMITIVES
+       ============================================================ */
+    .center {
+      max-width: var(--max-w);
+      margin-inline: auto;
+      padding-inline: var(--sp-5);
+    }
+    .center--narrow { max-width: var(--max-w-narrow); }
+
+    section { position: relative; }
+
+    /* ============================================================
+       GLASS (iOS-style frosted glass; NO outer glow)
+       Reusable across hero pane, module cards, review cards, etc.
+       ============================================================ */
+    .glass {
+      background: var(--glass-tint);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--r-lg);
+      backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+    }
+
+    /* Subtle accent-tinted inner edge — use ONLY where the brief allows it */
+    .glass--accent-tint {
+      background:
+        linear-gradient(180deg, var(--accent-soft-a), transparent 40%),
+        var(--glass-tint);
+      border-color: var(--accent-line);
+    }
+
+    /* ============================================================
+       REUSABLE PIECES (pill, buttons, accent gradient text)
+       These recur across sections and future pages; keep generic.
+       ============================================================ */
+    .pill {
+      display: inline-block;
+      padding: var(--sp-2) var(--sp-4);
+      border-radius: 999px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-tint);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      color: var(--accent-b);
+      font-size: var(--fs-eyebrow);
+      letter-spacing: var(--tracking-wide);
+      text-transform: uppercase;
+      margin-bottom: var(--sp-5);
+    }
+
+    .btn-glass {
+      display: inline-block;
+      padding: var(--sp-3) var(--sp-5);
+      border-radius: 999px;
+      border: 1px solid var(--glass-border-strong);
+      background: var(--glass-tint);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      color: var(--fg);
+      font-weight: 500;
+      transition:
+        border-color var(--dur-fast) var(--ease-out),
+        background var(--dur-fast) var(--ease-out);
+    }
+    .btn-glass:hover {
+      border-color: var(--accent-line);
+      background: var(--accent-soft-b);
+    }
+
+    .btn-ghost {
+      display: inline-block;
+      padding: var(--sp-3) var(--sp-4);
+      color: var(--fg-muted);
+      font-weight: 500;
+      transition: color var(--dur-fast) var(--ease-out);
+    }
+    .btn-ghost:hover { color: var(--fg); }
+
+    /* Moving violet→cyan gradient text. Reserved for [learn you]. */
+    .learn-you {
+      font-family: var(--font-italic);
+      font-style: italic;
+      font-weight: 500;
+      letter-spacing: var(--tracking-tight);
+      background: linear-gradient(90deg,
+        var(--accent-a), var(--accent-b), var(--accent-a));
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      animation: gradient-drift var(--dur-shimmer) var(--ease-in-out) infinite;
+    }
+    @keyframes gradient-drift {
+      0%, 100% { background-position: 0% 50%; }
+      50%      { background-position: 100% 50%; }
+    }
+
+    /* ============================================================
+       HERO (Phase 1)
+       Full viewport. Media stack behind: grid → glow → video → mask.
+       Content: one centred glass card (pill, headline, actions).
+       ============================================================ */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      min-height: 100svh;
+      display: grid;
+      align-items: center;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    /* Media stack lives behind the card, inside the hero only */
+    .hero__media { position: absolute; inset: 0; z-index: 0; }
+    .hero__media > * { position: absolute; inset: 0; }
+
+    .hero__grid {
+      background-color: var(--bg-0);
+      background-image:
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: var(--grid-size) var(--grid-size);
+    }
+
+    .hero__glow {
+      background:
+        radial-gradient(42% 55% at 68% 40%, var(--hero-glow-b), transparent 70%),
+        radial-gradient(52% 62% at 22% 72%, var(--hero-glow-a), transparent 72%);
+      animation: glow-drift var(--dur-glow) var(--ease-in-out) infinite alternate;
+    }
+    @keyframes glow-drift {
+      from { transform: translate3d(-1.5%, -1%, 0) scale(1); opacity: 0.8; }
+      to   { transform: translate3d(1.5%, 2%, 0) scale(1.07); opacity: 1; }
+    }
+
+    .hero__video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: var(--hero-video-alpha);
+    }
+
+    /* Black fade where the media meets the page below while scrolling */
+    .hero__mask-bottom {
+      inset: auto 0 0 0;
+      height: var(--hero-mask-h);
+      background: linear-gradient(to bottom, var(--mask-soft), var(--mask-end));
+      pointer-events: none;
+    }
+
+    /* Centred wrapper — everything the hero shows lives in one glass card */
+    .hero__wrap {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: var(--max-w);
+      margin-inline: auto;
+      padding: var(--sp-7) var(--sp-5);
+      display: grid;
+      place-items: center;
+    }
+
+    .hero__card {
+      width: 100%;
+      max-width: 46rem;
+      padding: var(--sp-7);
+      text-align: center;
+    }
+
+    .hero__title {
+      font-size: var(--fs-h1);
+      line-height: var(--lh-tight);
+      letter-spacing: var(--tracking-tight);
+      font-weight: 700;
+      margin: 0 0 var(--sp-6);
+    }
+    .hero__title .learn-you {
+      font-family: var(--font-italic);
+      font-style: italic;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+
+    .hero__actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: var(--sp-3);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================================
+       PAGE BACKGROUND: falling cyan matrix
+       ============================================================ -->
+  <canvas id="matrix" aria-hidden="true"></canvas>
+
+  <!-- ============================================================
+       PAGE CONTENT
+       ============================================================ -->
+  <main>
+
+    <!-- ==========================================================
+         HERO (Phase 1)
+         One centred glass card holding the pill, headline, actions.
+         Behind: dark grid → drifting radial glow → stock video.
+         To use a real stock video, drop an .mp4 at assets/hero-stock.mp4
+         (or paste any URL into the <source> below). Until then the
+         grid + glow fallback carries the section.
+         ========================================================== -->
+    <section class="hero" id="top">
+      <div class="hero__media" aria-hidden="true">
+        <div class="hero__grid"></div>
+        <div class="hero__glow"></div>
+        <video class="hero__video" autoplay muted loop playsinline preload="metadata">
+          <source src="assets/hero-3.mp4" type="video/mp4" />
+        </video>
+        <div class="hero__mask-bottom"></div>
+      </div>
+
+      <div class="hero__wrap">
+        <div class="glass glass--accent-tint hero__card">
+          <span class="pill">Nelson Mandela University · Computer Science</span>
+          <h1 class="hero__title">Notes that <span class="learn-you">learn you</span> as you learn</h1>
+          <div class="hero__actions">
+            <a class="btn-glass" href="#modules">Explore all the modules</a>
+            <a class="btn-ghost" href="#mission">Why this exists</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================
+       DATA POOLS
+       Each block is JSON you can edit to add/remove entries without
+       touching the rest of the page. The shape is documented above
+       each pool.
+       ============================================================ -->
+
+  <!--
+    MODULES POOL — shape:
+      { code: string, name: string, desc: string }
+    Add a line per module. Reordering is fine; the page reads in order.
+  -->
+  <script type="application/json" id="modules-pool">
+  []
+  </script>
+
+  <!--
+    REVIEWS POOL — shape (added in Phase 4):
+      { name: string, module: string, rating: 1..5, summary: string, body: string }
+  -->
+  <script type="application/json" id="reviews-pool">
+  []
+  </script>
+
+  <!-- ============================================================
+       NEXUS UI — small reusable toolkit (matrix rain, marquee, etc.)
+       Phase 0 registers only the matrix. Marquee/hoverSwap/render
+       are added in Phase 3.
+       ============================================================ -->
+  <script>
+    (function () {
+      'use strict';
+
+      // Reduced motion respect
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      // ---------- Matrix rain ----------
+      // Throttled to ~30fps, pauses when tab is hidden, respects reduced motion.
+      function startMatrix(canvas) {
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d', { alpha: false });
+        if (!ctx) return;
+
+        const glyphs = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン0123456789<MATT><MAPV><WRAV><WRFV><WRSC><STAS>{}[]()/=*+-';
+        const fontSize = 16;
+        let columns = 0;
+        let drops = [];
+        let lastDraw = 0;
+        const fps = 30;
+        const interval = 1000 / fps;
+        let running = true;
+
+        function resize() {
+          const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+          canvas.width  = Math.floor(window.innerWidth  * dpr);
+          canvas.height = Math.floor(window.innerHeight * dpr);
+          canvas.style.width  = window.innerWidth + 'px';
+          canvas.style.height = window.innerHeight + 'px';
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          columns = Math.floor(window.innerWidth / fontSize);
+          drops = new Array(columns).fill(0).map(() => Math.random() * window.innerHeight / fontSize);
+          ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg-0').trim() || '#000';
+          ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+        }
+
+        function draw(now) {
+          if (!running) return;
+          requestAnimationFrame(draw);
+          if (document.hidden) return;
+          if (reducedMotion) return;
+          if (now - lastDraw < interval) return;
+          lastDraw = now;
+
+          // Trail: paint a translucent black rectangle over the whole canvas
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.10)';
+          ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+          const color = getComputedStyle(document.documentElement).getPropertyValue('--matrix-color').trim() || '#00E5FF';
+          ctx.fillStyle = color;
+          ctx.font = fontSize + "px 'JetBrains Mono', ui-monospace, monospace";
+
+          for (let i = 0; i < columns; i++) {
+            const ch = glyphs.charAt(Math.floor(Math.random() * glyphs.length));
+            const x = i * fontSize;
+            const y = drops[i] * fontSize;
+            ctx.fillText(ch, x, y);
+
+            if (y > window.innerHeight && Math.random() > 0.975) {
+              drops[i] = 0;
+            }
+            drops[i] += 1;
+          }
+        }
+
+        window.addEventListener('resize', resize);
+        document.addEventListener('visibilitychange', () => {
+          running = !document.hidden;
+          if (running) requestAnimationFrame(draw);
+        });
+
+        resize();
+        requestAnimationFrame(draw);
+      }
+
+      window.NexusUI = { reducedMotion, startMatrix };
+      document.addEventListener('DOMContentLoaded', () => {
+        NexusUI.startMatrix(document.getElementById('matrix'));
+      });
+    })();
+  </script>
+</body>
+</html>
