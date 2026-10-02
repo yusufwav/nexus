@@ -1,0 +1,41 @@
+{
+  "name": "Main",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "check-types": "turbo run check-types",
+    "dev:web": "turbo run dev -F web --",
+    "db:push": "turbo run db:push -F @Main/db --",
+    "db:studio": "turbo run db:studio -F @Main/db --",
+    "db:generate": "turbo run db:generate -F @Main/db --",
+    "db:migrate": "turbo run db:migrate -F @Main/db --",
+    "deploy:setup": "pnpm dlx vercel link",
+    "dev:vercel": "pnpm dlx vercel dev -L",
+    "env:preview": "tsx scripts/sync-vercel-env.ts preview",
+    "env:production": "tsx scripts/sync-vercel-env.ts production",
+    "deploy": "pnpm dlx vercel deploy",
+    "deploy:prod": "pnpm dlx vercel deploy --prod",
+    "deploy:check": "pnpm dlx vercel deploy --dry",
+    "env:generate": "varlock codegen --path ./apps/web/ && varlock codegen --path ./packages/db/",
+    "postinstall": "varlock codegen --path ./apps/web/ && varlock codegen --path ./packages/db/",
+    "auth:generate": "cd apps/web && pnpm run auth:generate"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@Main/config": "workspace:*",
+    "@types/node": "catalog:",
+    "tsx": "^4.23.13",
+    "turbo": "^2.10.12",
+    "typescript": "catalog:",
+    "varlock": "catalog:"
+  },
+  "packageManager": "pnpm@12.4.2"
+}
