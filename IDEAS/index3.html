@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexus · Notes that learn you as you learn</title>
+  <meta name="description" content="First-year Computer Science notes for Nelson Mandela University students. Maths, applied maths, C#, MATLAB, fundamentals and statistics." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <style>
+    /* ============================================================
+       TOKENS — index3: "EDITORIAL"
+       Direction: warm scholarly. Serif-forward, asymmetric, generous
+       margins. Argues the understanding case rather than showing off.
+       Deliberately not dark-neon: this is ink on warm paper at night.
+       Same brand accent, different temperature.
+       ============================================================ */
+    :root {
+      /* Warm near-black rather than pure blue-black, so the red accent
+         never goes cold and muddy. */
+      --bg-0: #070605;
+      --bg-1: #0d0b09;
+      --bg-2: #141110;
+
+      --fg:       #F5F0E8;
+      --fg-muted: #B8AFA2;
+      --fg-dim:   #7A7267;
+
+      --accent-a: #8B0000;
+      --accent-b: #fdd3aeff;
+      --accent-c: #6b0024ff;
+
+      --rule:        rgba(245, 240, 232, 0.10);
+      --rule-strong: rgba(245, 240, 232, 0.20);
+      --accent-line: rgba(253, 211, 174, 0.30);
+      --accent-wash: rgba(139, 0, 0, 0.22);
+
+      --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+      --font-sans:  "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --font-mono:  "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+      --fs-xs:   0.68rem;
+      --fs-sm:   0.82rem;
+      --fs-body: 1.05rem;
+      --fs-lead: 1.25rem;
+      --fs-h1:   clamp(2.8rem, 7vw, 6rem);
+      --fs-h2:   clamp(2rem, 4.5vw, 3.4rem);
+      --fs-h3:   clamp(1.3rem, 2vw, 1.75rem);
+
+      --lh-body: 1.75;
+      --lh-snug: 1.25;
+      --lh-tight: 1.06;
+
+      --tracking: 0.01em;
+      --tracking-wide: 0.2em;
+
+      --sp-1: 0.25rem; --sp-2: 0.5rem;  --sp-3: 0.75rem;
+      --sp-4: 1rem;    --sp-5: 1.5rem;  --sp-6: 2rem;
+      --sp-7: 3.5rem;  --sp-8: 5rem;    --sp-9: 7.5rem;
+
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --dur-med: 340ms;
+      --dur-slow: 700ms;
+
+      --max-w: 1220px;
+      --measure: 34rem;   /* classic reading measure for body copy */
+    }
+
+    /* ============================================================
+       BASE
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html { background: var(--bg-0); scrollbar-width: none; }
+    html::-webkit-scrollbar { width: 0; height: 0; display: none; }
+    body {
+      margin: 0;
+      color: var(--fg);
+      background: var(--bg-0);
+      font-family: var(--font-serif);
+      font-size: var(--fs-body);
+      line-height: var(--lh-body);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    ::selection { background: var(--accent-a); color: var(--fg); }
+    :focus-visible { outline: 2px solid var(--accent-b); outline-offset: 3px; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+
+    /* ============================================================
+       TYPE SYSTEM
+       Serif does the heavy lifting; sans is reserved for UI and
+       data. That split is what makes it read as editorial.
+       ============================================================ */
+    .eyebrow {
+      font-family: var(--font-sans);
+      font-size: var(--fs-xs);
+      font-weight: 500;
+      letter-spacing: var(--tracking-wide);
+      text-transform: uppercase;
+      color: var(--accent-b);
+    }
+    .display {
+      font-size: var(--fs-h1);
+      line-height: var(--lh-tight);
+      letter-spacing: -0.02em;
+      font-weight: 400;
+      margin: 0;
+    }
+    .display em {
+      font-style: italic;
+      font-weight: 300;
+      color: var(--accent-b);
+    }
+    .h2 {
+      font-size: var(--fs-h2);
+      line-height: var(--lh-snug);
+      letter-spacing: -0.015em;
+      font-weight: 400;
+      margin: 0;
+    }
+    .lead {
+      font-size: var(--fs-lead);
+      line-height: 1.6;
+      color: var(--fg-muted);
+      max-width: var(--measure);
+      margin: 0;
+    }
+    .body {
+      max-width: var(--measure);
+      color: var(--fg-muted);
+      margin: 0;
+    }
+    .body strong { color: var(--fg); font-weight: 600; }
+    .body em { font-style: italic; color: var(--fg); }
+
+    /* ============================================================
+       LAYOUT
+       Asymmetric: a narrow sticky rail for meta, a wide column for
+       text. The asymmetry is the whole look.
+       ============================================================ */
+    .wrap {
+      max-width: var(--max-w);
+      margin-inline: auto;
+      padding-inline: var(--sp-6);
+    }
+    .split {
+      display: grid;
+      grid-template-columns: 8rem 1fr;
+      gap: var(--sp-6);
+      align-items: start;
+    }
+    .rail {
+      font-family: var(--font-sans);
+      font-size: var(--fs-xs);
+      letter-spacing: var(--tracking-wide);
+      text-transform: uppercase;
+      color: var(--fg-dim);
+      padding-top: 0.5em;
+      position: sticky;
+      top: 2rem;
+    }
+    .rail b {
+      display: block;
+      color: var(--accent-b);
+      font-weight: 500;
+      margin-bottom: var(--sp-2);
+      font-size: 1.3em;
+    }
+    @media (max-width: 800px) {
+      .split { grid-template-columns: 1fr; gap: var(--sp-4); }
+      .rail { position: static; }
+    }
+
+    section { position: relative; }
+    .rule { border-top: 1px solid var(--rule); }
+
+    /* ============================================================
+       HERO
+       Big serif display type, deliberately unbalanced. The rule
+       after the eyebrow and the single warm glow give it structure.
+       ============================================================ */
+    .hero {
+      min-height: 100vh;
+      min-height: 100svh;
+      display: grid;
+      align-content: center;
+      padding-block: var(--sp-9);
+      position: relative;
+    }
+    /* One warm light source behind the headline. This is the only
+       glow on the page and it earns its place. */
+    .hero::before {
+      content: "";
+      position: absolute;
+      top: -20%; right: -10%;
+      width: 60vw; height: 60vw;
+      max-width: 700px; max-height: 700px;
+      background: radial-gradient(circle, var(--accent-wash), transparent 65%);
+      pointer-events: none;
+      z-index: -1;
+      animation: breathe 16s ease-in-out infinite alternate;
+    }
+    @keyframes breathe {
+      from { transform: translate(0, 0) scale(1); opacity: 0.8; }
+      to   { transform: translate(-4%, 3%) scale(1.08); opacity: 1; }
+    }
+
+    .hero__inner { max-width: 56rem; }
+    .hero__kicker {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-4);
+      margin-bottom: var(--sp-6);
+    }
+    .hero__kicker::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--rule);
+      max-width: 12rem;
+    }
+    .hero__display { margin-bottom: var(--sp-6); }
+    .hero__lead {
+      font-size: 1.35rem;
+      line-height: 1.55;
+      color: var(--fg-muted);
+      max-width: 30rem;
+      margin: 0 0 var(--sp-7);
+    }
+    .hero__actions { display: flex; flex-wrap: wrap; gap: var(--sp-4); align-items: center; }
+
+    .btn {
+      display: inline-block;
+      padding: 0.85rem 1.75rem;
+      font-family: var(--font-sans);
+      font-size: 0.88rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      border-radius: 2px;
+      border: 1px solid var(--accent-line);
+      color: var(--fg);
+      background: var(--accent-wash);
+      transition: background var(--dur-med) var(--ease-out),
+                  transform var(--dur-med) var(--ease-out);
+    }
+    .btn:hover { background: var(--accent-a); transform: translateY(-2px); }
+    .btn--plain {
+      background: none;
+      border-color: var(--rule-strong);
+      color: var(--fg-muted);
+    }
+    .btn--plain:hover { background: none; color: var(--fg); border-color: var(--accent-b); }
+
+    /* ============================================================
+       MARQUEE — a ribbon of italic serif use-cases
+       ============================================================ */
+    .marquee { position: relative; overflow: hidden; padding-block: var(--sp-5); }
+    .marquee::before, .marquee::after {
+      content: "";
+      position: absolute; top: 0; bottom: 0;
+      width: 120px; z-index: 2; pointer-events: none;
+    }
+    .marquee::before { left: 0; background: linear-gradient(to right, var(--bg-0), transparent); }
+    .marquee::after  { right: 0; background: linear-gradient(to left, var(--bg-0), transparent); }
+    .marquee__track {
+      display: flex; align-items: center;
+      width: max-content;
+      animation: ribbon 50s linear infinite;
+    }
+    .marquee:hover .marquee__track { animation-play-state: paused; }
+    @keyframes ribbon { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    .marquee__item {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 1.35rem;
+      color: var(--fg-dim);
+      white-space: nowrap;
+    }
+    .marquee__item::after {
+      content: "·";
+      margin-inline: var(--sp-5);
+      color: var(--accent-c);
+      font-style: normal;
+    }
+
+    /* ============================================================
+       MARGINALIA
+       The defining detail. Notes sit in the margin beside the body
+       copy, like annotations in a well-set book.
+       ============================================================ */
+    .marginalia {
+      display: grid;
+      grid-template-columns: 12rem 1fr;
+      gap: var(--sp-6);
+      padding-block: var(--sp-5);
+      align-items: start;
+    }
+    .marginalia + .marginalia { border-top: 1px solid var(--rule); }
+    .marginalia__note {
+      font-family: var(--font-sans);
+      font-size: var(--fs-sm);
+      line-height: 1.6;
+      color: var(--fg-dim);
+      padding-left: var(--sp-4);
+      border-left: 1px solid var(--accent-line);
+    }
+    .marginalia__note b {
+      display: block;
+      color: var(--accent-b);
+      font-weight: 500;
+      letter-spacing: var(--tracking-wide);
+      text-transform: uppercase;
+      font-size: var(--fs-xs);
+      margin-bottom: var(--sp-2);
+    }
+    .marginalia__text { max-width: var(--measure); color: var(--fg-muted); }
+    @media (max-width: 760px) {
+      .marginalia { grid-template-columns: 1fr; gap: var(--sp-3); }
+      .marginalia__note {
+        padding-left: 0; padding-top: var(--sp-3);
+        border-left: 0; border-top: 1px solid var(--accent-line);
+      }
+    }
+
+    /* ============================================================
+       MODULES — an index / table of contents, not a card grid
+       ============================================================ */
+    .toc { margin-top: var(--sp-7); }
+    .toc__row {
+      display: grid;
+      grid-template-columns: 3rem 8rem 1fr;
+      gap: var(--sp-4);
+      align-items: baseline;
+      padding-block: var(--sp-4);
+      border-top: 1px solid var(--rule);
+      transition: padding-left var(--dur-med) var(--ease-out),
+                  background var(--dur-med) var(--ease-out);
+    }
+    .toc__row:last-child { border-bottom: 1px solid var(--rule); }
+    .toc__row:hover {
+      padding-left: var(--sp-4);
+      background: linear-gradient(to right, var(--accent-wash), transparent 60%);
+    }
+    .toc__idx { font-family: var(--font-sans); font-size: var(--fs-xs); color: var(--fg-dim); }
+    .toc__code { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--accent-b); }
+    .toc__name { font-size: 1.2rem; color: var(--fg); }
+    .toc__desc {
+      grid-column: 3;
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: var(--fs-sm);
+      line-height: 1.6;
+      color: var(--fg-dim);
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transition: max-height var(--dur-slow) var(--ease-out),
+                  opacity var(--dur-med) var(--ease-out),
+                  padding-top var(--dur-med) var(--ease-out);
+    }
+    .toc__row:hover .toc__desc { max-height: 7rem; opacity: 1; padding-top: var(--sp-3); }
+    @media (max-width: 720px) {
+      .toc__row { grid-template-columns: 2.5rem 6rem 1fr; gap: var(--sp-2); }
+      .toc__name { font-size: 1.05rem; }
+    }
+
+    /* ============================================================
+       PULL QUOTE
+       ============================================================ */
+    .pull {
+      margin-block: var(--sp-8);
+      padding-left: var(--sp-6);
+      border-left: 2px solid var(--accent-a);
+      font-size: clamp(1.5rem, 3.2vw, 2.4rem);
+      line-height: 1.35;
+      font-style: italic;
+      font-weight: 300;
+      color: var(--fg);
+      max-width: 44rem;
+    }
+
+    /* ============================================================
+       PARTNER
+       ============================================================ */
+    .partner__list { list-style: none; margin: var(--sp-6) 0 0; padding: 0; max-width: 46rem; }
+    .partner__list li { padding-block: var(--sp-5); border-top: 1px solid var(--rule); }
+    .partner__list li:last-child { border-bottom: 1px solid var(--rule); }
+    .partner__list h3 {
+      font-size: var(--fs-h3);
+      font-weight: 400;
+      font-style: italic;
+      color: var(--accent-b);
+      margin: 0 0 var(--sp-2);
+    }
+    .partner__list p {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: var(--fs-body);
+      line-height: 1.7;
+      color: var(--fg-muted);
+      max-width: 38rem;
+    }
+
+    /* ============================================================
+       PRICING
+       Two columns divided by a single vertical rule. No boxes.
+       ============================================================ */
+    .pricing__grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      margin-top: var(--sp-7);
+      border-top: 1px solid var(--rule);
+    }
+    .pricing__col { padding: var(--sp-6) var(--sp-5) var(--sp-6) 0; }
+    .pricing__col + .pricing__col {
+      border-left: 1px solid var(--rule);
+      padding-left: var(--sp-6);
+      padding-right: 0;
+    }
+    .pricing__amount {
+      font-size: clamp(2.6rem, 6vw, 4rem);
+      line-height: 1;
+      letter-spacing: -0.02em;
+      margin: var(--sp-3) 0 var(--sp-2);
+    }
+    .pricing__col--bundle .pricing__amount { color: var(--accent-b); }
+    .pricing__per {
+      font-family: var(--font-sans);
+      font-size: var(--fs-sm);
+      color: var(--fg-dim);
+      margin: 0 0 var(--sp-4);
+    }
+    .pricing__desc {
+      font-family: var(--font-sans);
+      font-size: var(--fs-sm);
+      line-height: 1.7;
+      color: var(--fg-muted);
+      max-width: 22rem;
+      margin: 0 0 var(--sp-4);
+    }
+    .pricing__save {
+      display: inline-block;
+      padding: var(--sp-1) var(--sp-3);
+      border: 1px solid var(--accent-line);
+      font-family: var(--font-sans);
+      font-size: var(--fs-xs);
+      letter-spacing: var(--tracking-wide);
+      text-transform: uppercase;
+      color: var(--accent-b);
+    }
+    @media (max-width: 700px) {
+      .pricing__grid { grid-template-columns: 1fr; }
+      .pricing__col + .pricing__col {
+        border-left: 0; border-top: 1px solid var(--rule); padding-left: 0;
+      }
+    }
+
+    /* ============================================================
+       REVIEWS — stacked, with a hanging initial
+       ============================================================ */
+    .rev {
+      padding-block: var(--sp-6);
+      border-top: 1px solid var(--rule);
+      display: grid;
+      grid-template-columns: 4rem 1fr;
+      gap: var(--sp-5);
+    }
+    .rev:last-child { border-bottom: 1px solid var(--rule); }
+    .rev__initial {
+      font-size: 2.6rem;
+      line-height: 0.9;
+      color: var(--accent-c);
+      text-align: right;
+    }
+    .rev__head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--sp-3);
+      margin-bottom: var(--sp-2);
+    }
+    .rev__name { font-size: 1.15rem; color: var(--fg); }
+    .rev__module { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--fg-dim); }
+    .rev__stars { color: var(--accent-b); font-size: var(--fs-sm); letter-spacing: 0.14em; }
+    .rev__stars .off { color: var(--fg-dim); }
+    .rev__summary {
+      font-style: italic;
+      font-size: 1.2rem;
+      color: var(--accent-b);
+      margin: 0 0 var(--sp-3);
+    }
+    .rev__body { margin: 0; max-width: var(--measure); color: var(--fg-muted); }
+    @media (max-width: 600px) {
+      .rev { grid-template-columns: 1fr; gap: var(--sp-2); }
+      .rev__initial { text-align: left; }
+    }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    .footer { padding-block: var(--sp-8); border-top: 1px solid var(--rule); }
+    .footer__grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: var(--sp-6);
+      align-items: start;
+    }
+    .footer__title { font-size: 1.6rem; font-style: italic; margin: 0 0 var(--sp-3); }
+    .footer__text {
+      font-family: var(--font-sans);
+      font-size: var(--fs-sm);
+      color: var(--fg-dim);
+      max-width: 26rem;
+      margin: 0;
+    }
+    .footer__links { display: grid; gap: var(--sp-2); }
+    .footer__links a {
+      font-family: var(--font-sans);
+      font-size: var(--fs-sm);
+      color: var(--fg-dim);
+      transition: color var(--dur-med) var(--ease-out);
+    }
+    .footer__links a:hover { color: var(--accent-b); }
+    @media (max-width: 700px) { .footer__grid { grid-template-columns: 1fr; } }
+
+    /* ============================================================
+       REVEAL — long easing, to match the editorial pace
+       ============================================================ */
+    .reveal {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity var(--dur-slow) var(--ease-out),
+                  transform var(--dur-slow) var(--ease-out);
+    }
+    .reveal.is-in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <main>
+
+    <!-- ==========================================================
+         HERO
+         ========================================================== -->
+    <section class="hero" id="top">
+      <div class="wrap">
+        <div class="hero__inner">
+          <div class="hero__kicker reveal">
+            <span class="eyebrow">Nelson Mandela University · Computer Science</span>
+          </div>
+          <h1 class="display hero__display reveal">Notes that <em>learn you</em> as you learn</h1>
+          <p class="hero__lead reveal">
+            First year is where a lot of talent quietly gets lost. Not because the
+            material is too hard, but because nobody had time to explain it a second
+            way.
+          </p>
+          <div class="hero__actions reveal">
+            <a class="btn" href="#modules">Browse the modules</a>
+            <a class="btn btn--plain" href="#mission">Why this exists</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         MARQUEE
+         ========================================================== -->
+    <section class="rule" aria-label="Fields where AI is already at work">
+      <div class="marquee">
+        <div class="marquee__track" id="aitags">
+          <span class="marquee__item">Trading</span>
+          <span class="marquee__item">Research</span>
+          <span class="marquee__item">Medical study</span>
+          <span class="marquee__item">Maths papers</span>
+          <span class="marquee__item">Writing</span>
+          <span class="marquee__item">Therapy</span>
+          <span class="marquee__item">Coding</span>
+          <span class="marquee__item">Law</span>
+          <span class="marquee__item">Design</span>
+          <span class="marquee__item">Music</span>
+          <span class="marquee__item">Data analysis</span>
+          <span class="marquee__item">Language</span>
+          <span class="marquee__item">Finance</span>
+          <span class="marquee__item">Education</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         MISSION — marginalia layout
+         ========================================================== -->
+    <section class="mission" id="mission" aria-label="Why this exists">
+      <div class="wrap">
+        <div class="split">
+          <div class="rail"><b>I</b>Why this exists</div>
+          <div>
+            <h2 class="h2 reveal" style="margin-bottom:var(--sp-6);max-width:26rem">
+              The notes we get are sufficient. Sufficient is not the same as understanding.
+            </h2>
+
+            <div class="reveal">
+              <div class="marginalia">
+                <div class="marginalia__note">
+                  <b>The problem</b>
+                  Courses are built on the assumption that everyone can sit with a
+                  textbook for six hours. Most people cannot.
+                </div>
+                <p class="marginalia__text">
+                  Nexus exists to bring first year Computer Science students at
+                  Nelson Mandela University up to the level the rest of the world is
+                  already working at, starting with the modules sitting on your desk
+                  right now. The notes you get on campus are genuinely good. I have
+                  read them closely and I have nothing against them. What they do not
+                  do is show you <em>why</em>.
+                </p>
+              </div>
+
+              <div class="marginalia">
+                <div class="marginalia__note">
+                  <b>What I changed</b>
+                  Clearer structure, worked examples, and the reasoning behind every
+                  step instead of the steps alone.
+                </div>
+                <p class="marginalia__text">
+                  So I took them apart and rebuilt them. Every derivation gets the
+                  reasoning. Every formula arrives somewhere before it is used. If you
+                  have ever closed a textbook chapter and realised you could follow the
+                  symbols but not the argument, that gap is the one I am trying to close.
+                </p>
+              </div>
+
+              <div class="marginalia">
+                <div class="marginalia__note">
+                  <b>The part nobody mentions</b>
+                  AI fluency is becoming an unofficial job requirement.
+                </div>
+                <p class="marginalia__text">
+                  The industry is not going to wait for universities to decide what to
+                  call a qualification in it. Learning to work with these tools now,
+                  while you are still studying, is the difference between catching up
+                  later and leading from the start. And for the students it does not
+                  click for immediately, an AI that learns how you learn is the
+                  difference between giving up and getting it.
+                </p>
+              </div>
+            </div>
+
+            <blockquote class="pull reveal">
+              Learning just clicks for some of us. For the rest, it takes hearing the
+              same idea a different way, in our own words, at our own pace.
+            </blockquote>
+
+            <p class="body reveal">
+              A quick word about me, because you should know who is writing this: I am
+              a first year Computer Science student at NMU, building this in my own
+              time because I remember exactly how disorienting that first semester was.
+              I am not a company. I am one person who figured some of this out the hard
+              way, and would rather hand you the shortcut than watch you struggle
+              through it. If the notes help, wonderful. If something is unclear or
+              wrong, tell me and I will fix it.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         MODULES — table of contents
+         ========================================================== -->
+    <section class="modules" id="modules" aria-label="Modules covered">
+      <div class="wrap">
+        <div class="split">
+          <div class="rail"><b>II</b>The modules</div>
+          <div>
+            <h2 class="h2 reveal" style="max-width:24rem">Thirteen modules, one semester</h2>
+            <p class="lead reveal" style="margin-top:var(--sp-4)">
+              This is what is covered so far. Hover any line to read what it actually
+              involves. The list grows as each set of notes is finished.
+            </p>
+            <div class="toc" id="toc"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         PARTNER
+         ========================================================== -->
+    <section class="partner" id="partner" aria-label="AI study partner">
+      <div class="wrap">
+        <div class="split">
+          <div class="rail"><b>III</b>The study partner</div>
+          <div>
+            <h2 class="h2 reveal" style="max-width:26rem">An AI that learns you back</h2>
+            <p class="lead reveal" style="margin-top:var(--sp-4);margin-bottom:var(--sp-6)">
+              Coming with the notes. Not a search box that hands back a definition.
+            </p>
+
+            <ul class="partner__list reveal">
+              <li>
+                <h3>It adapts to how you actually understand</h3>
+                <p>Some people learn from a diagram. Others need the same idea repeated
+                in different words. The partner reads which explanation is landing and
+                adjusts without being asked, so you are never stuck re-reading the same
+                paragraph hoping it clicks this time.</p>
+              </li>
+              <li>
+                <h3>It knows the module it is teaching</h3>
+                <p>Scoped to your first year subjects and grounded in these notes, so it
+                explains MATT101 the way your lecturer means it, rather than the way the
+                internet tends to.</p>
+              </li>
+              <li>
+                <h3>It never gets tired of the question</h3>
+                <p>Ask the same thing nine times and it will answer nine times,
+                differently if it has to. Which is the patience you actually need at two
+                in the morning, three weeks before an exam.</p>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         PRICING
+         ========================================================== -->
+    <section class="pricing" id="pricing" aria-label="Pricing">
+      <div class="wrap">
+        <div class="split">
+          <div class="rail"><b>IV</b>Pricing</div>
+          <div>
+            <h2 class="h2 reveal" style="max-width:24rem">Unlock the whole semester</h2>
+            <p class="lead reveal" style="margin-top:var(--sp-4)">
+              Take what you need one module at a time, or take the lot.
+            </p>
+
+            <div class="pricing__grid reveal">
+              <div class="pricing__col">
+                <span class="eyebrow">Per module</span>
+                <div class="pricing__amount">R50</div>
+                <p class="pricing__per">per module · per semester</p>
+                <p class="pricing__desc">
+                  One module, for one semester. Pay for the ones you are actually
+                  struggling with rather than the ones you have already mastered.
+                </p>
+              </div>
+              <div class="pricing__col pricing__col--bundle">
+                <span class="eyebrow">Whole semester</span>
+                <div class="pricing__amount">R250</div>
+                <p class="pricing__per">all thirteen modules</p>
+                <p class="pricing__desc">
+                  Everything above, for the full semester. Less than the cost of five
+                  modules bought separately, and you keep them.
+                  <span class="pricing__save">Save R400</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         REVIEWS
+         ========================================================== -->
+    <section class="reviews" id="reviews" aria-label="What students say">
+      <div class="wrap">
+        <div class="split">
+          <div class="rail"><b>V</b>Reviews</div>
+          <div>
+            <h2 class="h2 reveal" style="max-width:24rem;margin-bottom:var(--sp-5)">
+              What students are saying
+            </h2>
+            <p class="lead reveal" style="margin-bottom:var(--sp-6)">
+              Placeholders for now, replaced with real reviews as people work through
+              the notes.
+            </p>
+            <div id="revlist"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <div class="wrap">
+      <div class="footer__grid">
+        <div>
+          <h2 class="footer__title">Notes that learn you as you learn</h2>
+          <p class="footer__text">
+            Built by a first year Computer Science student at Nelson Mandela
+            University. If something here is wrong or unclear, tell me and I will fix it.
+          </p>
+        </div>
+        <div class="footer__links">
+          <a href="#modules">Modules</a>
+          <a href="#partner">Study partner</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#top">Back to top</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============================================================
+       DATA POOLS
+       ============================================================ -->
+  <script type="application/json" id="modules-pool">
+  [
+    { "code": "MATT101", "name": "Core Mathematics I",       "desc": "Calculus foundations, limits, derivatives, and the algebra that holds it all up." },
+    { "code": "MATT102", "name": "Core Mathematics II",      "desc": "Integration, sequences, series, and the techniques that close out first year." },
+    { "code": "MAPV101", "name": "Applied Mathematics I",    "desc": "Vectors, mechanics, and the math that maps to real physical problems." },
+    { "code": "MAPV102", "name": "Applied Mathematics II",   "desc": "Dynamics, work, energy, and the differential models behind them." },
+    { "code": "MAPV111", "name": "Applied Mathematics (Extended) I",  "desc": "Richer mechanics and proof-based methods for the extended stream." },
+    { "code": "MAPV112", "name": "Applied Mathematics (Extended) II", "desc": "Advanced modelling, multivariable problems, and the deeper toolkit." },
+    { "code": "WRAV101", "name": "C# Programming I",         "desc": "From your first console app to clean, typed, object-oriented code." },
+    { "code": "WRAV102", "name": "C# Programming II",        "desc": "Collections, generics, LINQ, and the patterns real software relies on." },
+    { "code": "WRSC111", "name": "MATLAB Programming",       "desc": "Scripting, matrices, and the numerical toolkit used across engineering." },
+    { "code": "WRFV101", "name": "Computer Fundamentals I",  "desc": "How a computer actually works, from bits and gates to operating systems." },
+    { "code": "WRFV102", "name": "Computer Fundamentals II", "desc": "Networks, databases, and the layers between hardware and software." },
+    { "code": "STAS101", "name": "Statistics I",             "desc": "Descriptive statistics, probability, and the reasoning behind the numbers." },
+    { "code": "STAS102", "name": "Statistics II",            "desc": "Inference, regression, and the tests that turn data into decisions." }
+  ]
+  </script>
+
+  <script type="application/json" id="reviews-pool">
+  [
+    { "name": "Placeholder Student", "module": "MATT101", "rating": 5, "summary": "derivatives finally clicked", "body": "I had tried three YouTube videos before this and none of them stuck. The worked examples show the reasoning instead of skipping to the answer, which was the part I was missing." },
+    { "name": "Placeholder Student", "module": "WRAV101", "rating": 5, "summary": "my first real object-oriented code", "body": "Coming into C# I could write code but not explain it. The notes made me stop and think about why each step was there, and suddenly the syntax stopped feeling arbitrary." },
+    { "name": "Placeholder Student", "module": "STAS102", "rating": 4, "summary": "inference finally makes sense", "body": "Regression looked like memorised formulas until I saw why each one was derived. Still slow on the exam questions, but I understand what I am doing now." },
+    { "name": "Placeholder Student", "module": "MAPV101", "rating": 5, "summary": "vectors finally visual", "body": "I could do the arithmetic but not picture the problem. Drawing the free body diagram alongside each worked solution fixed that. First time mechanics has felt reason-able." },
+    { "name": "Placeholder Student", "module": "WRFV101", "rating": 4, "summary": "bits to buses, all connected", "body": "The gap between what the textbook says and what actually happens in the hardware was exactly what I needed filled in. Short, clear, and it does not assume I already know the answer." }
+  ]
+  </script>
+
+  <!-- ============================================================
+       SCRIPT
+       ============================================================ -->
+  <script>
+    (function () {
+      'use strict';
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function readPool(id) {
+        const el = document.getElementById(id);
+        if (!el) return [];
+        try { return JSON.parse(el.textContent); } catch (e) { return []; }
+      }
+
+      // ---------- Modules as a table of contents ----------
+      function renderModules() {
+        const host = document.getElementById('toc');
+        if (!host) return;
+        const pad = (n) => String(n).padStart(2, '0');
+        readPool('modules-pool').forEach((m, i) => {
+          const row = document.createElement('div');
+          row.className = 'toc__row';
+          row.innerHTML =
+            '<span class="toc__idx">' + pad(i + 1) + '</span>' +
+            '<span class="toc__code">' + m.code + '</span>' +
+            '<span class="toc__name">' + m.name + '</span>' +
+            '<p class="toc__desc">' + m.desc + '</p>';
+          host.appendChild(row);
+        });
+      }
+
+      // ---------- Reviews ----------
+      function stars(n) {
+        let s = '';
+        for (let i = 1; i <= 5; i++) s += i <= n ? '★' : '<span class="off">★</span>';
+        return '<span class="rev__stars" role="img" aria-label="' + n + ' out of 5 stars">' + s + '</span>';
+      }
+
+      function renderReviews() {
+        const host = document.getElementById('revlist');
+        if (!host) return;
+        readPool('reviews-pool').forEach((r) => {
+          const initial = (r.name || '?').trim()[0].toUpperCase();
+          const el = document.createElement('div');
+          el.className = 'rev reveal';
+          el.innerHTML =
+            '<div class="rev__initial" aria-hidden="true">' + initial + '</div>' +
+            '<div>' +
+              '<div class="rev__head">' +
+                '<span class="rev__name">' + r.name + '</span>' +
+                '<span class="rev__module">' + r.module + '</span>' +
+                stars(r.rating) +
+              '</div>' +
+              '<p class="rev__summary">' + r.summary + '</p>' +
+              '<p class="rev__body">' + r.body + '</p>' +
+            '</div>';
+          host.appendChild(el);
+        });
+      }
+
+      // ---------- Marquee ----------
+      function initMarquees() {
+        document.querySelectorAll('.marquee__track').forEach((track) => {
+          Array.from(track.children).forEach((el) => track.appendChild(el.cloneNode(true)));
+        });
+      }
+
+      // ---------- Reveal ----------
+      function initReveal() {
+        const items = document.querySelectorAll('.reveal');
+        if (!('IntersectionObserver' in window) || reduced) {
+          items.forEach((el) => el.classList.add('is-in'));
+          return;
+        }
+        const io = new IntersectionObserver((es) => {
+          es.forEach((e) => {
+            if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); }
+          });
+        }, { threshold: 0.1 });
+        items.forEach((el) => io.observe(el));
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        renderModules();
+        renderReviews();
+        initMarquees();
+        initReveal();
+      });
+    })();
+  </script>
+</body>
+</html>

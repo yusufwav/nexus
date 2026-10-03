@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nexus · Notes that learn you as you learn</title>
+  <meta name="description" content="First-year Computer Science notes for Nelson Mandela University students, rebuilt from the ground up. Maths, C#, MATLAB, fundamentals and statistics." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@1,500&display=swap" rel="stylesheet">
+
+  <style>
+    /* ============================================================
+       TOKENS — index2: "TERMINAL"
+       Direction: monospace-forward and code-native. The product IS
+       notes, so the page is built out of code rather than described
+       in prose. Same palette as index.html so the brand is unchanged.
+       ============================================================ */
+    :root {
+      --bg-0: #000000;
+      --bg-1: #050608;
+      --bg-2: #0A0D11;
+
+      --fg:       #F2F4F7;
+      --fg-muted: #A8B0BB;
+      --fg-dim:   #6B7280;
+
+      --accent-a: #8B0000;
+      --accent-b: #fdd3aeff;
+      --accent-c: #6b0024ff;
+
+      /* Syntax palette — borrowed from the existing brand colours so
+         highlighted code still reads as the same product. */
+      --syn-key:  #ff7b72;   /* keywords / control flow */
+      --syn-fn:   #fdd3ae;   /* function and method names */
+      --syn-str:  #a5d6a7;   /* strings and literals */
+      --syn-num:  #79c0ff;   /* numbers */
+      --syn-com:  #6b7280;   /* comments */
+      --syn-var:  #F2F4F7;   /* plain identifiers */
+      --syn-type: #ffa657;   /* types and classes */
+
+      --line:      rgba(255, 255, 255, 0.08);
+      --line-soft: rgba(255, 255, 255, 0.045);
+      --panel:     rgba(255, 255, 255, 0.025);
+      --accent-line: rgba(255, 208, 222, 0.27);
+      --accent-soft: rgba(139, 0, 0, 0.34);
+      --grid-line: rgba(253, 211, 174, 0.035);
+      --grid-size: 32px;
+
+      --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+      --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --font-serif: "Playfair Display", Georgia, serif;
+
+      --fs-xs: 0.7rem;
+      --fs-sm: 0.8rem;
+      --fs-body: 1rem;
+      --fs-lg: 1.1rem;
+      --fs-h1: clamp(2.2rem, 5.2vw, 4.2rem);
+      --fs-h2: clamp(1.5rem, 3vw, 2.2rem);
+
+      --lh-body: 1.65;
+      --lh-snug: 1.3;
+
+      --tracking: 0.02em;
+      --tracking-wide: 0.16em;
+
+      --sp-1: 0.25rem; --sp-2: 0.5rem; --sp-3: 0.75rem;
+      --sp-4: 1rem;    --sp-5: 1.5rem; --sp-6: 2rem;
+      --sp-7: 3rem;    --sp-8: 4rem;    --sp-9: 6rem;
+
+      --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
+
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --dur-fast: 160ms;
+      --dur-med: 300ms;
+      --dur-slow: 600ms;
+      --dur-caret: 1.05s;
+
+      --max-w: 1180px;
+      --max-w-narrow: 760px;
+    }
+
+    /* ============================================================
+       BASE
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+      background: var(--bg-0);
+      scrollbar-width: none;
+    }
+    html::-webkit-scrollbar { width: 0; height: 0; display: none; }
+    body {
+      margin: 0;
+      padding: 0;
+      color: var(--fg);
+      background: var(--bg-0);
+      font-family: var(--font-mono);
+      font-size: var(--fs-body);
+      line-height: var(--lh-body);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* The grid. Static and fixed, like a terminal backdrop, fading
+       out toward the bottom so it never fights body copy. */
+    .grid-bg {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      background-image:
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: var(--grid-size) var(--grid-size);
+      -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 92%);
+      mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 92%);
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    ::selection { background: var(--accent-soft); color: var(--fg); }
+
+    :focus-visible {
+      outline: 2px solid var(--accent-b);
+      outline-offset: 2px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+
+    /* ============================================================
+       LAYOUT
+       ============================================================ */
+    .wrap {
+      max-width: var(--max-w);
+      margin-inline: auto;
+      padding-inline: var(--sp-5);
+    }
+    .wrap--narrow { max-width: var(--max-w-narrow); }
+    section { position: relative; }
+
+    /* ============================================================
+       SYNTAX HIGHLIGHTING — spans emitted by highlight() below.
+       ============================================================ */
+    .t-key { color: var(--syn-key); }
+    .t-fn  { color: var(--syn-fn); font-weight: 500; }
+    .t-str { color: var(--syn-str); }
+    .t-num { color: var(--syn-num); }
+    .t-com { color: var(--syn-com); font-style: italic; }
+    .t-var { color: var(--syn-var); }
+    .t-typ { color: var(--syn-type); }
+    .t-pun { color: var(--fg-dim); }
+
+    /* ============================================================
+       NAV
+       ============================================================ */
+    .nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--sp-4) var(--sp-5);
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid transparent;
+      transition: border-color var(--dur-med) var(--ease-out);
+      font-size: var(--fs-sm);
+    }
+    .nav--stuck { border-bottom-color: var(--line); }
+    .nav__mark { font-weight: 700; letter-spacing: var(--tracking); }
+    .nav__mark .caret {
+      color: var(--accent-b);
+      animation: blink var(--dur-caret) step-end infinite;
+    }
+    @keyframes blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+    .nav__links { display: flex; gap: var(--sp-5); }
+    .nav__link { color: var(--fg-dim); transition: color var(--dur-fast) var(--ease-out); }
+    .nav__link:hover { color: var(--accent-b); }
+    @media (max-width: 700px) { .nav__links { display: none; } }
+
+    /* ============================================================
+       HERO — a terminal window
+       ============================================================ */
+    .hero {
+      min-height: 100vh;
+      min-height: 100svh;
+      display: grid;
+      place-items: center;
+      padding: var(--sp-8) 0;
+    }
+    .term {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      background: var(--panel);
+      overflow: hidden;
+      box-shadow: 0 30px 80px -40px #000;
+    }
+    .term__bar {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-2);
+      padding: var(--sp-3) var(--sp-4);
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.02);
+      font-size: var(--fs-xs);
+      color: var(--fg-dim);
+    }
+    .term__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+    .term__dot:nth-child(1) { background: rgba(139, 0, 0, 0.8); }
+    .term__title { margin-left: auto; letter-spacing: var(--tracking); }
+
+    .term__body {
+      padding: var(--sp-6);
+      font-size: var(--fs-sm);
+      line-height: 1.85;
+      overflow-x: auto;
+    }
+    .term__line { display: block; white-space: pre; }
+    .term__prompt { color: var(--accent-b); }
+    .term__out { color: var(--fg-muted); }
+    .term__h1 {
+      display: block;
+      margin: var(--sp-4) 0;
+      font-size: var(--fs-h1);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      font-weight: 700;
+      white-space: normal;
+    }
+    .term__h1 em {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 500;
+      color: var(--accent-b);
+    }
+    .term__cta { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-5); }
+
+    .btn {
+      display: inline-block;
+      padding: var(--sp-3) var(--sp-5);
+      border: 1px solid var(--accent-line);
+      border-radius: var(--r-sm);
+      background: transparent;
+      font-family: var(--font-mono);
+      font-size: var(--fs-sm);
+      color: var(--fg);
+      transition: background var(--dur-fast) var(--ease-out),
+                  color var(--dur-fast) var(--ease-out);
+    }
+    .btn::before { content: "$ "; color: var(--fg-dim); }
+    .btn:hover { background: var(--accent-soft); }
+    .btn--ghost { border-color: var(--line); color: var(--fg-muted); }
+    .btn--ghost::before { content: ""; }
+    .btn--ghost:hover { color: var(--fg); border-color: var(--accent-line); }
+
+    /* ============================================================
+       SECTION HEADER — file-banner style
+       ============================================================ */
+    .sec-head { margin-bottom: var(--sp-6); }
+    .sec-head__bar {
+      display: flex;
+      align-items: center;
+      gap: var(--sp-3);
+      padding-bottom: var(--sp-2);
+      margin-bottom: var(--sp-4);
+      border-bottom: 1px solid var(--line);
+      font-size: var(--fs-xs);
+      color: var(--fg-dim);
+      letter-spacing: var(--tracking);
+    }
+    .sec-head__path { color: var(--accent-c); }
+    .sec-head__title {
+      font-size: var(--fs-h2);
+      line-height: var(--lh-snug);
+      letter-spacing: -0.02em;
+      font-weight: 700;
+      margin: 0 0 var(--sp-3);
+    }
+    .sec-head__lead {
+      max-width: 42rem;
+      margin: 0;
+      color: var(--fg-muted);
+      font-size: var(--fs-body);
+    }
+
+    /* ============================================================
+       HERO SAMPLE — a real snippet, syntax highlighted
+       ============================================================ */
+    .sample {
+      margin-top: var(--sp-6);
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .sample__bar {
+      display: flex;
+      gap: var(--sp-3);
+      padding: var(--sp-2) var(--sp-4);
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.02);
+      font-size: var(--fs-xs);
+      color: var(--fg-dim);
+    }
+    .sample__body {
+      margin: 0;
+      padding: var(--sp-5);
+      font-size: var(--fs-sm);
+      line-height: 1.8;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    /* ============================================================
+       MODULES — a file listing, deliberately NOT cards
+       ============================================================ */
+    .modlist { border-top: 1px solid var(--line); }
+    .modlist__row {
+      display: grid;
+      grid-template-columns: 9rem 1fr auto;
+      align-items: center;
+      gap: var(--sp-4);
+      padding: var(--sp-4) var(--sp-3);
+      border-bottom: 1px solid var(--line-soft);
+      transition: background var(--dur-fast) var(--ease-out),
+                  padding-left var(--dur-med) var(--ease-out);
+    }
+    .modlist__row:hover {
+      background: rgba(255, 255, 255, 0.022);
+      padding-left: var(--sp-5);
+    }
+    .modlist__code { color: var(--accent-b); font-weight: 500; }
+    .modlist__name { color: var(--fg-muted); font-size: var(--fs-sm); }
+    .modlist__desc {
+      grid-column: 1 / -1;
+      margin: 0;
+      font-size: var(--fs-sm);
+      color: var(--fg-dim);
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transition: max-height var(--dur-med) var(--ease-out),
+                  opacity var(--dur-med) var(--ease-out),
+                  padding-top var(--dur-med) var(--ease-out);
+    }
+    .modlist__row:hover .modlist__desc {
+      max-height: 6rem;
+      opacity: 1;
+      padding-top: var(--sp-3);
+    }
+    .modlist__status {
+      font-size: var(--fs-xs);
+      letter-spacing: var(--tracking);
+      color: var(--fg-dim);
+    }
+    .modlist__status::before { content: "-> "; }
+    @media (max-width: 720px) {
+      .modlist__row { grid-template-columns: 1fr auto; }
+      .modlist__name { display: none; }
+    }
+
+    /* ============================================================
+       MARQUEE
+       ============================================================ */
+    .marquee { position: relative; overflow: hidden; }
+    .marquee::before, .marquee::after {
+      content: "";
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 90px;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .marquee::before { left: 0; background: linear-gradient(to right, #000, transparent); }
+    .marquee::after  { right: 0; background: linear-gradient(to left, #000, transparent); }
+    .marquee__track {
+      display: flex;
+      align-items: center;
+      width: max-content;
+      animation: scroll-x 44s linear infinite;
+    }
+    .marquee:hover .marquee__track { animation-play-state: paused; }
+    @keyframes scroll-x { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+    .tag {
+      padding: var(--sp-2) var(--sp-4);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: var(--fs-xs);
+      letter-spacing: var(--tracking);
+      color: var(--fg-muted);
+      white-space: nowrap;
+    }
+
+    /* ============================================================
+       PARTNER — a chat transcript, not a feature grid
+       ============================================================ */
+    .partner { padding-block: var(--sp-9); }
+    .chat {
+      max-width: 46rem;
+      margin-inline: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .chat__msg {
+      display: flex;
+      gap: var(--sp-3);
+      padding: var(--sp-4) var(--sp-5);
+      border-bottom: 1px solid var(--line-soft);
+      font-size: var(--fs-sm);
+      line-height: 1.75;
+    }
+    .chat__msg:last-child { border-bottom: 0; }
+    .chat__who {
+      flex-shrink: 0;
+      width: 5.5rem;
+      color: var(--fg-dim);
+      font-size: var(--fs-xs);
+      letter-spacing: var(--tracking);
+      padding-top: 0.2em;
+    }
+    .chat__msg--you .chat__who { color: var(--accent-b); }
+    .chat__text { color: var(--fg-muted); }
+    .chat__text b { color: var(--fg); font-weight: 500; }
+    @media (max-width: 640px) {
+      .chat__msg { flex-direction: column; gap: var(--sp-2); }
+      .chat__who { width: auto; }
+    }
+
+    /* ============================================================
+       PRICING — a table view
+       ============================================================ */
+    .pricing { padding-block: var(--sp-9); }
+    .price-table {
+      max-width: 42rem;
+      margin-inline: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      overflow: hidden;
+    }
+    .price-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: var(--sp-4);
+      padding: var(--sp-5);
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .price-row:last-child { border-bottom: 0; }
+    .price-row--bundle { background: var(--accent-soft); }
+    .price-row__label { color: var(--fg-muted); font-size: var(--fs-sm); }
+    .price-row--bundle .price-row__label { color: var(--fg); }
+    .price-row__amount {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .price-row__amount small {
+      font-size: var(--fs-xs);
+      font-weight: 400;
+      color: var(--fg-dim);
+      margin-left: var(--sp-2);
+      letter-spacing: var(--tracking);
+    }
+    .price-row--bundle .price-row__amount { color: var(--accent-b); }
+    .price-note {
+      max-width: 42rem;
+      margin: var(--sp-4) auto 0;
+      font-size: var(--fs-xs);
+      color: var(--fg-dim);
+      text-align: center;
+    }
+
+    /* ============================================================
+       REVIEWS
+       ============================================================ */
+    .reviews { padding-block: var(--sp-9); }
+    .rev {
+      max-width: 42rem;
+      margin-inline: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--r-md);
+      background: var(--panel);
+      padding: var(--sp-5);
+    }
+    .rev + .rev { margin-top: var(--sp-3); }
+    .rev__head {
+      display: flex;
+      align-items: baseline;
+      gap: var(--sp-3);
+      margin-bottom: var(--sp-2);
+      font-size: var(--fs-xs);
+      letter-spacing: var(--tracking);
+    }
+    .rev__name { color: var(--accent-b); }
+    .rev__module { color: var(--fg-dim); }
+    .rev__stars { color: var(--accent-b); margin-left: auto; letter-spacing: 0.1em; }
+    .rev__stars .off { color: var(--fg-dim); }
+    .rev__summary { color: var(--fg); font-weight: 500; margin-bottom: var(--sp-2); }
+    .rev__body {
+      margin: 0;
+      color: var(--fg-muted);
+      font-size: var(--fs-sm);
+      line-height: var(--lh-body);
+    }
+
+    /* ============================================================
+       MISSION
+       ============================================================ */
+    .mission { padding-block: var(--sp-9); }
+    .mission__body {
+      max-width: 44rem;
+      margin-inline: auto;
+      color: var(--fg-muted);
+      font-size: var(--fs-body);
+    }
+    .mission__body p { margin: 0 0 var(--sp-4); }
+    .mission__body strong { color: var(--fg); font-weight: 600; }
+    .mission__points { list-style: none; padding: 0; margin: var(--sp-5) 0 0; }
+    .mission__points li {
+      display: grid;
+      grid-template-columns: 3rem 1fr;
+      gap: var(--sp-4);
+      padding: var(--sp-4) 0;
+      border-top: 1px solid var(--line-soft);
+    }
+    .mission__points li:last-child { border-bottom: 1px solid var(--line-soft); }
+    .mission__idx { color: var(--accent-c); font-size: var(--fs-xs); padding-top: 0.35em; }
+    .mission__points strong { color: var(--fg); font-weight: 600; }
+
+    /* ============================================================
+       FOOTER
+       ============================================================ */
+    .footer {
+      padding-block: var(--sp-7);
+      border-top: 1px solid var(--line);
+      text-align: center;
+      font-size: var(--fs-xs);
+      color: var(--fg-dim);
+      letter-spacing: var(--tracking);
+    }
+
+    /* ============================================================
+       REVEAL
+       ============================================================ */
+    .reveal {
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity var(--dur-slow) var(--ease-out),
+                  transform var(--dur-slow) var(--ease-out);
+    }
+    .reveal.is-in { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .reveal { opacity: 1; transform: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="grid-bg" aria-hidden="true"></div>
+
+  <nav class="nav" id="nav" aria-label="Main">
+    <span class="nav__mark">nexus<span class="caret">_</span></span>
+    <div class="nav__links">
+      <a class="nav__link" href="#mission">~/readme</a>
+      <a class="nav__link" href="#modules">~/modules</a>
+      <a class="nav__link" href="#partner">~/partner</a>
+      <a class="nav__link" href="#pricing">~/pricing</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <!-- ==========================================================
+         HERO — a terminal session
+         ========================================================== -->
+    <section class="hero" id="top">
+      <div class="wrap">
+        <div class="term reveal">
+          <div class="term__bar">
+            <span class="term__dot"></span>
+            <span class="term__dot"></span>
+            <span class="term__dot"></span>
+            <span class="term__title">nexus ~/zsh 120x40</span>
+          </div>
+          <div class="term__body">
+            <span class="term__line"><span class="t-com"># first-year CS, Nelson Mandela University</span></span>
+            <span class="term__line term__prompt">$ cat manifesto.md</span>
+            <span class="term__line term__h1">Notes that <em>learn you</em> as you learn.</span>
+            <span class="term__line term__out">I took the notes we get, took them apart, and rebuilt them so you</span>
+            <span class="term__line term__out">understand why each step works instead of just copying it.</span>
+            <span class="term__line term__cta">
+              <a class="btn" href="#modules">open modules</a>
+              <a class="btn btn--ghost" href="#mission">why this exists</a>
+            </span>
+          </div>
+        </div>
+
+        <!-- A real snippet, highlighted at runtime. Showing the product
+             beats describing it. -->
+        <div class="sample reveal">
+          <div class="sample__bar">
+            <span>MATLAB / traps.m</span>
+          </div>
+          <pre class="sample__body"><code id="snippet"></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         MISSION
+         ========================================================== -->
+    <section class="mission" id="mission" aria-label="Why this exists">
+      <div class="wrap wrap--narrow">
+        <div class="sec-head reveal">
+          <div class="sec-head__bar">
+            <span class="sec-head__path">~/nexus</span>
+            <span>/README.md</span>
+          </div>
+          <h1 class="sec-head__title">Why this exists</h1>
+        </div>
+
+        <div class="mission__body reveal">
+          <p>Nexus exists to bring first year Computer Science students at Nelson Mandela University up to the level the rest of the world is already working at, starting with the modules sitting on your desk right now.</p>
+          <p>And the uncomfortable part nobody in academia wants to say out loud: most people do not have the attention span to learn from a textbook. Courses are still built on the assumption that they do, and that assumption is exactly why capable students fall behind.</p>
+          <ul class="mission__points">
+            <li><span class="mission__idx">01</span><span><strong>The notes we get are sufficient.</strong> They really are. But sufficient is not the same as understanding, so I took them apart and rebuilt them with clearer structure and worked examples.</span></li>
+            <li><span class="mission__idx">02</span><span><strong>AI fluency is quietly becoming a requirement</strong> that universities have not yet decided how to qualify. Learning these tools now, while you are still studying, is the difference between catching up and leading.</span></li>
+            <li><span class="mission__idx">03</span><span><strong>Everything is aimed at one outcome:</strong> making you genuinely competitive with students anywhere in the world, at a price a student can actually afford.</span></li>
+            <li><span class="mission__idx">04</span><span><strong>For some of us learning just clicks.</strong> For the rest it takes hearing the same idea a different way, in our own words, at our own pace. That is what the study partner is for.</span></li>
+          </ul>
+          <p>A quick word about me: I am a first year CS student at NMU building this in my own time because I remember how disorienting that first semester is. If something here is wrong or unclear, tell me and I will fix it.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         MODULES — a file listing
+         ========================================================== -->
+    <section class="modules" id="modules" aria-label="Modules">
+      <div class="wrap">
+        <div class="sec-head reveal">
+          <div class="sec-head__bar">
+            <span class="sec-head__path">~/nexus</span>
+            <span>/modules/</span>
+          </div>
+          <h2 class="sec-head__title">13 modules, one semester</h2>
+          <p class="sec-head__lead">Hover any line to see what it actually covers. The list grows as I finish each set of notes.</p>
+        </div>
+        <div class="modlist" id="modlist"></div>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         MARQUEE
+         ========================================================== -->
+    <section class="ticker" aria-label="Where AI is already used">
+      <div class="marquee">
+        <div class="marquee__track" id="aitags">
+          <span class="tag">trading</span><span class="tag">research</span>
+          <span class="tag">medical study</span><span class="tag">maths papers</span>
+          <span class="tag">writing</span><span class="tag">therapy</span>
+          <span class="tag">coding</span><span class="tag">law</span>
+          <span class="tag">design</span><span class="tag">music</span>
+          <span class="tag">data analysis</span><span class="tag">language</span>
+          <span class="tag">finance</span><span class="tag">education</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         PARTNER — a chat transcript
+         ========================================================== -->
+    <section class="partner" id="partner" aria-label="AI study partner">
+      <div class="wrap wrap--narrow">
+        <div class="sec-head reveal">
+          <div class="sec-head__bar">
+            <span class="sec-head__path">~/nexus</span>
+            <span>/partner</span>
+          </div>
+          <h2 class="sec-head__title">It learns you back</h2>
+          <p class="sec-head__lead">Not a search box returning a definition. A study partner that adapts to how you actually understand things.</p>
+        </div>
+
+        <div class="chat reveal">
+          <div class="chat__msg">
+            <span class="chat__who">student</span>
+            <span class="chat__text">why does the chain rule work? i just dont get it</span>
+          </div>
+          <div class="chat__msg chat__msg--you">
+            <span class="chat__who">partner</span>
+            <span class="chat__text">It comes from two things: the chain rule itself, and the fact that <b>y</b> is a function of <b>x</b>. Because <b>y</b> depends on <b>x</b>, and <b>x</b> depends on <b>u</b>, the rate of change multiplies. You already know this from velocity and acceleration: if <b>v</b> changes with time, acceleration is the derivative of <b>v</b> with respect to time. Same shape of idea.</span>
+          </div>
+          <div class="chat__msg">
+            <span class="chat__who">student</span>
+            <span class="chat__text">ok but show me with numbers</span>
+          </div>
+          <div class="chat__msg chat__msg--you">
+            <span class="chat__who">partner</span>
+            <span class="chat__text">Let <b>x = u²</b> and <b>y = 3x</b>. Then dy/du = dy/dx × dx/du = 3 × 2u = 6u. At u = 2: dy/du = 12.</span>
+          </div>
+        </div>
+        <p class="price-note">In development, launching with the notes.</p>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         PRICING
+         ========================================================== -->
+    <section class="pricing" id="pricing" aria-label="Pricing">
+      <div class="wrap wrap--narrow">
+        <div class="sec-head reveal">
+          <div class="sec-head__bar">
+            <span class="sec-head__path">~/nexus</span>
+            <span>/pricing</span>
+          </div>
+          <h2 class="sec-head__title">Unlock the whole semester</h2>
+        </div>
+        <div class="price-table reveal">
+          <div class="price-row">
+            <span class="price-row__label">single module, single semester</span>
+            <span class="price-row__amount">R50</span>
+          </div>
+          <div class="price-row price-row--bundle">
+            <span class="price-row__label">all 13 modules, full semester</span>
+            <span class="price-row__amount">R250 <small>SAVE R400</small></span>
+          </div>
+        </div>
+        <p class="price-note">Notes stay yours either way. Pick what you need, or take the lot.</p>
+      </div>
+    </section>
+
+    <!-- ==========================================================
+         REVIEWS
+         ========================================================== -->
+    <section class="reviews" id="reviews" aria-label="Reviews">
+      <div class="wrap wrap--narrow">
+        <div class="sec-head reveal">
+          <div class="sec-head__bar">
+            <span class="sec-head__path">~/nexus</span>
+            <span>/reviews</span>
+          </div>
+          <h2 class="sec-head__title">What students are saying</h2>
+          <p class="sec-head__lead">Placeholders for now. Replaced with real reviews as people work through the notes.</p>
+        </div>
+        <div id="revlist"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    built by a first year CS student at NMU · if something is wrong, tell me
+  </footer>
+
+  <!-- ============================================================
+       DATA POOLS
+       ============================================================ -->
+  <script type="application/json" id="modules-pool">
+  [
+    { "code": "MATT101", "name": "Core Mathematics I",       "desc": "Calculus foundations, limits, derivatives, and the algebra that holds it all up." },
+    { "code": "MATT102", "name": "Core Mathematics II",      "desc": "Integration, sequences, series, and the techniques that close out first year." },
+    { "code": "MAPV101", "name": "Applied Mathematics I",    "desc": "Vectors, mechanics, and the math that maps to real physical problems." },
+    { "code": "MAPV102", "name": "Applied Mathematics II",   "desc": "Dynamics, work, energy, and the differential models behind them." },
+    { "code": "MAPV111", "name": "Applied Math (Ext) I",     "desc": "Richer mechanics and proof-based methods for the extended stream." },
+    { "code": "MAPV112", "name": "Applied Math (Ext) II",    "desc": "Advanced modelling, multivariable problems, and the deeper toolkit." },
+    { "code": "WRAV101", "name": "C# Programming I",         "desc": "From your first console app to clean, typed, object-oriented code." },
+    { "code": "WRAV102", "name": "C# Programming II",        "desc": "Collections, generics, LINQ, and the patterns real software relies on." },
+    { "code": "WRSC111", "name": "MATLAB Programming",       "desc": "Scripting, matrices, and the numerical toolkit used across engineering." },
+    { "code": "WRFV101", "name": "Computer Fundamentals I",  "desc": "How a computer actually works, from bits and gates to operating systems." },
+    { "code": "WRFV102", "name": "Computer Fundamentals II", "desc": "Networks, databases, and the layers between hardware and software." },
+    { "code": "STAS101", "name": "Statistics I",             "desc": "Descriptive statistics, probability, and the reasoning behind the numbers." },
+    { "code": "STAS102", "name": "Statistics II",            "desc": "Inference, regression, and the tests that turn data into decisions." }
+  ]
+  </script>
+
+  <script type="application/json" id="reviews-pool">
+  [
+    { "name": "Placeholder Student", "module": "MATT101", "rating": 5, "summary": "derivatives finally clicked", "body": "I had tried three YouTube videos before this and none of them stuck. The worked examples show the reasoning instead of skipping to the answer, which was the part I was missing." },
+    { "name": "Placeholder Student", "module": "WRAV101", "rating": 5, "summary": "my first real object-oriented code", "body": "Coming into C# I could write code but not explain it. The notes made me stop and think about why each step was there, and suddenly the syntax stopped feeling arbitrary." },
+    { "name": "Placeholder Student", "module": "STAS102", "rating": 4, "summary": "inference finally makes sense", "body": "Regression looked like memorised formulas until I saw why each one was derived. Still slow on the exam questions, but I understand what I am doing now." },
+    { "name": "Placeholder Student", "module": "MAPV101", "rating": 5, "summary": "vectors finally visual", "body": "I could do the arithmetic but not picture the problem. Drawing the free body diagram alongside each worked solution fixed that. First time mechanics has felt reason-able." },
+    { "name": "Placeholder Student", "module": "MATT102", "rating": 5, "summary": "series stopped being scary", "body": "I convinced myself for a whole semester that I was bad at second year maths. Turns out I just never had anyone explaining convergence in a way that landed." }
+  ]
+  </script>
+
+  <!-- ============================================================
+       SCRIPT
+       ============================================================ -->
+  <script>
+    (function () {
+      'use strict';
+
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      function readPool(id) {
+        const el = document.getElementById(id);
+        if (!el) return [];
+        try { return JSON.parse(el.textContent); } catch (e) { return []; }
+      }
+
+      // ---------- Tiny syntax highlighter ----------
+      // Regex-only, not a real parser. Enough to colour a short
+      // snippet convincingly without pulling in a dependency.
+      const KEYWORDS = /\b(?:function|return|for|if|else|while|end|function)\b/;
+      const RULES = [
+        ['com', /\/\/[^\n]*/],
+        ['str', /"(?:[^"\\]|\\.)*"/],
+        ['num', /\b\d+(?:\.\d+)?\b/],
+        ['key', KEYWORDS],
+        ['typ', /\b(?:nargin|nargout|varargin|error|fprintf|linspace|length|size|zeros)\b/],
+        ['fn',  /\b[a-zA-Z_]\w*(?=\s*\()/],
+        ['pun', /[{}();,.<>+\-*/=]/]
+      ];
+
+      function highlight(src) {
+        let out = '';
+        let i = 0;
+        while (i < src.length) {
+          let matched = false;
+          for (const [cls, re] of RULES) {
+            re.lastIndex = i;
+            const m = re.exec(src);
+            if (m && m.index === i && m[0].length) {
+              out += '<span class="t-' + cls + '">' + m[0] + '</span>';
+              i += m[0].length;
+              matched = true;
+              break;
+            }
+          }
+          if (!matched) { out += src[i]; i++; }
+        }
+        return out;
+      }
+
+      const SNIPPET = [
+        '// Simpson\'s rule: integral of sin(x) from 0 to pi',
+        'function I = traps(a, b, n)',
+        '    if mod(n, 2) ~= 0',
+        '        error("n must be even");',
+        '    end',
+        '    h = (b - a) / n;',
+        '    x = linspace(a, b, n + 1);',
+        '    y = sin(x);',
+        '',
+        '    I = (h / 3) * (y(1) + y(end) ...',
+        '            + 4 * sum(y(2:2:end-1)) ...',
+        '            + 2 * sum(y(3:2:end-1)));',
+        'end'
+      ].join('\n');
+
+      // ---------- Render modules as a file listing ----------
+      function renderModules() {
+        const host = document.getElementById('modlist');
+        if (!host) return;
+        readPool('modules-pool').forEach((m) => {
+          const row = document.createElement('div');
+          row.className = 'modlist__row';
+          row.innerHTML =
+            '<span class="modlist__code">' + m.code + '</span>' +
+            '<span class="modlist__name">' + m.name + '</span>' +
+            '<span class="modlist__status">available</span>' +
+            '<p class="modlist__desc">' + m.desc + '</p>';
+          host.appendChild(row);
+        });
+      }
+
+      // ---------- Render reviews ----------
+      function stars(n) {
+        let s = '';
+        for (let i = 1; i <= 5; i++) s += i <= n ? '★' : '<span class="off">★</span>';
+        return '<span class="rev__stars" role="img" aria-label="' + n + ' out of 5 stars">' + s + '</span>';
+      }
+
+      function renderReviews() {
+        const host = document.getElementById('revlist');
+        if (!host) return;
+        readPool('reviews-pool').forEach((r) => {
+          const el = document.createElement('div');
+          el.className = 'rev reveal';
+          el.innerHTML =
+            '<div class="rev__head">' +
+              '<span class="rev__name">' + r.name + '</span>' +
+              '<span class="rev__module">' + r.module + '</span>' +
+              stars(r.rating) +
+            '</div>' +
+            '<div class="rev__summary">' + r.summary + '</div>' +
+            '<p class="rev__body">' + r.body + '</p>';
+          host.appendChild(el);
+        });
+      }
+
+      // ---------- Marquee clone ----------
+      function initMarquees() {
+        document.querySelectorAll('.marquee__track').forEach((track) => {
+          Array.from(track.children).forEach((el) => track.appendChild(el.cloneNode(true)));
+        });
+      }
+
+      // ---------- Nav + reveal ----------
+      function initNav() {
+        const nav = document.getElementById('nav');
+        const onScroll = () => nav.classList.toggle('nav--stuck', window.scrollY > 24);
+        onScroll();
+        window.addEventListener('scroll', onScroll, { passive: true });
+      }
+
+      function initReveal() {
+        const items = document.querySelectorAll('.reveal');
+        if (!('IntersectionObserver' in window) || reduced) {
+          items.forEach((el) => el.classList.add('is-in'));
+          return;
+        }
+        const io = new IntersectionObserver((es) => {
+          es.forEach((e) => {
+            if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); }
+          });
+        }, { threshold: 0.12 });
+        items.forEach((el) => io.observe(el));
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const snip = document.getElementById('snippet');
+        if (snip) snip.innerHTML = highlight(SNIPPET);
+        renderModules();
+        renderReviews();
+        initMarquees();
+        initNav();
+        initReveal();
+      });
+    })();
+  </script>
+</body>
+</html>
