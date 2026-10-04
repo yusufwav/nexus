@@ -1,0 +1,1287 @@
+/* ============================================================
+   NEXUS TERMINAL LANDING
+   ------------------------------------------------------------
+   Ported from the finalized design in IDEAS/index.html. Every
+   class is namespaced under .nt-root so nothing here can leak
+   into /login, /dashboard or /ai, which keep the cyan palette.
+
+   Class names are the design's own with an `nt-` prefix. The
+   tokens stay as CSS custom properties because the ASCII and
+   morph engines read them at runtime — changing a value in the
+   .nt-root block below is all that is needed to retune the look.
+   ============================================================ */
+
+.nt-root {
+  /* ============================================================
+     TOKENS
+     ============================================================ */
+  --bg-0: #000000;
+  --bg-1: #050608;
+  --bg-2: #0a0d11;
+
+  --fg: #f2f4f7;
+  --fg-muted: #a8b0bb;
+  --fg-dim: #6b7280;
+
+  --accent-a: #8b0000;
+  --accent-b: #fdd3aeff;
+  --accent-c: #6b0024ff;
+
+  /* Syntax palette — borrowed from the brand colours so highlighted
+     code still reads as the same product. */
+  --syn-key: #ff7b72;
+  --syn-fn: #fdd3ae;
+  --syn-str: #a5d6a7;
+  --syn-num: #79c0ff;
+  --syn-com: #6b7280;
+  --syn-var: #f2f4f7;
+  --syn-type: #ffa657;
+
+  --line: rgba(255, 255, 255, 0.08);
+  --line-soft: rgba(255, 255, 255, 0.045);
+  --panel: rgba(255, 255, 255, 0.025);
+  --accent-line: rgba(255, 208, 222, 0.27);
+  --accent-soft: rgba(139, 0, 0, 0.34);
+  --grid-line: rgba(255, 255, 255, 0.06);
+  --grid-size: 32px;
+
+  --nt-font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --nt-font-sans: var(--font-inter), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --nt-font-serif: var(--font-playfair), Georgia, serif;
+
+  --fs-xs: 0.7rem;
+  --fs-sm: 0.8rem;
+  --fs-body: 1rem;
+  --fs-lg: 1.1rem;
+  --fs-h1: clamp(2.2rem, 5.2vw, 4.2rem);
+  --fs-h2: clamp(1.5rem, 3vw, 2.2rem);
+
+  --lh-body: 1.65;
+  --lh-snug: 1.3;
+
+  --tracking: 0.02em;
+  --tracking-wide: 0.16em;
+
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+  --sp-8: 4rem;
+  --sp-9: 6rem;
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 160ms;
+  --dur-med: 300ms;
+  --dur-slow: 600ms;
+  --dur-caret: 1.05s;
+
+  --nt-max-w: 1180px;
+  --nt-max-w-narrow: 760px;
+
+  /* ============================================================
+     ASCII ENGINE — every tunable for both background layers.
+     The canvas engine reads these at startup.
+     ============================================================ */
+  --ascii-ramp: " .·:-=+*#%@";
+  --ascii-font: 11px;
+  --ascii-fps: 26;
+  --ascii-scale: 1;
+
+  /* Landing layer — fullscreen, cursor-reactive */
+  --ascii-op: 1;
+  --ascii-low: #000000;
+  --ascii-high: #6b0024;
+  --ascii-speed: 1;
+  --ascii-cursor-radius: 7;
+  --ascii-cursor-power: 1;
+
+  /* Ambient layer — fixed, slow, non-interactive */
+  --amb-ramp: " .·:+=xX#";
+  --amb-font: 10px;
+  --amb-fps: 20;
+  --amb-scale: 0.6;
+  --amb-op: 0.6;
+  --amb-low: #8b0000;
+  --amb-high: #fdd3ae;
+  --amb-speed: 0.2;
+
+  /* Title gradient — the "learn you" phrase */
+  --grad-from: #fdd3ae;
+  --grad-mid: #ffffff;
+  --grad-to: #6b0024;
+  --grad-dur: 9s;
+  --grad-dur-hover: 5s;
+  --grad-bright: 1.15;
+  --grad-sat: 1.35;
+
+  /* Hover states */
+  --hover-lift: -3px;
+  --hover-edge: rgba(255, 0, 43, 0.42);
+  --hover-fill: rgba(253, 211, 174, 0.05);
+  --hover-glow: 0 18px 50px -26px rgba(255, 0, 47, 0.5);
+  --dur-hover: 520ms;
+  --hover-grow: 1.012;
+
+  /* Glassmorphism — shared by buttons and containers. */
+  --glass-bg: rgba(255, 255, 255, 0.028);
+  --glass-bg-hover: rgba(253, 211, 174, 0.05);
+  --glass-blur: 14px;
+  --glass-blur-hover: 22px;
+  --glass-edge: rgba(255, 255, 255, 0.09);
+  --glass-tint: rgba(255, 255, 255, 0.3);
+  --glass-tint-hover: rgba(17, 0, 0, 0.7);
+  --glass-sheen: rgba(255, 0, 0, 0.06);
+
+  /* Morph text — the rotating hero line */
+  --morph-interval: 2.6s;
+  --morph-stagger: 0.55;
+  --morph-blur-in: 14px;
+  --morph-blur-out: 16px;
+  --morph-scale-in: 0.88;
+  --morph-scale-out: 1.12;
+
+  /* Scroll reveals. --rv-i is the per-line stagger index, assigned
+     by the script; the default is line zero. */
+  --rv-stagger: 90ms;
+  --rv-i: 0;
+
+  --bundle-spin: 6s;
+  --bundle-glow: 0 26px 70px -30px rgba(253, 211, 174, 0.5);
+
+  /* ============================================================
+     BASE
+     ============================================================ */
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  background: var(--bg-0);
+  color: var(--fg);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+.nt-root *,
+.nt-root *::before,
+.nt-root *::after {
+  box-sizing: border-box;
+}
+
+.nt-root ::selection {
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+
+.nt-root :focus-visible {
+  outline: 2px solid var(--accent-b);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-root *,
+  .nt-root *::before,
+  .nt-root *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* The grid. Static and fixed, like a terminal backdrop, fading out
+   toward the bottom so it never fights body copy. */
+.nt-grid-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: var(--grid-size) var(--grid-size);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 80%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 80%);
+}
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+.nt-wrap {
+  max-width: var(--nt-max-w);
+  margin-inline: auto;
+  padding-inline: var(--sp-5);
+}
+.nt-wrap--narrow {
+  max-width: var(--nt-max-w-narrow);
+}
+.nt-root section {
+  position: relative;
+}
+
+/* ============================================================
+   SYNTAX HIGHLIGHTING
+   ============================================================ */
+.nt-t-key { color: var(--syn-key); }
+.nt-t-fn { color: var(--syn-fn); font-weight: 500; }
+.nt-t-str { color: var(--syn-str); }
+.nt-t-num { color: var(--syn-num); }
+.nt-t-com { color: var(--syn-com); font-style: italic; }
+.nt-t-var { color: var(--syn-var); }
+.nt-t-typ { color: var(--syn-type); }
+.nt-t-pun { color: var(--fg-dim); }
+
+/* ============================================================
+   NAV
+   ============================================================ */
+.nt-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-4) var(--sp-5);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--dur-med) var(--ease-out);
+  font-size: var(--fs-sm);
+}
+.nt-nav--stuck {
+  border-bottom-color: var(--line);
+}
+.nt-nav__mark {
+  font-weight: 700;
+  letter-spacing: var(--tracking);
+}
+.nt-nav__mark .nt-caret {
+  color: var(--accent-b);
+  animation: nt-blink var(--dur-caret) step-end infinite;
+}
+@keyframes nt-blink {
+  0%, 50% { opacity: 1; }
+  50.01%, 100% { opacity: 0; }
+}
+.nt-nav__links {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+}
+.nt-nav__link {
+  color: var(--fg-dim);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.nt-nav__link:hover {
+  color: var(--accent-b);
+}
+@media (max-width: 700px) {
+  .nt-nav__links .nt-nav__link {
+    display: none;
+  }
+}
+
+/* ============================================================
+   LANDING — fullscreen, scrolls away to reveal the page
+   ============================================================ */
+.nt-landing {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-8) var(--sp-5);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Both canvas layers sit behind the copy. z-index 0 keeps the
+   overlay stack (content is z-index 2) readable and clickable. */
+.nt-landing__ascii,
+.nt-landing__veil {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.nt-landing__ascii {
+  z-index: 0;
+  opacity: var(--ascii-op);
+}
+/* A soft vignette so the headline never fights the field. */
+.nt-landing__veil {
+  z-index: 1;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.7) 0%,
+    rgba(0, 0, 0, 0.45) 45%,
+    transparent 78%
+  );
+}
+
+/* Ambient layer lives on the page root, fixed, behind everything. */
+.nt-ambient-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  opacity: var(--amb-op);
+}
+
+.nt-landing__inner {
+  position: relative;
+  z-index: 2;
+  max-width: var(--nt-max-w-narrow);
+  text-align: center;
+}
+.nt-landing__eyebrow {
+  display: block;
+  width: fit-content;
+  margin: 0 auto var(--sp-5);
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--fg);
+}
+.nt-landing__title {
+  margin: 0 auto;
+  max-width: 100%;
+  font-size: var(--fs-h1);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* ---- The "learn you" gradient ----
+   A wide gradient clipped to the text. Hovering speeds the flow
+   and lifts brightness/saturation. */
+.nt-grad {
+  display: inline-block;
+  background-image: linear-gradient(
+    100deg,
+    var(--grad-from) 0%,
+    var(--grad-mid) 28%,
+    var(--grad-to) 52%,
+    var(--grad-mid) 76%,
+    var(--grad-from) 100%
+  );
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  font-family: var(--nt-font-serif);
+  font-style: italic;
+  font-weight: 500;
+  filter: brightness(var(--grad-bright)) saturate(var(--grad-sat));
+  animation: nt-grad-flow var(--grad-dur) linear infinite;
+  transition: filter var(--dur-slow) var(--ease-out);
+}
+@keyframes nt-grad-flow {
+  from { background-position: 0% 50%; }
+  to   { background-position: 260% 50%; }
+}
+.nt-landing:hover .nt-grad {
+  animation-duration: var(--grad-dur-hover);
+  filter: brightness(1.3) saturate(1.6);
+}
+
+/* ---- Morph text ----
+   Every phrase is stacked in one grid slot and cross-fades on a
+   shared timeline. The keyframe stops are rewritten at runtime by
+   the morph engine from the tokens above; the shape below is the
+   no-JS fallback. */
+.nt-landing__title--morph {
+  display: grid;
+  grid-template-areas: "morphslot";
+  justify-items: center;
+  align-items: center;
+  min-height: 1.3em;
+}
+.nt-morph__word {
+  grid-area: morphslot;
+  white-space: nowrap;
+  opacity: 0;
+  line-height: 1.25;
+  padding-bottom: 0.08em;
+  will-change: opacity, filter, transform;
+}
+@keyframes nt-morph-word-rotate {
+  0%    { opacity: 0; filter: blur(var(--morph-blur-in)); transform: scale(var(--morph-scale-in)); }
+  12%   { opacity: 1; filter: blur(0); transform: scale(1); }
+  72%   { opacity: 1; filter: blur(0); transform: scale(1); }
+  88%   { opacity: 0; filter: blur(var(--morph-blur-out)); transform: scale(var(--morph-scale-out)); }
+  100%  { opacity: 0; filter: blur(var(--morph-blur-out)); transform: scale(var(--morph-scale-out)); }
+}
+
+.nt-landing__sub {
+  max-width: 34rem;
+  margin: var(--sp-5) auto 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-body);
+}
+.nt-landing__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  justify-content: center;
+  margin-top: var(--sp-6);
+}
+
+/* Scroll cue — a blinking caret, on theme. */
+.nt-landing__cue {
+  position: absolute;
+  left: 50%;
+  bottom: var(--sp-6);
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.nt-landing__cue:hover {
+  color: var(--accent-b);
+}
+.nt-landing__cue::after {
+  content: "";
+  width: 1px;
+  height: 34px;
+  background: linear-gradient(var(--accent-b), transparent);
+  animation: nt-cue-drop 2.2s var(--ease-out) infinite;
+}
+@keyframes nt-cue-drop {
+  0%   { transform: scaleY(0); transform-origin: top; opacity: 0; }
+  35%  { transform: scaleY(1); transform-origin: top; opacity: 1; }
+  70%  { transform: scaleY(1); transform-origin: bottom; opacity: 1; }
+  100% { transform: scaleY(0); transform-origin: bottom; opacity: 0; }
+}
+
+/* ============================================================
+   HOVER + GLASS
+   One treatment shared by buttons and containers: a blurred glass
+   pane that warms toward --accent-a as it is hovered, grows a
+   hair, and eases in over --dur-hover rather than snapping on.
+   ============================================================ */
+.nt-hoverable {
+  position: relative;
+  transition:
+    transform var(--dur-hover) var(--ease-out),
+    border-color var(--dur-hover) var(--ease-out),
+    background-color var(--dur-hover) var(--ease-out),
+    box-shadow var(--dur-hover) var(--ease-out),
+    backdrop-filter var(--dur-hover) var(--ease-out);
+}
+.nt-hoverable:hover {
+  transform: translateY(var(--hover-lift)) scale(var(--hover-grow));
+  border-color: var(--hover-edge);
+  background-color: var(--hover-fill);
+  box-shadow: var(--hover-glow);
+}
+
+/* -webkit-backdrop-filter is listed first because Safari still needs
+   the prefixed property to composite at all. */
+.nt-glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen),
+    0 10px 34px -26px rgba(0, 0, 0, 0.9);
+}
+.nt-glass:hover,
+.nt-glass:focus-within {
+  background:
+    linear-gradient(var(--glass-tint-hover), var(--glass-tint-hover)),
+    var(--glass-bg-hover);
+  -webkit-backdrop-filter: blur(var(--glass-blur-hover)) saturate(1.5);
+  backdrop-filter: blur(var(--glass-blur-hover)) saturate(1.5);
+  border-color: var(--hover-edge);
+}
+
+/* Buttons: glass by default, and they scale rather than jump. */
+.nt-btn {
+  position: relative;
+  display: inline-block;
+  padding: var(--sp-3) var(--sp-5);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-sm);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  box-shadow: inset 0 1px 0 0 var(--glass-sheen);
+  transition:
+    transform var(--dur-hover) var(--ease-out),
+    background-color var(--dur-hover) var(--ease-out),
+    background-image var(--dur-hover) var(--ease-out),
+    border-color var(--dur-hover) var(--ease-out),
+    color var(--dur-hover) var(--ease-out),
+    box-shadow var(--dur-hover) var(--ease-out),
+    -webkit-backdrop-filter var(--dur-hover) var(--ease-out),
+    backdrop-filter var(--dur-hover) var(--ease-out);
+}
+.nt-btn::before {
+  content: "$ ";
+  color: var(--fg-dim);
+  transition: color var(--dur-hover) var(--ease-out);
+}
+.nt-btn:hover::before {
+  color: var(--accent-b);
+}
+.nt-btn:active {
+  transform: translateY(0) scale(0.985);
+  transition-duration: var(--dur-fast);
+}
+.nt-btn:hover {
+  transform: scale(var(--hover-grow));
+  color: var(--fg);
+  border-color: var(--hover-edge);
+  background:
+    linear-gradient(var(--glass-tint-hover), var(--glass-tint-hover)),
+    var(--glass-bg-hover);
+  -webkit-backdrop-filter: blur(var(--glass-blur-hover)) saturate(1.5);
+  backdrop-filter: blur(var(--glass-blur-hover)) saturate(1.5);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen),
+    0 14px 40px -22px rgba(0, 0, 0, 0.75);
+}
+/* Ghost variants have no shell prompt and a quieter edge. */
+.nt-btn--ghost {
+  color: var(--fg-muted);
+}
+.nt-btn--ghost::before {
+  content: "";
+}
+
+/* ============================================================
+   HERO — the terminal window
+   ============================================================ */
+.nt-hero {
+  position: relative;
+  padding: var(--sp-8) 0;
+}
+/* Fade the top edge in so the landing hands off smoothly. */
+.nt-hero::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 140px;
+  pointer-events: none;
+  background: linear-gradient(to bottom, var(--bg-0), transparent);
+}
+.nt-term {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  overflow: hidden;
+  box-shadow: 0 30px 80px -40px #000;
+}
+.nt-term__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+}
+.nt-term__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--line);
+}
+.nt-term__dot:nth-child(1) {
+  background: rgba(139, 0, 0, 0.8);
+}
+.nt-term__title {
+  margin-left: auto;
+  letter-spacing: var(--tracking);
+}
+.nt-term__body {
+  padding: var(--sp-6);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  overflow-x: auto;
+}
+.nt-term__line {
+  display: block;
+  white-space: pre;
+}
+.nt-term__prompt {
+  color: var(--accent-b);
+}
+.nt-term__out {
+  color: var(--fg-muted);
+}
+.nt-term__h1 {
+  display: block;
+  margin: var(--sp-4) 0;
+  font-size: var(--fs-h1);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  white-space: normal;
+}
+.nt-term__h1 em {
+  font-family: var(--nt-font-serif);
+  font-style: italic;
+  font-weight: 500;
+  color: var(--accent-b);
+}
+/* The landing owns the big headline, so the terminal title steps
+   down so the two don't shout over each other. */
+.nt-term__h1--sm {
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  margin: var(--sp-3) 0;
+}
+/* .nt-term__cta is also a .nt-term__line, so it inherits
+   white-space: pre — which turns the newline + indentation between
+   the two links into real whitespace and pushes the second button
+   onto its own row. Opting back out of pre lets the source indent
+   stay invisible, and centering keeps the pair balanced. */
+.nt-term__cta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+  white-space: normal;
+}
+
+/* ============================================================
+   SECTION HEADER — file-banner style
+   ============================================================ */
+.nt-sec-head {
+  margin-bottom: var(--sp-6);
+}
+.nt-sec-head__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+.nt-sec-head__path {
+  color: var(--accent-c);
+}
+.nt-sec-head__title {
+  font-size: var(--fs-h2);
+  line-height: var(--lh-snug);
+  letter-spacing: -0.02em;
+  font-weight: 700;
+  margin: 0 0 var(--sp-3);
+}
+.nt-sec-head__lead {
+  max-width: 42rem;
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-body);
+}
+
+/* ============================================================
+   HERO SAMPLE — a real snippet, syntax highlighted
+   ============================================================ */
+.nt-sample {
+  margin-top: var(--sp-6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  overflow: hidden;
+}
+.nt-sample__bar {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+}
+.nt-sample__body {
+  margin: 0;
+  padding: var(--sp-5);
+  font-size: var(--fs-sm);
+  line-height: 1.8;
+  overflow-x: auto;
+  white-space: pre;
+}
+/* One block per source line so the stagger can address them. The
+   reveal animation is transform-only, so it never disturbs the
+   monospace alignment the pre relies on. */
+.nt-sample__line {
+  display: block;
+  min-height: 1.8em;
+}
+
+/* ============================================================
+   MODULES — a file listing, deliberately NOT cards
+   ============================================================ */
+.nt-modules {
+  padding-block: var(--sp-9);
+}
+.nt-modlist {
+  border-top: 1px solid var(--line);
+}
+.nt-modlist__row {
+  display: grid;
+  grid-template-columns: 9rem 1fr auto;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-3);
+  border-bottom: 1px solid var(--line-soft);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    padding-left var(--dur-med) var(--ease-out),
+    border-color var(--dur-med) var(--ease-out),
+    box-shadow var(--dur-med) var(--ease-out);
+}
+.nt-modlist__row:hover {
+  background: rgba(255, 255, 255, 0.022);
+  padding-left: var(--sp-5);
+  border-color: var(--hover-edge);
+  box-shadow: var(--hover-glow);
+}
+.nt-modlist__code {
+  color: var(--accent-b);
+  font-weight: 500;
+}
+.nt-modlist__name {
+  color: var(--fg-muted);
+  font-size: var(--fs-sm);
+}
+.nt-modlist__desc {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--fg-dim);
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition:
+    max-height var(--dur-med) var(--ease-out),
+    opacity var(--dur-med) var(--ease-out),
+    padding-top var(--dur-med) var(--ease-out);
+}
+.nt-modlist__row:hover .nt-modlist__desc {
+  max-height: 6rem;
+  opacity: 1;
+  padding-top: var(--sp-3);
+}
+.nt-modlist__status {
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  color: var(--fg-dim);
+}
+.nt-modlist__status::before {
+  content: "-> ";
+}
+@media (max-width: 720px) {
+  .nt-modlist__row {
+    grid-template-columns: 1fr auto;
+  }
+  .nt-modlist__name {
+    display: none;
+  }
+}
+
+/* ============================================================
+   MARQUEE
+   ============================================================ */
+.nt-marquee {
+  position: relative;
+  overflow: hidden;
+}
+.nt-marquee::before,
+.nt-marquee::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 90px;
+  z-index: 2;
+  pointer-events: none;
+}
+.nt-marquee::before {
+  left: 0;
+  background: linear-gradient(to right, #000, transparent);
+}
+.nt-marquee::after {
+  right: 0;
+  background: linear-gradient(to left, #000, transparent);
+}
+.nt-marquee__track {
+  display: flex;
+  align-items: center;
+  width: max-content;
+  animation: nt-scroll-x 44s linear infinite;
+}
+.nt-marquee:hover .nt-marquee__track {
+  animation-play-state: paused;
+}
+@keyframes nt-scroll-x {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.nt-tag {
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+
+/* ============================================================
+   PARTNER — a chat transcript, not a feature grid
+   ============================================================ */
+.nt-partner {
+  padding-block: var(--sp-9);
+}
+.nt-chat {
+  max-width: 46rem;
+  margin-inline: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  overflow: hidden;
+}
+.nt-chat__msg {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--fs-sm);
+  line-height: 1.75;
+}
+.nt-chat__msg:last-child {
+  border-bottom: 0;
+}
+.nt-chat__who {
+  flex-shrink: 0;
+  width: 5.5rem;
+  color: var(--fg-dim);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  padding-top: 0.2em;
+}
+.nt-chat__msg--you .nt-chat__who {
+  color: var(--accent-b);
+}
+.nt-chat__text {
+  color: var(--fg-muted);
+}
+.nt-chat__text b {
+  color: var(--fg);
+  font-weight: 500;
+}
+@media (max-width: 640px) {
+  .nt-chat__msg {
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+  .nt-chat__who {
+    width: auto;
+  }
+}
+
+/* ============================================================
+   PRICING — a table view
+   ============================================================ */
+.nt-pricing {
+  padding-block: var(--sp-9);
+}
+.nt-price-table {
+  max-width: 42rem;
+  margin-inline: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+.nt-price-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-5);
+  border-bottom: 1px solid var(--line-soft);
+  border-top: 1px solid transparent;
+  background-clip: padding-box;
+}
+.nt-price-row:last-child {
+  border-bottom: 0;
+}
+.nt-price-row__label {
+  color: var(--fg-muted);
+  font-size: var(--fs-sm);
+}
+.nt-price-row__amount {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.nt-price-row__amount small {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--accent-b);
+  margin-left: var(--sp-2);
+  letter-spacing: var(--tracking);
+}
+.nt-price-note {
+  max-width: 42rem;
+  margin: var(--sp-4) auto 0;
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  text-align: center;
+}
+
+/* ---- The R250 bundle: the one loud treatment ----
+   A rotating conic ring behind the row, a breathing glow, and a
+   sheen that sweeps across on hover. */
+.nt-price-row--bundle {
+  background: var(--accent-soft);
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    transform var(--dur-med) var(--ease-out),
+    box-shadow var(--dur-med) var(--ease-out);
+}
+/* Rotating conic gradient, masked to a 1px ring at the border. */
+.nt-price-row--bundle::before {
+  content: "";
+  position: absolute;
+  inset: -140%;
+  z-index: -1;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    var(--accent-b) 40deg,
+    var(--accent-c) 90deg,
+    transparent 150deg,
+    transparent 360deg
+  );
+  animation: nt-bundle-spin var(--bundle-spin) linear infinite;
+  opacity: 0.45;
+  /* Trim the fill away, leaving only a thin edge of light. */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  padding: 1px;
+}
+@keyframes nt-bundle-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+/* A slow breathing glow so it reads as "live" without animating. */
+.nt-price-row--bundle::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    rgba(253, 211, 174, 0.14) 0%,
+    transparent 70%
+  );
+  animation: nt-bundle-breathe 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes nt-bundle-breathe {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 1; }
+}
+.nt-price-row--bundle:hover {
+  transform: translateY(var(--hover-lift));
+  border-color: var(--accent-b);
+  box-shadow: var(--bundle-glow);
+}
+.nt-price-row--bundle .nt-price-row__sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(253, 211, 174, 0.16) 50%,
+    transparent 70%
+  );
+  transform: translateX(-100%);
+}
+.nt-price-row--bundle:hover .nt-price-row__sheen {
+  animation: nt-sheen 1.1s var(--ease-out);
+}
+@keyframes nt-sheen {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+.nt-price-row--bundle .nt-price-row__label {
+  color: var(--fg);
+}
+.nt-price-row--bundle .nt-price-row__amount {
+  color: var(--fg);
+}
+
+/* ============================================================
+   REVIEWS
+   ============================================================ */
+.nt-reviews {
+  padding-block: var(--sp-9);
+}
+.nt-rev {
+  max-width: 42rem;
+  margin-inline: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  padding: var(--sp-5);
+}
+.nt-rev + .nt-rev {
+  margin-top: var(--sp-3);
+}
+.nt-rev__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+}
+.nt-rev__name {
+  color: var(--accent-b);
+}
+.nt-rev__module {
+  color: var(--fg-dim);
+}
+.nt-rev__stars {
+  color: var(--accent-b);
+  margin-left: auto;
+  letter-spacing: 0.1em;
+}
+.nt-rev__stars .nt-off {
+  color: var(--fg-dim);
+}
+.nt-rev__summary {
+  color: var(--fg);
+  font-weight: 500;
+  margin-bottom: var(--sp-2);
+}
+.nt-rev__body {
+  margin: 0;
+  color: var(--fg-muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+}
+
+/* ============================================================
+   MISSION
+   ============================================================ */
+.nt-mission {
+  padding-block: var(--sp-9);
+}
+.nt-mission__body {
+  max-width: 44rem;
+  margin-inline: auto;
+  color: var(--fg-muted);
+  font-size: var(--fs-body);
+}
+.nt-mission__body p {
+  margin: 0 0 var(--sp-4);
+}
+.nt-mission__body strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+.nt-mission__points {
+  list-style: none;
+  padding: 0;
+  margin: var(--sp-5) 0 0;
+}
+.nt-mission__points li {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: var(--sp-4);
+  padding: var(--sp-4) 0;
+  border-top: 1px solid var(--line-soft);
+}
+.nt-mission__points li:last-child {
+  border-bottom: 1px solid var(--line-soft);
+}
+.nt-mission__idx {
+  color: var(--accent-b);
+  font-size: var(--fs-xs);
+  padding-top: 0.35em;
+}
+.nt-mission__points strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.nt-footer {
+  padding-block: var(--sp-7);
+  border-top: 1px solid var(--line);
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+
+/* ============================================================
+   REVEAL
+   The page is a terminal, so content arrives the way a terminal
+   produces output. Elements opt in with data-reveal and the
+   effect replays on every scroll pass.
+     wipe — a wipe-bar sweeps down, then the text lands
+     rise — staggered lines lift into place
+     scan — a scanline passes, then the block settles
+   ============================================================ */
+.nt-root [data-reveal] {
+  opacity: 0;
+}
+
+/* Shared entrance: everything fades up as it arrives. Every effect
+   is gated on .is-in — without it the animations would fire at
+   load and be over long before you scroll to the element. */
+.nt-rv-wipe,
+.nt-rv-rise,
+.nt-rv-scan {
+  animation: none;
+}
+.nt-rv-wipe.is-in,
+.nt-rv-rise.is-in,
+.nt-rv-scan.is-in {
+  animation: nt-rv-fade-up 620ms var(--ease-out) forwards;
+}
+@keyframes nt-rv-fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Children fade in on a stagger, so a block resolves line by line
+   rather than all at once. */
+.nt-rv-line {
+  opacity: 0;
+}
+.is-in .nt-rv-line {
+  animation: nt-rv-line-in 520ms var(--ease-out) forwards;
+  animation-delay: calc(160ms + var(--rv-i, 0) * var(--rv-stagger));
+}
+@keyframes nt-rv-line-in {
+  from { opacity: 0; transform: translateY(8px); filter: blur(3px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+
+/* --- wipe --- A bar sweeps down over the block, then it lands.
+   Kept on ::before so it never affects layout. */
+.nt-rv-wipe {
+  position: relative;
+}
+.nt-rv-wipe::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(253, 211, 174, 0.16) 45%,
+    rgba(253, 211, 174, 0.5) 50%,
+    rgba(253, 211, 174, 0.16) 55%,
+    transparent 100%
+  );
+  background-size: 100% 220%;
+  background-repeat: no-repeat;
+  opacity: 0;
+}
+.nt-rv-wipe.is-in::before {
+  animation: nt-rv-wipe-bar 720ms var(--ease-out) forwards;
+}
+@keyframes nt-rv-wipe-bar {
+  0%   { background-position: 0 -120%; opacity: 1; }
+  70%  { background-position: 0 120%; opacity: 1; }
+  100% { background-position: 0 120%; opacity: 0; }
+}
+
+/* --- scan --- A scanline runs down the block, and the text
+   resolves from a blur as it passes. */
+.nt-rv-scan {
+  position: relative;
+}
+.nt-rv-scan::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 34%;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(139, 0, 0, 0.28),
+    transparent
+  );
+  opacity: 0;
+}
+.nt-rv-scan.is-in::after {
+  animation: nt-rv-scan 820ms var(--ease-out) forwards;
+}
+@keyframes nt-rv-scan {
+  0%   { top: -34%; opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-root [data-reveal],
+  .nt-root .nt-rv-line,
+  .nt-root .nt-rv-wipe::before,
+  .nt-root .nt-rv-scan::after {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    animation: none;
+  }
+}

@@ -1,63 +1,75 @@
-import Hero from "@/components/landing/hero";
-import MatrixRain from "@/components/landing/matrix-rain";
-import MissionBody from "@/components/landing/mission-body";
-import ModulesContainer, { type ModuleCard } from "@/components/landing/modules-container";
-import ReviewsSection, { type Review } from "@/components/landing/reviews-section";
-import TickerMarquee from "@/components/landing/ticker-marquee";
+import type { Metadata } from "next";
 
-const HERO_HEADLINE = "Learning with the notes that learn you, just as you learn it.";
-const HERO_SUBHEAD =
-  "A tutoring platform built for first-year Computer Science students at Nelson Mandela University. AI-assisted notes, structured modules, R50 per semester.";
-const HERO_PRIMARY_CTA = { label: "Get started", href: "/login" };
+import AiMarquee from "@/components/landing/ai-marquee";
+import AsciiField from "@/components/landing/ascii-field";
+import ChatPartner, { type ChatMessage } from "@/components/landing/chat-partner";
+import LandingNav from "@/components/landing/landing-nav";
+import MissionSection from "@/components/landing/mission-section";
+import ModuleList, { type ModuleEntry } from "@/components/landing/module-list";
+import MorphTitle from "@/components/landing/morph-title";
+import PriceTable from "@/components/landing/price-table";
+import ReviewsList, { type ReviewEntry } from "@/components/landing/reviews-list";
+import ScrollReveal from "@/components/landing/scroll-reveal";
+import TerminalHero from "@/components/landing/terminal-hero";
 
-const TICKER_ITEMS: ReadonlyArray<string> = [
-  "Trading",
-  "Research",
-  "Medical Study",
-  "Mathematics Papers",
-  "Technical Writing",
-  "Therapy",
-  "Engineering",
-  "Data Science",
-  "Language Learning",
-  "Code Review",
-  "Past-Paper Drills",
-  "Concept Maps",
-  "Citation Help",
-  "Lecture Summaries",
+import "@/styles/landing.css";
+
+export const metadata: Metadata = {
+  title: "Nexus · Notes that learn you as you learn",
+  description:
+    "First-year Computer Science notes for Nelson Mandela University students, rebuilt from the ground up. Maths, C#, MATLAB, fundamentals and statistics.",
+};
+
+/* ---- Hero ---- */
+const MORPH_PHRASES: ReadonlyArray<string> = ["Notes that learn you", "as you learn them"];
+
+const HERO_SUBHEAD = "The notes we got were good enough. But I made them better.";
+
+const HERO_CTA = { label: "open modules", href: "#modules" } as const;
+
+/* ---- Terminal README ---- */
+const README_TAGLINE: ReadonlyArray<string> = [
+  "Nexus Tutoring is an AI-powered study platform leveraging RAG to improve student learning.",
+  "Powered by an intelligent chatbot and shared study notes,",
+  "it helps students master coursework with contextual AI support.",
 ];
 
-const MISSION_INTRO = "Why this exists.";
-const MISSION_CONTEXT =
-  "I grew up staring at the same 800-page textbooks you have been handed. They were written for someone with twice my attention span and half my distractions. If you have ever closed a chapter feeling like you understood the cover but not the content, this platform was built for you.";
-const MISSION_POINTS: ReadonlyArray<{ readonly title: string; readonly body: string }> = [
-  {
-    title: "Where existing notes fall short",
-    body: "Academic resources get you a pass. They do not get you fluent. Nexus was designed to close that gap with notes that adapt, examples that click, and an AI that walks a concept with you until it lands.",
-  },
-  {
-    title: "AI is already a job requirement",
-    body: "Industry expects AI fluency on day one. Universities are catching up, but the gap is already wide. Using these tools well, and using them honestly, is part of becoming a competitive graduate right now.",
-  },
-  {
-    title: "Honest pricing, real notes",
-    body: "Pick the modules you need at R50 each, or grab the full bundle at R250 for the semester. Every rand goes back into better notes, more past-paper coverage, and faster AI responses for the next student.",
-  },
-  {
-    title: "Notes that learn you",
-    body: "Some students absorb a concept the first time. Others need it broken into pieces that match how they think. The AI here adapts to you, the same way a great tutor would, so the material finally fits the way you learn it.",
-  },
+/* ---- Mission ---- */
+const MISSION_PARAGRAPHS: ReadonlyArray<string> = [
+  "Nexus exists to bring Computer Science students at Nelson Mandela University up to the level the rest of the world is already working at, starting with the modules sitting in front of you right now.",
+  "And the uncomfortable part nobody in academia wants to say out loud: most people no longer have the attention span to open a textbook. Courses are still built on the assumption that they do, and that assumption is exactly why capable students fall behind.",
 ];
-const MISSION_CLOSING =
-  "Use the tools. Get fluent. Close the gap between where you are and where the rest of the world already is. That is the whole point.";
 
-const MODULES: ReadonlyArray<ModuleCard> = [
+const MISSION_POINTS = [
+  {
+    title: "The notes we get are sufficient.",
+    body: "They really are. But sufficient is not the equivalent to being understood, so I took them apart and rebuilt them with clearer structure and worked examples, specifically to target building intuition as you go.",
+  },
+  {
+    title: "AI fluency is quietly becoming a requirement",
+    body: "that universities have not yet decided how to qualify. Learning these tools now, while you are still studying, is the difference between catching up and leading.",
+  },
+  {
+    title: "Everything is aimed at one outcome:",
+    body: "making you genuinely competitive with students anywhere in the world, at a price a student can actually afford.",
+  },
+  {
+    title: "For some of us, learning just clicks.",
+    body: "For the rest, it takes hearing the same idea a different way, in our own words, or at our own pace. That is what a study partner is for.",
+  },
+] as const;
+
+const MISSION_SIGNATURE =
+  "A quick word about me: I am a first year CS student at NMU building this in my own time, because I remember how disorienting that first semester was. If something here is wrong or unclear, tell me and I will fix it.";
+
+/* ---- Modules ---- */
+const MODULES: ReadonlyArray<ModuleEntry> = [
   { code: "MATT101", name: "Core Mathematics I", description: "Calculus foundations, limits, derivatives, and the algebra that holds it all up." },
   { code: "MATT102", name: "Core Mathematics II", description: "Integration, sequences, series, and the techniques that close out first year." },
   { code: "MAPV101", name: "Applied Mathematics I", description: "Vectors, mechanics, and the math that maps to real physical problems." },
   { code: "MAPV102", name: "Applied Mathematics II", description: "Dynamics, work, energy, and the differential models behind them." },
-  { code: "MAPV111", name: "Applied Mathematics (Extended) I", description: "Richer mechanics and proof-based methods for the extended stream." },
-  { code: "MAPV112", name: "Applied Mathematics (Extended) II", description: "Advanced modelling, multivariable problems, and the deeper toolkit." },
+  { code: "MAPV111", name: "Applied Math (Ext) I", description: "Richer mechanics and proof-based methods for the extended stream." },
+  { code: "MAPV112", name: "Applied Math (Ext) II", description: "Advanced modelling, multivariable problems, and the deeper toolkit." },
   { code: "WRAV101", name: "C# Programming I", description: "From your first console app to clean, typed, object-oriented code." },
   { code: "WRAV102", name: "C# Programming II", description: "Collections, generics, LINQ, and the patterns real software relies on." },
   { code: "WRSC111", name: "MATLAB Programming", description: "Scripting, matrices, and the numerical toolkit used across engineering." },
@@ -67,69 +79,178 @@ const MODULES: ReadonlyArray<ModuleCard> = [
   { code: "STAS102", name: "Statistics II", description: "Inference, regression, and the tests that turn data into decisions." },
 ];
 
-const REVIEWS: ReadonlyArray<Review> = [
+const MODULES_TITLE = "13 modules total, for every semester I've done.";
+const MODULES_LEAD =
+  "Hover any line to see what it actually covers. The list grows as I finish each set of notes.";
+
+/* ---- Marquee ---- */
+const AI_TAGS: ReadonlyArray<string> = [
+  "trading",
+  "research",
+  "medical study",
+  "maths papers",
+  "writing",
+  "therapy",
+  "coding",
+  "law",
+  "design",
+  "music",
+  "data analysis",
+  "language",
+  "finance",
+  "education",
+];
+
+/* ---- Partner ---- */
+const CHAT: ReadonlyArray<ChatMessage> = [
+  { who: "student", text: "how does the chain rule work? explain like im 5" },
   {
-    id: "r1",
-    avatarInitials: "TM",
-    headline: "Saved my semester",
-    body: "I was failing MATT102 until I started using the AI tutor at 11pm. It walked me through integration by parts three different ways until one finally clicked.",
-    rating: 5,
+    who: "partner",
+    text: `The chain rule is an onion you peel one layer at a time.
+If a function is inside another f(g(x)) pretend you only have f(x)
+then differentiate it. now you have f'(g(x)) and once again,
+differentiate g(x) on its own and multiply the two derivatives together,
+and you'll get something that looks like this! f'(g(x)) × g'(x)`,
   },
+  { who: "student", text: "ok but show me with numbers" },
   {
-    id: "r2",
-    avatarInitials: "LS",
-    headline: "Notes that actually explain",
-    body: "The WRAV101 notes show why a snippet works, not just what it does. That made the difference between copying code and writing my own.",
-    rating: 5,
-  },
-  {
-    id: "r3",
-    avatarInitials: "NK",
-    headline: "Worth every rand",
-    body: "R250 for the bundle is a joke compared to the textbook I never opened. The past-paper drills alone are worth more than the price.",
-    rating: 5,
-  },
-  {
-    id: "r4",
-    avatarInitials: "AP",
-    headline: "Patient AI, finally",
-    body: "Other AI tools rush you. This one breaks the problem into smaller pieces when you stall. That is the feature I did not know I needed.",
-    rating: 4,
-  },
-  {
-    id: "r5",
-    avatarInitials: "RD",
-    headline: "MATLAB made simple",
-    body: "WRSC111 used to terrify me. The MATLAB notes here are short, visual, and tied to actual scripts I can run. I actually enjoy it now.",
-    rating: 5,
+    who: "partner",
+    text: `Let f(x) = 5 × g(x)² and g(x) = x³ Then f'(x) = f'(g(x)) × g'(x).
+so substitute in the variables, (5 × 2(x³) ) × (3x²) and simplify,
+(10x³)×(3x²) = 30x⁵ done! Want to try one on your own?`,
   },
 ];
 
+const PARTNER_TITLE = "It learns you back";
+const PARTNER_LEAD =
+  "Not a search box returning a definition. A study partner that explains topics like it's the first time you're hearing it.";
+const PARTNER_FOOTNOTE = "In development, launching with the notes.";
+
+/* ---- Pricing ---- */
+const PRICING_TITLE = "Unlock the whole semester";
+const PRICES = [
+  { label: "one module, one semester", amount: "R50" },
+  {
+    label: "all 7 modules, one semester",
+    amount: "R250",
+    badge: "SAVE R100",
+    bundle: true,
+  },
+] as const;
+const PRICING_FOOTNOTE = "Notes stay yours either way. Pick what you need, or take the lot.";
+
+/* ---- Reviews ---- */
+const REVIEWS: ReadonlyArray<ReviewEntry> = [
+  {
+    name: "Placeholder Student",
+    module: "MATT101",
+    rating: 5,
+    summary: "derivatives finally clicked",
+    body: "I had tried three YouTube videos before this and none of them stuck. The worked examples show the reasoning instead of skipping to the answer, which was the part I was missing.",
+  },
+  {
+    name: "Placeholder Student",
+    module: "WRAV101",
+    rating: 5,
+    summary: "my first real object-oriented code",
+    body: "Coming into C# I could write code but not explain it. The notes made me stop and think about why each step was there, and suddenly the syntax stopped feeling arbitrary.",
+  },
+  {
+    name: "Placeholder Student",
+    module: "STAS102",
+    rating: 4,
+    summary: "inference finally makes sense",
+    body: "Regression looked like memorised formulas until I saw why each one was derived. Still slow on the exam questions, but I understand what I am doing now.",
+  },
+  {
+    name: "Placeholder Student",
+    module: "MAPV101",
+    rating: 5,
+    summary: "vectors finally visual",
+    body: "I could do the arithmetic but not picture the problem. Drawing the free body diagram alongside each worked solution fixed that. First time mechanics has felt reason-able.",
+  },
+  {
+    name: "Placeholder Student",
+    module: "MATT102",
+    rating: 5,
+    summary: "series stopped being scary",
+    body: "I convinced myself for a whole semester that I was bad at second year maths. Turns out I just never had anyone explaining convergence in a way that landed.",
+  },
+];
+
+const REVIEWS_TITLE = "What students are saying";
+const REVIEWS_LEAD =
+  "Placeholders for now. Replaced with real reviews as people work through the notes.";
+
 export default function Landing(): React.JSX.Element {
   return (
-    <div className="relative min-h-screen w-full bg-black text-white">
-      <MatrixRain />
+    <div className="nt-root">
+      {/* Fixed ASCII ambient layer, behind everything. */}
+      <AsciiField variant="ambient" />
+      <div className="nt-grid-bg" aria-hidden="true" />
 
-      <div className="nexus-scroll-hidden relative z-10 flex w-full flex-col">
-        <Hero
-          headline={HERO_HEADLINE}
-          subhead={HERO_SUBHEAD}
-          primaryCta={HERO_PRIMARY_CTA}
-        />
-        <TickerMarquee items={TICKER_ITEMS} duration={70} />
-        <MissionBody
-          introLine={MISSION_INTRO}
-          contextParagraph={MISSION_CONTEXT}
+      <LandingNav />
+      <ScrollReveal />
+
+      <main>
+        {/* ---- LANDING: fullscreen, scrolls away to reveal the page ---- */}
+        <section className="nt-landing" id="top">
+          {/* Interactive fluid ASCII field. Canvas is z-index 0; the copy
+              below is z-index 2 so it stays readable and clickable. */}
+          <AsciiField variant="landing" />
+          <div className="nt-landing__veil" aria-hidden="true" />
+
+          <div className="nt-landing__inner">
+            <span className="nt-landing__eyebrow">Computer Science · NMU</span>
+            <MorphTitle phrases={MORPH_PHRASES} />
+            <p className="nt-landing__sub">{HERO_SUBHEAD}</p>
+            <div className="nt-landing__cta">
+              <a className="nt-btn" href={HERO_CTA.href}>
+                {HERO_CTA.label}
+              </a>
+              <a className="nt-btn nt-btn--ghost" href="#mission">
+                why this exists
+              </a>
+            </div>
+          </div>
+
+          <a className="nt-landing__cue" href="#hero">
+            scroll
+          </a>
+        </section>
+
+        <TerminalHero tagline={README_TAGLINE} cta={HERO_CTA} />
+
+        <MissionSection
+          paragraphs={MISSION_PARAGRAPHS}
           points={MISSION_POINTS}
-          closingParagraph={MISSION_CLOSING}
+          signature={MISSION_SIGNATURE}
         />
-        <ModulesContainer
-          heading="A library that grows with every module."
-          pricingNotice="R50 per module per semester. R250 for the full bundle."
-          modules={MODULES}
+
+        <ModuleList title={MODULES_TITLE} lead={MODULES_LEAD} modules={MODULES} />
+
+        <AiMarquee tags={AI_TAGS} />
+
+        <ChatPartner
+          title={PARTNER_TITLE}
+          lead={PARTNER_LEAD}
+          messages={CHAT}
+          footnote={PARTNER_FOOTNOTE}
         />
-        <ReviewsSection reviews={REVIEWS} />
-      </div>
+
+        <PriceTable
+          title={PRICING_TITLE}
+          rows={PRICES}
+          footnote={PRICING_FOOTNOTE}
+          cta={{ label: "get started", href: "/login" }}
+        />
+
+        <ReviewsList title={REVIEWS_TITLE} lead={REVIEWS_LEAD} reviews={REVIEWS} />
+      </main>
+
+      <footer className="nt-footer">
+        built by a first year CS student at NMU · if something is wrong, tell me
+      </footer>
     </div>
   );
 }
