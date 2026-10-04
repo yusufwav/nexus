@@ -45,7 +45,7 @@
       --panel:     rgba(255, 255, 255, 0.025);
       --accent-line: rgba(255, 208, 222, 0.27);
       --accent-soft: rgba(139, 0, 0, 0.34);
-      --grid-line: rgba(253, 211, 174, 0.035);
+      --grid-line: rgba(255, 255, 255, 0.06);
       --grid-size: 32px;
 
       --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
@@ -79,6 +79,87 @@
 
       --max-w: 1180px;
       --max-w-narrow: 760px;
+
+      /* ============================================================
+         ASCII ENGINE — every tunable for both background layers
+         lives in this block. The canvas engine reads these at
+         startup, so changing a value here is all that is needed.
+         ============================================================ */
+      --ascii-ramp: " .·:-=+*#%@";  /* sparse → dense glyph ramp */
+      --ascii-font: 11px;           /* cell size, landing layer */
+      --ascii-fps: 26;              /* landing render throttle */
+      --ascii-scale: 1;          /* buffer resolution vs screen */
+
+      /* Landing layer — fullscreen, cursor-reactive */
+      --ascii-op: 1;             /* canvas opacity */
+      --ascii-low: #00000;         /* sparse / well colour */
+      --ascii-high: #6b0024;        /* dense / bright colour */
+      --ascii-speed: 1;             /* time multiplier */
+      --ascii-cursor-radius: 7;    /* cursor influence, in cells */
+      --ascii-cursor-power: 1;      /* cursor influence strength */
+
+      /* Ambient layer — fixed, slow, non-interactive */
+      --amb-ramp: " .·:+=xX#";
+      --amb-font: 10px;
+      --amb-fps: 20;
+      --amb-scale: 0.6;
+      --amb-op: 0.6;
+      --amb-low: #8b0000;
+      --amb-high: #fdd3ae;
+      --amb-speed: 0.2;
+
+      /* Title gradient — the "learn you" phrase */
+      --grad-from: #fdd3ae;
+      --grad-mid: #ffffff;
+      --grad-to: #6b0024;
+      --grad-dur: 9s;               /* resting flow speed */
+      --grad-dur-hover: 5s;       /* container hovered */
+      --grad-bright: 1.15;
+      --grad-sat: 1.35;
+
+      /* Hover states */
+      --hover-lift: -3px;
+      --hover-edge: rgba(255, 0, 43, 0.42);
+      --hover-fill: rgba(253, 211, 174, 0.05);
+      --hover-glow: 0 18px 50px -26px rgba(255, 0, 47, 0.5);
+      /* Everything eases in over a beat or so instead of snapping on. */
+      --dur-hover: 520ms;
+      --hover-grow: 1.012;          /* the tiny scale-up on hover */
+
+      /* Glassmorphism — shared by buttons and containers. Reads as a
+         real pane: blurred backdrop, a lit top edge, and a faint
+         inner highlight so it has thickness. */
+      --glass-bg: rgba(255, 255, 255, 0.028);
+      --glass-bg-hover: rgba(253, 211, 174, 0.05);
+      --glass-blur: 14px;
+      --glass-blur-hover: 22px;
+      --glass-edge: rgba(255, 255, 255, 0.09);
+      /* On hover the glass warms toward --accent-a (#8b0000). */
+      --glass-tint: rgba(255, 255, 255, 0.3);
+      --glass-tint-hover: rgba(17, 0, 0, 0.7);
+      --glass-sheen: rgba(255, 0, 0, 0.06);
+
+      /* Morph text — the rotating hero line */
+      --morph-interval: 2.6s;       /* how long each phrase is held */
+      --morph-stagger: 0.55;        /* cross-fade overlap, as a fraction
+                                        of the interval. 0 = hard cut,
+                                        1 = each phrase fully dissolves
+                                        into the next. This is the gap
+                                        between one phrase and the next;
+                                        initMorph() bakes it into the
+                                        keyframe stops. */
+      --morph-blur-in: 14px;
+      --morph-blur-out: 16px;
+      --morph-scale-in: 0.88;
+      --morph-scale-out: 1.12;
+
+      /* Scroll reveals. --rv-i is the per-line stagger index; the
+         script assigns it, the default is line zero. */
+      --rv-stagger: 90ms;
+      --rv-i: 0;                  /* assigned per line by script */
+
+      --bundle-spin: 6s;            /* R250 ring rotation */
+      --bundle-glow: 0 26px 70px -30px rgba(253, 211, 174, 0.5);
     }
 
     /* ============================================================
@@ -95,7 +176,11 @@
       margin: 0;
       padding: 0;
       color: var(--fg);
-      background: var(--bg-0);
+      /* Must stay transparent. A background on <body> paints above any
+         negative z-index layer, which would hide both fixed ASCII
+         canvases behind a solid block. The black lives on <html>
+         instead, where it sits behind everything. */
+      background: transparent;
       font-family: var(--font-mono);
       font-size: var(--fs-body);
       line-height: var(--lh-body);
@@ -114,8 +199,8 @@
         linear-gradient(var(--grid-line) 1px, transparent 1px),
         linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
       background-size: var(--grid-size) var(--grid-size);
-      -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 92%);
-      mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 92%);
+      -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 80%);
+      mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 80%);
     }
 
     a { color: inherit; text-decoration: none; }
@@ -189,14 +274,390 @@
     @media (max-width: 700px) { .nav__links { display: none; } }
 
     /* ============================================================
-       HERO — a terminal window
+       LANDING — fullscreen, scrolls away to reveal the page
        ============================================================ */
-    .hero {
+    .landing {
+      position: relative;          /* the canvas anchors to this */
       min-height: 100vh;
       min-height: 100svh;
       display: grid;
       place-items: center;
+      padding: var(--sp-8) var(--sp-5);
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    /* Both canvas layers sit behind the copy. z-index 0 keeps the
+       overlay stack (content is z-index 2) readable and clickable. */
+    .landing__ascii,
+    .landing__veil {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    .landing__ascii {
+      z-index: 0;
+      opacity: var(--ascii-op);
+    }
+    /* A soft vignette so the headline never fights the field. */
+    .landing__veil {
+      z-index: 1;
+      background: radial-gradient(
+        ellipse at center,
+        rgba(0, 0, 0, 0.7) 0%,
+        rgba(0, 0, 0, 0.45) 45%,
+        transparent 78%
+      );
+    }
+
+    /* Ambient layer lives on the body, fixed, behind everything. */
+    .ambient-bg {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      opacity: var(--amb-op);
+    }
+    /* The existing grid backdrop moves down a level. */
+    .grid-bg { z-index: -1; }
+
+    .landing__inner {
+      position: relative;
+      z-index: 2;                  /* copy sits above both canvases */
+      max-width: var(--max-w-narrow);
+      text-align: center;
+    }
+    .landing__eyebrow {
+      display: block;
+      width: fit-content;
+      margin: 0 auto var(--sp-5);   /* centred on its own, above the title */
+      padding: var(--sp-2) var(--sp-4);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-size: var(--fs-xs);
+      letter-spacing: var(--tracking-wide);
+      text-transform: uppercase;
+      color: var(--fg);
+    }
+    .landing__title {
+      margin: 0 auto;                /* centred in the landing column */
+      max-width: 100%;
+      font-size: var(--fs-h1);
+      line-height: 1.08;
+      letter-spacing: -0.03em;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    /* ---- The "learn you" gradient ----
+       A wide gradient clipped to the text. Hovering the container
+       (.landing) speeds the flow and lifts brightness/saturation;
+       the transition on --grad-dur is what makes it ease rather
+       than snap. */
+    .grad {
+      display: inline-block;
+      background-image: linear-gradient(
+        100deg,
+        var(--grad-from) 0%,
+        var(--grad-mid) 28%,
+        var(--grad-to) 52%,
+        var(--grad-mid) 76%,
+        var(--grad-from) 100%
+      );
+      background-size: 260% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      -webkit-text-fill-color: transparent;
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 500;
+      filter: brightness(var(--grad-bright)) saturate(var(--grad-sat));
+      animation: grad-flow var(--grad-dur) linear infinite;
+      transition: filter var(--dur-slow) var(--ease-out);
+    }
+    @keyframes grad-flow {
+      from { background-position: 0% 50%; }
+      to   { background-position: 260% 50%; }
+    }
+    .landing:hover .grad {
+      animation-duration: var(--grad-dur-hover);
+      filter: brightness(1.3) saturate(1.6);
+    }
+
+    /* ---- Morph text ----
+       Ported from the VengeanceUI MorphText component. Every phrase is
+       stacked in one grid slot and cross-fades on a shared timeline:
+       each gets the SAME total duration and a delay of n x interval,
+       so exactly one is visible at a time. The blur is what sells it.
+
+       Each word runs two animations at once — the morph and the
+       gradient flow — so they are declared together in one shorthand.
+       Timings are written by initMorph() from the tokens above. */
+    .landing__title--morph {
+      display: grid;
+      grid-template-areas: "morphslot";
+      justify-items: center;        /* each phrase centres in the slot */
+      align-items: center;
+      /* A fixed min-height keeps the landing layout stable while the
+         phrases swap, and leaves room for descenders. */
+      min-height: 1.3em;
+    }
+    .morph__word {
+      grid-area: morphslot;
+      white-space: nowrap;
+      opacity: 0;
+      /* Generous leading so the descender of "y" is never clipped by
+         the grid row box. */
+      line-height: 1.25;
+      padding-bottom: 0.08em;
+      will-change: opacity, filter, transform;
+    }
+    /* The keyframe percentages are placeholders. initMorph() reads
+       --morph-stagger and rewrites this rule with real stops so the
+       cross-fade gap is tunable without touching the script. The shape
+       below is the fallback when JS has not run. */
+    @keyframes morph-word-rotate {
+      0%    { opacity: 0; filter: blur(var(--morph-blur-in)); transform: scale(var(--morph-scale-in)); }
+      12%   { opacity: 1; filter: blur(0); transform: scale(1); }
+      72%   { opacity: 1; filter: blur(0); transform: scale(1); }
+      88%   { opacity: 0; filter: blur(var(--morph-blur-out)); transform: scale(var(--morph-scale-out)); }
+      100%  { opacity: 0; filter: blur(var(--morph-blur-out)); transform: scale(var(--morph-scale-out)); }
+    }
+
+    .landing__sub {
+      max-width: 34rem;
+      margin: var(--sp-5) auto 0;
+      color: var(--fg-muted);
+      font-size: var(--fs-body);
+    }
+    .landing__cta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--sp-3);
+      justify-content: center;
+      margin-top: var(--sp-6);
+    }
+
+    /* Scroll cue — a blinking caret, on theme. */
+    .landing__cue {
+      position: absolute;
+      left: 50%;
+      bottom: var(--sp-6);
+      transform: translateX(-50%);
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--sp-2);
+      font-size: var(--fs-xs);
+      letter-spacing: var(--tracking-wide);
+      text-transform: uppercase;
+      color: var(--fg-dim);
+      text-decoration: none;
+      transition: color var(--dur-fast) var(--ease-out);
+    }
+    .landing__cue:hover { color: var(--accent-b); }
+    .landing__cue::after {
+      content: "";
+      width: 1px;
+      height: 34px;
+      background: linear-gradient(var(--accent-b), transparent);
+      animation: cue-drop 2.2s var(--ease-out) infinite;
+    }
+    @keyframes cue-drop {
+      0%   { transform: scaleY(0); transform-origin: top; opacity: 0; }
+      35%  { transform: scaleY(1); transform-origin: top; opacity: 1; }
+      70%  { transform: scaleY(1); transform-origin: bottom; opacity: 1; }
+      100% { transform: scaleY(0); transform-origin: bottom; opacity: 0; }
+    }
+
+    /* ============================================================
+       HOVER + GLASS
+       One treatment shared by buttons and containers: a blurred
+       glass pane that warms toward --accent-a as it is hovered,
+       grows a hair, and eases in over --dur-hover rather than
+       snapping on. Every animated property is listed explicitly
+       so the change is a fade, never a jump.
+       ============================================================ */
+    .hoverable {
+      position: relative;
+      transition:
+        transform var(--dur-hover) var(--ease-out),
+        border-color var(--dur-hover) var(--ease-out),
+        background-color var(--dur-hover) var(--ease-out),
+        box-shadow var(--dur-hover) var(--ease-out),
+        backdrop-filter var(--dur-hover) var(--ease-out);
+    }
+    .hoverable:hover {
+      transform: translateY(var(--hover-lift)) scale(var(--hover-grow));
+      border-color: var(--hover-edge);
+      background-color: var(--hover-fill);
+      box-shadow: var(--hover-glow);
+    }
+
+    /* ---- The glass pane ----
+       -webkit-backdrop-filter is listed first because Safari still
+       needs the prefixed property to composite at all. */
+    .glass {
+      background: var(--glass-bg);
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+      backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+      border: 1px solid var(--glass-edge);
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-sheen),
+        0 10px 34px -26px rgba(0, 0, 0, 0.9);
+    }
+    /* Warm the pane toward the brand red as it is hovered. */
+    .glass:hover,
+    .glass:focus-within {
+      background:
+        linear-gradient(var(--glass-tint-hover), var(--glass-tint-hover)),
+        var(--glass-bg-hover);
+      -webkit-backdrop-filter: blur(var(--glass-blur-hover)) saturate(1.5);
+      backdrop-filter: blur(var(--glass-blur-hover)) saturate(1.5);
+      border-color: var(--hover-edge);
+    }
+
+    /* Buttons: glass by default, and they scale rather than jump. */
+    .btn {
+      position: relative;
+      background: var(--glass-bg);
+      -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+      backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+      box-shadow: inset 0 1px 0 0 var(--glass-sheen);
+      transition:
+        transform var(--dur-hover) var(--ease-out),
+        background-color var(--dur-hover) var(--ease-out),
+        background-image var(--dur-hover) var(--ease-out),
+        border-color var(--dur-hover) var(--ease-out),
+        color var(--dur-hover) var(--ease-out),
+        box-shadow var(--dur-hover) var(--ease-out),
+        -webkit-backdrop-filter var(--dur-hover) var(--ease-out),
+        backdrop-filter var(--dur-hover) var(--ease-out);
+    }
+    /* A press confirms the click instead of doing nothing. */
+    .btn:active {
+      transform: translateY(0) scale(0.985);
+      transition-duration: var(--dur-fast);
+    }
+    .btn:hover {
+      transform: scale(var(--hover-grow));
+      color: var(--fg);
+      border-color: var(--hover-edge);
+      background:
+        linear-gradient(var(--glass-tint-hover), var(--glass-tint-hover)),
+        var(--glass-bg-hover);
+      -webkit-backdrop-filter: blur(var(--glass-blur-hover)) saturate(1.5);
+      backdrop-filter: blur(var(--glass-blur-hover)) saturate(1.5);
+      box-shadow:
+        inset 0 1px 0 0 var(--glass-sheen),
+        0 14px 40px -22px rgba(0, 0, 0, 0.75);
+    }
+
+    /* ---- The R250 bundle: the one loud treatment ----
+       A rotating conic ring behind the row, a breathing glow, and
+       a sheen that sweeps across on hover. Everything is conic/mask
+       based so it stays crisp and costs one composited layer. */
+    .price-row--bundle {
+      position: relative;
+      overflow: hidden;
+      isolation: isolate;
+      transition:
+        transform var(--dur-med) var(--ease-out),
+        box-shadow var(--dur-med) var(--ease-out);
+    }
+    /* Rotating conic gradient, masked to a 1px ring at the border. */
+    .price-row--bundle::before {
+      content: "";
+      position: absolute;
+      inset: -140%;
+      z-index: -1;
+      background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        var(--accent-b) 40deg,
+        var(--accent-c) 90deg,
+        transparent 150deg,
+        transparent 360deg
+      );
+      animation: bundle-spin var(--bundle-spin) linear infinite;
+      opacity: 0.45;
+      /* Trim the fill away, leaving only a thin edge of light. */
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      mask-composite: exclude;
+      padding: 1px;
+    }
+    @keyframes bundle-spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+    /* A slow breathing glow so it reads as "live" without animating. */
+    .price-row--bundle::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      background: radial-gradient(
+        ellipse at 50% 50%,
+        rgba(253, 211, 174, 0.14) 0%,
+        transparent 70%
+      );
+      animation: bundle-breathe 4.5s ease-in-out infinite;
+      pointer-events: none;
+    }
+    @keyframes bundle-breathe {
+      0%, 100% { opacity: 0.45; }
+      50%      { opacity: 1; }
+    }
+    .price-row--bundle:hover {
+      transform: translateY(var(--hover-lift));
+      border-color: var(--accent-b);
+      box-shadow: var(--bundle-glow);
+    }
+    /* Sheen sweep, only on hover. */
+    .price-row--bundle .price-row__sheen {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(
+        105deg,
+        transparent 30%,
+        rgba(253, 211, 174, 0.16) 50%,
+        transparent 70%
+      );
+      transform: translateX(-100%);
+    }
+    .price-row--bundle:hover .price-row__sheen {
+      animation: sheen 1.1s var(--ease-out);
+    }
+    @keyframes sheen {
+      from { transform: translateX(-100%); }
+      to   { transform: translateX(100%); }
+    }
+
+    /* ============================================================
+       HERO — the terminal window, now below the landing
+       ============================================================ */
+    .hero {
+      position: relative;
+      /* Hug the terminal rather than forcing a full viewport. The box
+         is the content here, so the section is exactly as tall as it
+         needs to be plus its own breathing room. */
       padding: var(--sp-8) 0;
+    }
+    /* Fade the top edge in so the landing hands off smoothly. */
+    .hero::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 140px;
+      pointer-events: none;
+      background: linear-gradient(to bottom, var(--bg-0), transparent);
     }
     .term {
       width: 100%;
@@ -223,7 +684,9 @@
     .term__body {
       padding: var(--sp-6);
       font-size: var(--fs-sm);
-      line-height: 1.85;
+      /* Matches --lh-body so the terminal reads at the same rhythm as
+         every other block of copy on the page. */
+      line-height: var(--lh-body);
       overflow-x: auto;
     }
     .term__line { display: block; white-space: pre; }
@@ -244,25 +707,44 @@
       font-weight: 500;
       color: var(--accent-b);
     }
-    .term__cta { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin-top: var(--sp-5); }
+    /* Now that the landing owns the big headline, the terminal title
+       steps down so the two don't shout over each other. */
+    .term__h1--sm { font-size: clamp(1.5rem, 3vw, 2.2rem); margin: var(--sp-3) 0; }
+    /* Buttons sit side by side, centred as a pair. .term__cta is also
+       a .term__line, so it inherits white-space: pre — which turns the
+       newline + indentation between the two <a> tags into real
+       whitespace and pushes the second button onto its own row. Opting
+       back out of pre lets the source indent stay invisible, and
+       centering keeps the pair balanced on one line. */
+    .term__cta {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: var(--sp-3);
+      margin-top: var(--sp-5);
+      white-space: normal;
+    }
 
+    /* Layout + type only. The glass surface, hover and active states all
+       live in the HOVER + GLASS block above, so there is one place to
+       tune them rather than two rules fighting over the background. */
     .btn {
       display: inline-block;
       padding: var(--sp-3) var(--sp-5);
-      border: 1px solid var(--accent-line);
+      border: 1px solid var(--glass-edge);
       border-radius: var(--r-sm);
-      background: transparent;
       font-family: var(--font-mono);
       font-size: var(--fs-sm);
       color: var(--fg);
-      transition: background var(--dur-fast) var(--ease-out),
-                  color var(--dur-fast) var(--ease-out);
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
-    .btn::before { content: "$ "; color: var(--fg-dim); }
-    .btn:hover { background: var(--accent-soft); }
-    .btn--ghost { border-color: var(--line); color: var(--fg-muted); }
+    .btn::before { content: "$ "; color: var(--fg-dim); transition: color var(--dur-hover) var(--ease-out); }
+    .btn:hover::before { color: var(--accent-b); }
+    /* Ghost variants have no shell prompt and a quieter edge. */
+    .btn--ghost { color: var(--fg-muted); }
     .btn--ghost::before { content: ""; }
-    .btn--ghost:hover { color: var(--fg); border-color: var(--accent-line); }
 
     /* ============================================================
        SECTION HEADER — file-banner style
@@ -321,6 +803,13 @@
       overflow-x: auto;
       white-space: pre;
     }
+    /* One block per source line so the stagger can address them. The
+       .rv-line animation is transform-only, so it never disturbs the
+       monospace alignment the pre relies on. */
+    .sample__line {
+      display: block;
+      min-height: 1.8em;
+    }
 
     /* ============================================================
        MODULES — a file listing, deliberately NOT cards
@@ -334,11 +823,15 @@
       padding: var(--sp-4) var(--sp-3);
       border-bottom: 1px solid var(--line-soft);
       transition: background var(--dur-fast) var(--ease-out),
-                  padding-left var(--dur-med) var(--ease-out);
+                  padding-left var(--dur-med) var(--ease-out),
+                  border-color var(--dur-med) var(--ease-out),
+                  box-shadow var(--dur-med) var(--ease-out);
     }
     .modlist__row:hover {
       background: rgba(255, 255, 255, 0.022);
       padding-left: var(--sp-5);
+      border-color: var(--hover-edge);
+      box-shadow: var(--hover-glow);
     }
     .modlist__code { color: var(--accent-b); font-weight: 500; }
     .modlist__name { color: var(--fg-muted); font-size: var(--fs-sm); }
@@ -415,6 +908,10 @@
       background: var(--panel);
       overflow: hidden;
     }
+    /* Hovering the transcript highlights the whole panel, not a line. */
+    /* The chat pane picks up its hover state from the shared
+       .glass:hover / .hoverable:hover rules, so there is nothing
+       to override here. */
     .chat__msg {
       display: flex;
       gap: var(--sp-3);
@@ -458,6 +955,8 @@
       gap: var(--sp-4);
       padding: var(--sp-5);
       border-bottom: 1px solid var(--line-soft);
+      border-top: 1px solid transparent;
+      background-clip: padding-box;
     }
     .price-row:last-child { border-bottom: 0; }
     .price-row--bundle { background: var(--accent-soft); }
@@ -538,7 +1037,7 @@
       border-top: 1px solid var(--line-soft);
     }
     .mission__points li:last-child { border-bottom: 1px solid var(--line-soft); }
-    .mission__idx { color: var(--accent-c); font-size: var(--fs-xs); padding-top: 0.35em; }
+    .mission__idx { color: var(--accent-b); font-size: var(--fs-xs); padding-top: 0.35em; }
     .mission__points strong { color: var(--fg); font-weight: 600; }
 
     /* ============================================================
@@ -554,22 +1053,108 @@
     }
 
     /* ============================================================
-       REVEAL
+       REVEAL — the page is a terminal, so content arrives the way a
+       terminal produces output. Elements opt in with data-reveal and
+       the effect replays on every scroll pass (see initReveal).
        ============================================================ */
-    .reveal {
-      opacity: 0;
-      transform: translateY(14px);
-      transition: opacity var(--dur-slow) var(--ease-out),
-                  transform var(--dur-slow) var(--ease-out);
+    [data-reveal] { opacity: 0; }
+
+    /* Shared entrance: everything fades up as it arrives.
+       Every effect is gated on .is-in — without it the animations
+       would fire at load and be over long before you scroll to the
+       element, which is exactly the "only fires once" bug. */
+    .rv-wipe, .rv-rise, .rv-scan {
+      animation: none;
     }
-    .reveal.is-in { opacity: 1; transform: none; }
+    .rv-wipe.is-in, .rv-rise.is-in, .rv-scan.is-in {
+      animation: rv-fade-up 620ms var(--ease-out) forwards;
+    }
+    @keyframes rv-fade-up {
+      from { opacity: 0; transform: translateY(16px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* Children fade in on a stagger, so a block resolves line by
+       line rather than all at once. */
+    .rv-line { opacity: 0; }
+    .is-in .rv-line {
+      animation: rv-line-in 520ms var(--ease-out) forwards;
+      animation-delay: calc(160ms + var(--rv-i, 0) * var(--rv-stagger));
+    }
+    @keyframes rv-line-in {
+      from { opacity: 0; transform: translateY(8px); filter: blur(3px); }
+      to   { opacity: 1; transform: none; filter: blur(0); }
+    }
+
+    /* --- wipe --- A bar sweeps down over the block, then it lands.
+       Kept on ::before so it never affects layout. */
+    .rv-wipe { position: relative; }
+    .rv-wipe::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+      background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(253, 211, 174, 0.16) 45%,
+        rgba(253, 211, 174, 0.5) 50%,
+        rgba(253, 211, 174, 0.16) 55%,
+        transparent 100%
+      );
+      background-size: 100% 220%;
+      background-repeat: no-repeat;
+      opacity: 0;
+    }
+    .rv-wipe.is-in::before {
+      animation: rv-wipe-bar 720ms var(--ease-out) forwards;
+    }
+    @keyframes rv-wipe-bar {
+      0%   { background-position: 0 -120%; opacity: 1; }
+      70%  { background-position: 0 120%; opacity: 1; }
+      100% { background-position: 0 120%; opacity: 0; }
+    }
+
+    /* --- scan --- A scanline runs down the block, and the text
+       resolves from a blur as it passes. */
+    .rv-scan { position: relative; }
+    .rv-scan::after {
+      content: "";
+      position: absolute;
+      left: 0; right: 0;
+      top: 0;
+      height: 34%;
+      z-index: 3;
+      pointer-events: none;
+      background: linear-gradient(
+        to bottom,
+        transparent,
+        rgba(139, 0, 0, 0.28),
+        transparent
+      );
+      opacity: 0;
+    }
+    .rv-scan.is-in::after {
+      animation: rv-scan 820ms var(--ease-out) forwards;
+    }
+    @keyframes rv-scan {
+      0%   { top: -34%; opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
-      .reveal { opacity: 1; transform: none; }
+      [data-reveal],
+      .rv-line,
+      .rv-wipe::before,
+      .rv-scan::after { opacity: 1; transform: none; filter: none; animation: none; }
     }
   </style>
 </head>
 <body>
 
+  <!-- Ambient ASCII: fixed, slow, non-interactive, behind everything. -->
+  <canvas class="ambient-bg" id="ambient" aria-hidden="true"></canvas>
   <div class="grid-bg" aria-hidden="true"></div>
 
   <nav class="nav" id="nav" aria-label="Main">
@@ -585,11 +1170,39 @@
   <main>
 
     <!-- ==========================================================
+         LANDING — fullscreen, scrolls away to reveal the page
+         ========================================================== -->
+    <section class="landing" id="top">
+      <!-- Interactive fluid ASCII field. Canvas is z-index 0; the
+           copy below is z-index 2 so it stays readable/clickable. -->
+      <canvas class="landing__ascii" id="landing-ascii" aria-hidden="true"></canvas>
+      <div class="landing__veil" aria-hidden="true"></div>
+
+      <div class="landing__inner">
+        <span class="landing__eyebrow">first-year CS · NMU</span>
+        <h1 class="landing__title landing__title--morph" id="morph-title">
+          <span class="morph__word grad" data-morph-word>Notes that learn you</span>
+          <span class="morph__word grad" data-morph-word>as you learn them</span>
+        </h1>
+        <p class="landing__sub">
+          I took the notes we get, took them apart, and rebuilt them so you
+          understand why each step works instead of just copying it.
+        </p>
+        <div class="landing__cta">
+          <a class="btn" href="#modules">open modules</a>
+          <a class="btn btn--ghost" href="#mission">why this exists</a>
+        </div>
+      </div>
+
+      <a class="landing__cue" href="#hero">scroll</a>
+    </section>
+
+    <!-- ==========================================================
          HERO — a terminal session
          ========================================================== -->
-    <section class="hero" id="top">
+    <section class="hero" id="hero">
       <div class="wrap">
-        <div class="term reveal">
+        <div class="term glass hoverable" data-reveal="wipe">
           <div class="term__bar">
             <span class="term__dot"></span>
             <span class="term__dot"></span>
@@ -597,12 +1210,12 @@
             <span class="term__title">nexus ~/zsh 120x40</span>
           </div>
           <div class="term__body">
-            <span class="term__line"><span class="t-com"># first-year CS, Nelson Mandela University</span></span>
-            <span class="term__line term__prompt">$ cat manifesto.md</span>
-            <span class="term__line term__h1">Notes that <em>learn you</em> as you learn.</span>
-            <span class="term__line term__out">I took the notes we get, took them apart, and rebuilt them so you</span>
-            <span class="term__line term__out">understand why each step works instead of just copying it.</span>
-            <span class="term__line term__cta">
+            <span class="term__line rv-line"><span class="t-com"># first-year CS, Nelson Mandela University</span></span>
+            <span class="term__line term__prompt rv-line">$ cat manifesto.md</span>
+            <span class="term__line term__h1 term__h1--sm rv-line">the <em>readme</em></span>
+            <span class="term__line term__out rv-line">Everything below is the working part: the modules that exist,</span>
+            <span class="term__line term__out rv-line">how the study partner thinks, and what it costs. Start anywhere.</span>
+            <span class="term__line term__cta rv-line">
               <a class="btn" href="#modules">open modules</a>
               <a class="btn btn--ghost" href="#mission">why this exists</a>
             </span>
@@ -610,8 +1223,9 @@
         </div>
 
         <!-- A real snippet, highlighted at runtime. Showing the product
-             beats describing it. -->
-        <div class="sample reveal">
+             beats describing it. Same wipe + per-line stagger as the
+             README box above. -->
+        <div class="sample glass hoverable" data-reveal="wipe">
           <div class="sample__bar">
             <span>MATLAB / traps.m</span>
           </div>
@@ -625,7 +1239,7 @@
          ========================================================== -->
     <section class="mission" id="mission" aria-label="Why this exists">
       <div class="wrap wrap--narrow">
-        <div class="sec-head reveal">
+        <div class="sec-head" data-reveal="rise">
           <div class="sec-head__bar">
             <span class="sec-head__path">~/nexus</span>
             <span>/README.md</span>
@@ -633,16 +1247,18 @@
           <h1 class="sec-head__title">Why this exists</h1>
         </div>
 
-        <div class="mission__body reveal">
-          <p>Nexus exists to bring first year Computer Science students at Nelson Mandela University up to the level the rest of the world is already working at, starting with the modules sitting on your desk right now.</p>
-          <p>And the uncomfortable part nobody in academia wants to say out loud: most people do not have the attention span to learn from a textbook. Courses are still built on the assumption that they do, and that assumption is exactly why capable students fall behind.</p>
+        <!-- Each block reveals on its own so they load in sequence as
+you scroll: reach point 02 and only what sits above it has landed. -->
+        <div class="mission__body">
+          <p data-reveal="rise">Nexus exists to bring first year Computer Science students at Nelson Mandela University up to the level the rest of the world is already working at, starting with the modules sitting on your desk right now.</p>
+          <p data-reveal="rise">And the uncomfortable part nobody in academia wants to say out loud: most people do not have the attention span to learn from a textbook. Courses are still built on the assumption that they do, and that assumption is exactly why capable students fall behind.</p>
           <ul class="mission__points">
-            <li><span class="mission__idx">01</span><span><strong>The notes we get are sufficient.</strong> They really are. But sufficient is not the same as understanding, so I took them apart and rebuilt them with clearer structure and worked examples.</span></li>
-            <li><span class="mission__idx">02</span><span><strong>AI fluency is quietly becoming a requirement</strong> that universities have not yet decided how to qualify. Learning these tools now, while you are still studying, is the difference between catching up and leading.</span></li>
-            <li><span class="mission__idx">03</span><span><strong>Everything is aimed at one outcome:</strong> making you genuinely competitive with students anywhere in the world, at a price a student can actually afford.</span></li>
-            <li><span class="mission__idx">04</span><span><strong>For some of us learning just clicks.</strong> For the rest it takes hearing the same idea a different way, in our own words, at our own pace. That is what the study partner is for.</span></li>
+            <li data-reveal="rise"><span class="mission__idx">01</span><span><strong>The notes we get are sufficient.</strong> They really are. But sufficient is not the same as understanding, so I took them apart and rebuilt them with clearer structure and worked examples.</span></li>
+            <li data-reveal="rise"><span class="mission__idx">02</span><span><strong>AI fluency is quietly becoming a requirement</strong> that universities have not yet decided how to qualify. Learning these tools now, while you are still studying, is the difference between catching up and leading.</span></li>
+            <li data-reveal="rise"><span class="mission__idx">03</span><span><strong>Everything is aimed at one outcome:</strong> making you genuinely competitive with students anywhere in the world, at a price a student can actually afford.</span></li>
+            <li data-reveal="rise"><span class="mission__idx">04</span><span><strong>For some of us learning just clicks.</strong> For the rest it takes hearing the same idea a different way, in our own words, at our own pace. That is what the study partner is for.</span></li>
           </ul>
-          <p>A quick word about me: I am a first year CS student at NMU building this in my own time because I remember how disorienting that first semester is. If something here is wrong or unclear, tell me and I will fix it.</p>
+          <p data-reveal="rise">A quick word about me: I am a first year CS student at NMU building this in my own time because I remember how disorienting that first semester is. If something here is wrong or unclear, tell me and I will fix it.</p>
         </div>
       </div>
     </section>
@@ -652,7 +1268,7 @@
          ========================================================== -->
     <section class="modules" id="modules" aria-label="Modules">
       <div class="wrap">
-        <div class="sec-head reveal">
+        <div class="sec-head" data-reveal="rise">
           <div class="sec-head__bar">
             <span class="sec-head__path">~/nexus</span>
             <span>/modules/</span>
@@ -686,7 +1302,7 @@
          ========================================================== -->
     <section class="partner" id="partner" aria-label="AI study partner">
       <div class="wrap wrap--narrow">
-        <div class="sec-head reveal">
+        <div class="sec-head" data-reveal="rise">
           <div class="sec-head__bar">
             <span class="sec-head__path">~/nexus</span>
             <span>/partner</span>
@@ -695,20 +1311,23 @@
           <p class="sec-head__lead">Not a search box returning a definition. A study partner that adapts to how you actually understand things.</p>
         </div>
 
-        <div class="chat reveal">
-          <div class="chat__msg">
+        <!-- Wipe + per-message stagger, same as the README box. Each
+             message is its own stagger step so the exchange lands
+             turn by turn. -->
+        <div class="chat glass hoverable" data-reveal="wipe">
+          <div class="chat__msg rv-line">
             <span class="chat__who">student</span>
             <span class="chat__text">why does the chain rule work? i just dont get it</span>
           </div>
-          <div class="chat__msg chat__msg--you">
+          <div class="chat__msg chat__msg--you rv-line">
             <span class="chat__who">partner</span>
             <span class="chat__text">It comes from two things: the chain rule itself, and the fact that <b>y</b> is a function of <b>x</b>. Because <b>y</b> depends on <b>x</b>, and <b>x</b> depends on <b>u</b>, the rate of change multiplies. You already know this from velocity and acceleration: if <b>v</b> changes with time, acceleration is the derivative of <b>v</b> with respect to time. Same shape of idea.</span>
           </div>
-          <div class="chat__msg">
+          <div class="chat__msg rv-line">
             <span class="chat__who">student</span>
             <span class="chat__text">ok but show me with numbers</span>
           </div>
-          <div class="chat__msg chat__msg--you">
+          <div class="chat__msg chat__msg--you rv-line">
             <span class="chat__who">partner</span>
             <span class="chat__text">Let <b>x = u²</b> and <b>y = 3x</b>. Then dy/du = dy/dx × dx/du = 3 × 2u = 6u. At u = 2: dy/du = 12.</span>
           </div>
@@ -722,19 +1341,21 @@
          ========================================================== -->
     <section class="pricing" id="pricing" aria-label="Pricing">
       <div class="wrap wrap--narrow">
-        <div class="sec-head reveal">
+        <div class="sec-head" data-reveal="rise">
           <div class="sec-head__bar">
             <span class="sec-head__path">~/nexus</span>
             <span>/pricing</span>
           </div>
           <h2 class="sec-head__title">Unlock the whole semester</h2>
         </div>
-        <div class="price-table reveal">
-          <div class="price-row">
+        <!-- Wipe + per-row stagger, same as the README box. -->
+        <div class="price-table glass hoverable" data-reveal="wipe">
+          <div class="price-row hoverable rv-line">
             <span class="price-row__label">single module, single semester</span>
             <span class="price-row__amount">R50</span>
           </div>
-          <div class="price-row price-row--bundle">
+          <div class="price-row price-row--bundle rv-line">
+            <span class="price-row__sheen" aria-hidden="true"></span>
             <span class="price-row__label">all 13 modules, full semester</span>
             <span class="price-row__amount">R250 <small>SAVE R400</small></span>
           </div>
@@ -748,7 +1369,7 @@
          ========================================================== -->
     <section class="reviews" id="reviews" aria-label="Reviews">
       <div class="wrap wrap--narrow">
-        <div class="sec-head reveal">
+        <div class="sec-head" data-reveal="rise">
           <div class="sec-head__bar">
             <span class="sec-head__path">~/nexus</span>
             <span>/reviews</span>
@@ -868,7 +1489,7 @@
         if (!host) return;
         readPool('modules-pool').forEach((m) => {
           const row = document.createElement('div');
-          row.className = 'modlist__row';
+          row.className = 'modlist__row hoverable';
           row.innerHTML =
             '<span class="modlist__code">' + m.code + '</span>' +
             '<span class="modlist__name">' + m.name + '</span>' +
@@ -890,7 +1511,8 @@
         if (!host) return;
         readPool('reviews-pool').forEach((r) => {
           const el = document.createElement('div');
-          el.className = 'rev reveal';
+          el.className = 'rev glass hoverable';
+          el.dataset.reveal = 'rise';
           el.innerHTML =
             '<div class="rev__head">' +
               '<span class="rev__name">' + r.name + '</span>' +
@@ -918,28 +1540,486 @@
         window.addEventListener('scroll', onScroll, { passive: true });
       }
 
+      // ---------- Scroll reveals ----------
+      // The page is a terminal, so content arrives the way a terminal
+      // produces output rather than by sliding in generically. Each
+      // element is tagged with a data-reveal effect and re-runs every
+      // time it enters the viewport, so scrolling back up and down
+      // replays the sequence instead of leaving static text.
+      //
+      //   wipe   — a wipe-bar sweeps down, then the text lands
+      //   rise   — staggered lines lift into place
+      //   scan   — a scanline passes, then the block settles
       function initReveal() {
-        const items = document.querySelectorAll('.reveal');
-        if (!('IntersectionObserver' in window) || reduced) {
-          items.forEach((el) => el.classList.add('is-in'));
+        const items = Array.prototype.slice.call(document.querySelectorAll('[data-reveal]'));
+        if (!items.length || !('IntersectionObserver' in window) || reduced) {
+          items.forEach(function (el) { el.classList.add('is-in'); });
           return;
         }
-        const io = new IntersectionObserver((es) => {
-          es.forEach((e) => {
-            if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); }
+
+        // Lines inside an effect get their own stagger.
+        items.forEach(function (el) {
+          el.classList.add('rv-' + (el.dataset.reveal || 'wipe'));
+          const lines = el.querySelectorAll('.rv-line');
+          Array.prototype.forEach.call(lines, function (ln, i) {
+            ln.style.setProperty('--rv-i', i);
           });
-        }, { threshold: 0.12 });
-        items.forEach((el) => io.observe(el));
+        });
+
+        const io = new IntersectionObserver(function (entries) {
+          entries.forEach(function (e) {
+            if (e.isIntersecting) {
+              // Restart the animation even if it already ran, so the
+              // effect replays on every pass.
+              e.target.classList.remove('is-in');
+              // Force a reflow so re-adding the class restarts the
+              // keyframes instead of being coalesced away.
+              void e.target.offsetWidth;
+              e.target.classList.add('is-in');
+            } else {
+              // Leaving the viewport tears the state down, so the next
+              // entry plays the whole sequence again rather than
+              // resuming mid-way.
+              e.target.classList.remove('is-in');
+            }
+          });
+        }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+
+        items.forEach(function (el) { io.observe(el); });
+      }
+
+      // ---------- Morph title ----------
+      // Two phrases sharing ONE timeline cross-fade — both are half
+      // visible at the midpoint, which reads as a dissolve rather than
+      // a morph. To get a real hand-off, each phrase gets its OWN
+      // cycle of length `total`, and the delay is staggered so phrase
+      // n's hold ends exactly where phrase n+1's hold begins, plus the
+      // --morph-stagger overlap that controls the gap between them.
+      //
+      //   0% .............. hold .............. 100%
+      //   phrase 0:  [======= visible =======]...........
+      //   phrase 1:  ................[======= visible =======]
+      //
+      // The keyframe percentages are computed here from the tokens so
+      // the crossfade gap stays tunable from the top of the file.
+      function initMorph() {
+        const title = document.getElementById('morph-title');
+        if (!title) return;
+        const words = title.querySelectorAll('[data-morph-word]');
+        if (!words.length) return;
+        const n = words.length;
+
+        const tok = readTokens([
+          '--morph-interval', '--morph-stagger', '--grad-dur', '--grad-dur-hover',
+          '--morph-blur-in', '--morph-blur-out',
+          '--morph-scale-in', '--morph-scale-out'
+        ]);
+        const interval = (parseFloat(tok['morph-interval']) || 2.6) * 1000;
+        const stagger = Math.max(0, Math.min(0.98, parseFloat(tok['morph-stagger']) || 0));
+        const blurIn = tok['morph-blur-in'] || '14px';
+        const blurOut = tok['morph-blur-out'] || '16px';
+        const scaleIn = tok['morph-scale-in'] || '0.88';
+        const scaleOut = tok['morph-scale-out'] || '1.12';
+        const grad = parseFloat(tok['grad-dur']) || 9;
+        const gradHover = parseFloat(tok['grad-dur-hover']) || 2.6;
+
+        // Each phrase owns a slot of 1/n of the cycle. Its fade-in and
+        // fade-out together must fill exactly one interval, otherwise
+        // the stops invert and both words sit on screen at once.
+        //
+        //   stagger 0    -> fade-in and fade-out are instant, so each
+        //                    phrase simply replaces the last (hard cut)
+        //   stagger 0.55 -> the outgoing phrase is still visible as the
+        //                    incoming one arrives (a true dissolve)
+        //   stagger 1    -> a full dissolve, never fully opaque
+        const total = interval * n;
+        const fade = stagger * interval;       // each of fade-in/out
+        const hold = interval - fade;          // steady, fully opaque
+        const fadeInEnd = (fade / total) * 100;
+        const holdEnd = ((fade + hold) / total) * 100;
+
+        // Build the opacity ramp. The mid stop only exists when there
+        // is a fade to shape — at stagger 0 the ramp is a hard cut and
+        // three stops would all collapse onto 0%, which is invalid CSS.
+        const stops = [
+          ' 0%   { opacity: 0; filter: blur(' + blurIn + '); transform: scale(' + scaleIn + '); }'
+        ];
+        if (fadeInEnd > 0.5) {
+          stops.push(' ' + (fadeInEnd / 2).toFixed(2) + '% { opacity: .5; }');
+          stops.push(' ' + fadeInEnd.toFixed(2) + '% { opacity: 1; filter: blur(0); transform: scale(1); }');
+          stops.push(' ' + holdEnd.toFixed(2) + '% { opacity: 1; filter: blur(0); transform: scale(1); }');
+        } else {
+          stops.push(' ' + holdEnd.toFixed(2) + '% { opacity: 1; filter: blur(0); transform: scale(1); }');
+        }
+        stops.push(' 100% { opacity: 0; filter: blur(' + blurOut + '); transform: scale(' + scaleOut + '); }');
+
+        // Rewrite the keyframes with the computed stops. A style
+        // element is scoped to this page; there is only ever one
+        // morph title, so a single id is enough.
+        const style = document.createElement('style');
+        style.textContent = '@keyframes morph-word-rotate {\n' + stops.join('\n') + '\n}';
+        document.head.appendChild(style);
+
+        function apply(rate) {
+          Array.prototype.forEach.call(words, function (w, i) {
+            // Two animations on one element: the morph and the gradient
+            // flow. Declared in one shorthand so they stay in sync.
+            w.style.animation =
+              'morph-word-rotate ' + (total * rate) + 'ms linear ' +
+              (i * interval * rate) + 'ms infinite both, ' +
+              'grad-flow ' + (grad * rate) + 's linear infinite';
+          });
+        }
+
+        apply(1);
+        // Hovering tightens the morph and the gradient together, so the
+        // whole line reacts at once.
+        title.addEventListener('mouseenter', function () {
+          const rate = 0.4;
+          Array.prototype.forEach.call(words, function (w, i) {
+            w.style.animation =
+              'morph-word-rotate ' + (total * rate) + 'ms linear ' +
+              (i * interval * rate) + 'ms infinite both, ' +
+              'grad-flow ' + (gradHover * rate) + 's linear infinite';
+          });
+        });
+        title.addEventListener('mouseleave', function () { apply(1); });
+      }
+
+// ============================================================
+      // ASCII BACKGROUND ENGINE
+      // ------------------------------------------------------------
+      // Approach mirrors asciify-engine's fluid background: the
+      // field is computed into an ImageData buffer and blitted with
+      // a single putImageData per frame. Glyphs are pre-rendered ONCE
+      // into an offscreen atlas, so per-frame work is one typed-array
+      // write per cell rather than a fillText() call. That is the
+      // difference between a slideshow and a smooth 30fps.
+      //
+      // Every tunable — ramp, cell size, fps, opacity, both colour
+      // endpoints, speed, cursor influence — is read from the CSS
+      // custom properties in the :root token block at the top of this
+      // file, so the whole look is adjustable in one place.
+      //
+      // Two instances run:
+      //   landing  — fullscreen, cursor-reactive (the "fluid" layer)
+      //   ambient  — fixed, very slow, no pointer response
+      // ============================================================
+      function readTokens(names) {
+        const cs = getComputedStyle(document.documentElement);
+        const out = {};
+        names.forEach((n) => out[n.replace(/^--/, '')] = cs.getPropertyValue(n).trim());
+        return out;
+      }
+
+      function hexToRgb(hex) {
+        const h = (hex || '').replace('#', '').trim();
+        const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+        const n = parseInt(full, 16);
+        if (isNaN(n)) return [255, 255, 255];
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+      }
+
+      // A 32-bit avalanche mix. Math.imul keeps every step in integer
+      // space — plain multiplication on large constants overflows
+      // float precision and collapses the output to [0, 0.5].
+      function hash2(x, y, seed) {
+        let h = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(seed | 0, 1274126177);
+        h = Math.imul(h ^ (h >>> 13), 1274126177);
+        h = (h ^ (h >>> 16)) >>> 0;
+        return h / 4294967295;
+      }
+
+      function smooth(t) { return t * t * (3 - 2 * t); }
+
+      // Bilinear value noise with a soft, organic falloff.
+      function valueNoise(x, y, seed) {
+        const xi = Math.floor(x), yi = Math.floor(y);
+        const xf = smooth(x - xi), yf = smooth(y - yi);
+        const a = hash2(xi, yi, seed);
+        const b = hash2(xi + 1, yi, seed);
+        const c = hash2(xi, yi + 1, seed);
+        const d = hash2(xi + 1, yi + 1, seed);
+        return (a * (1 - xf) + b * xf) * (1 - yf) + (c * (1 - xf) + d * xf) * yf;
+      }
+
+      function createAsciiLayer(canvas, opts) {
+        const ctx = canvas.getContext('2d', { alpha: true });
+        if (!ctx) return null;
+        const interactive = !!opts.interactive;
+
+        const t = readTokens([
+          '--ascii-ramp', '--ascii-font', '--ascii-fps', '--ascii-op',
+          '--ascii-low', '--ascii-high', '--ascii-speed', '--ascii-scale',
+          '--ascii-cursor-radius', '--ascii-cursor-power',
+          '--amb-ramp', '--amb-font', '--amb-fps', '--amb-op', '--amb-scale',
+          '--amb-low', '--amb-high', '--amb-speed'
+        ]);
+
+        // The landing layer reads the --ascii-* tokens, the ambient
+        // layer the --amb-* ones.
+        const P = interactive ? 'ascii' : 'amb';
+        const ramp = (t[P + '-ramp'] || ' .:-=+*#%@').replace(/["']/g, '').split('');
+        const cell = parseFloat(t[P + '-font']) || 13;
+        const fps = parseFloat(t[P + '-fps']) || 24;
+        const speed = parseFloat(t[P + '-speed']) || 1;
+        const op = parseFloat(t[P + '-op']);
+        const cursorRadius = parseFloat(t['ascii-cursor-radius']) || 10;
+        const cursorPower = parseFloat(t['ascii-cursor-power']) || 1;
+
+        // Resolution of the buffer relative to the screen. The canvas
+        // is CSS-scaled back up, so a sub-1.0 value is invisible on a
+        // background this faint but cuts the per-pixel work directly.
+        let scale = parseFloat(t[P + '-scale']);
+        if (!(scale > 0 && scale <= 1)) scale = 1;
+
+        const low = hexToRgb(t[P + '-low']);
+        const high = hexToRgb(t[P + '-high']);
+
+        canvas.style.opacity = isNaN(op) ? 1 : op;
+
+        // ---- Glyph atlas ----
+        // Each ramp glyph is rasterised ONCE into its own small canvas
+        // at the scaled cell size. Per frame we only alpha-blend these
+        // into the buffer, so no text rasterisation happens during the
+        // animation loop.
+        const fontFamily = getComputedStyle(document.body).fontFamily;
+        const atlasCell = Math.max(2, Math.round(cell * scale));
+        const atlas = ramp.map(function (ch) {
+          const c = document.createElement('canvas');
+          c.width = atlasCell;
+          c.height = atlasCell;
+          const g = c.getContext('2d');
+          g.font = atlasCell + 'px ' + fontFamily;
+          g.textBaseline = 'top';
+          g.fillStyle = '#fff';
+          g.fillText(ch, 0, 0);
+          // Keep only the glyph's coverage, so it can be tinted per
+          // cell without re-reading pixels.
+          const d = g.getImageData(0, 0, atlasCell, atlasCell).data;
+          const a = new Uint8Array(atlasCell * atlasCell);
+          for (let p = 0, k = 3; p < a.length; p++, k += 4) a[p] = d[k];
+          return { ch: ch, a: a };
+        });
+
+        // Precompute the colour ramp so the per-cell path does no
+        // interpolation maths — just an index and a copy.
+        const STEPS = 32;
+        const lutR = new Uint8Array(STEPS), lutG = new Uint8Array(STEPS), lutB = new Uint8Array(STEPS);
+        for (let i = 0; i < STEPS; i++) {
+          const f = i / (STEPS - 1);
+          lutR[i] = low[0] + (high[0] - low[0]) * f;
+          lutG[i] = low[1] + (high[1] - low[1]) * f;
+          lutB[i] = low[2] + (high[2] - low[2]) * f;
+        }
+
+        // Contrast expansion for the noise field. 1 = untouched.
+        const CONTRAST = 1.35;
+
+        const pointer = { x: -9999, y: -9999, active: false };
+        const frameMs = 1000 / fps;
+        let raf = 0, last = 0, running = true, destroyed = false;
+        let img = null, buf = null, bufW = 0, bufH = 0;
+        let cols = 0, rows = 0, cellPx = atlasCell;
+
+        // The buffer is rendered at `scale` of the element's CSS size,
+        // then the canvas is stretched back up by CSS. Keeping the
+        // backing store below device pixels is the single biggest
+        // lever on cost, and on a 20%-opacity background it is
+        // visually indistinguishable.
+        function resize() {
+          const w = canvas.clientWidth || canvas.offsetWidth || 1;
+          const h = canvas.clientHeight || canvas.offsetHeight || 1;
+
+          const renderW = Math.max(1, Math.round(w * scale));
+          const renderH = Math.max(1, Math.round(h * scale));
+
+          canvas.width = renderW;
+          canvas.height = renderH;
+
+          // The noise grid still divides the screen evenly; only the
+          // pixels each glyph is rasterised into are scaled down.
+          cellPx = Math.max(2, Math.round(cell * scale));
+          cols = Math.max(1, Math.ceil(renderW / cellPx));
+          rows = Math.max(1, Math.ceil(renderH / cellPx));
+          bufW = renderW;
+          bufH = renderH;
+          img = ctx.createImageData(bufW, bufH);
+          buf = img.data;
+        }
+
+        function draw(now) {
+          if (destroyed) return;
+          raf = requestAnimationFrame(draw);
+          if (now - last < frameMs) return;
+          last = now;
+          if (!buf) return;
+
+          const time = now * 0.001 * speed;
+
+          // Clear the whole buffer in one typed-array operation.
+          buf.fill(0);
+
+          for (let y = 0; y < rows; y++) {
+            for (let x = 0; x < cols; x++) {
+              const n1 = valueNoise(
+                x * 0.055 + time * 0.22,
+                y * 0.055 - time * 0.14,
+                1
+              );
+              const n2 = valueNoise(
+                x * 0.021 - time * 0.11,
+                y * 0.021 + time * 0.09,
+                7
+              );
+              let v = n1 * 0.62 + n2 * 0.38;
+
+              // Cursor influence: a soft radial well that lifts the
+              // field toward the pointer. Landing layer only.
+              if (interactive && pointer.active) {
+                const cxp = pointer.x / cell, cyp = pointer.y / cell;
+                const dx = x - cxp, dy = y - cyp;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < cursorRadius) {
+                  const infl = 1 - dist / cursorRadius;
+                  v += infl * infl * 0.55 * cursorPower;
+                }
+              }
+
+              // Expand around the midpoint; raw value noise clusters
+              // near 0.5 and would render as a flat smear.
+              v = (v - 0.5) * CONTRAST + 0.5;
+              if (v <= 0) continue;
+
+              let gi = (v * (ramp.length - 1)) | 0;
+              if (gi > ramp.length - 1) gi = ramp.length - 1;
+              const gl = atlas[gi];
+              if (!gl || gl.ch === ' ') continue;
+
+              let ci = (v * (STEPS - 1)) | 0;
+              if (ci > STEPS - 1) ci = STEPS - 1;
+              const cr = lutR[ci], cg = lutG[ci], cb = lutB[ci];
+              const mask = gl.a;
+
+              // Blend this cell's glyph into the buffer.
+              const px0 = x * cellPx, py0 = y * cellPx;
+              const bw = bufW - px0, bh = bufH - py0;
+              if (bw <= 0 || bh <= 0) continue;
+              const wCell = bw < cellPx ? bw : cellPx;
+              const hCell = bh < cellPx ? bh : cellPx;
+
+              for (let gy = 0; gy < hCell; gy++) {
+                const mRow = gy * cellPx;
+                const dRow = ((py0 + gy) * bufW + px0) << 2;
+                for (let gx = 0; gx < wCell; gx++) {
+                  const a = mask[mRow + gx];
+                  if (a === 0) continue;
+                  const o = dRow + (gx << 2);
+                  buf[o] = cr;
+                  buf[o + 1] = cg;
+                  buf[o + 2] = cb;
+                  buf[o + 3] = a;
+                }
+              }
+            }
+          }
+
+          // One blit per frame instead of thousands of text draws.
+          ctx.putImageData(img, 0, 0);
+        }
+
+        // ---- Lifecycle ----
+        function start() { if (!running || destroyed) return; last = 0; raf = requestAnimationFrame(draw); }
+        function stop() { running = false; cancelAnimationFrame(raf); }
+        function play() { running = true; start(); }
+
+        function onPointerMove(e) {
+          const r = canvas.getBoundingClientRect();
+          pointer.x = e.clientX - r.left;
+          pointer.y = e.clientY - r.top;
+          pointer.active = true;
+        }
+        function onPointerLeave() { pointer.active = false; }
+
+        const ro = ('ResizeObserver' in window) ? new ResizeObserver(resize) : null;
+        if (interactive) {
+          window.addEventListener('pointermove', onPointerMove, { passive: true });
+          window.addEventListener('pointerleave', onPointerLeave, { passive: true });
+        }
+        if (ro) ro.observe(canvas);
+        window.addEventListener('resize', resize);
+
+        // Only burn frames while the layer is actually on screen.
+        const io = ('IntersectionObserver' in window)
+          ? new IntersectionObserver(function (es) {
+              es.forEach(function (e) { e.isIntersecting ? play() : stop(); });
+            }, { threshold: 0 })
+          : null;
+        if (io) io.observe(canvas);
+
+        document.addEventListener('visibilitychange', function () {
+          document.hidden ? stop() : play();
+        });
+
+        resize();
+        start();
+
+        // Paired with creation above so the layer tears down cleanly —
+        // no orphaned rAF loop and no duplicate canvas.
+        function destroy() {
+          destroyed = true;
+          stop();
+          if (ro) ro.disconnect();
+          if (io) io.disconnect();
+          window.removeEventListener('resize', resize);
+          if (interactive) {
+            window.removeEventListener('pointermove', onPointerMove);
+            window.removeEventListener('pointerleave', onPointerLeave);
+          }
+          if (buf) buf.fill(0);
+          if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        return { destroy: destroy, start: play, stop: stop, resize: resize };
+      }
+
+      function initAscii() {
+        const landingCanvas = document.getElementById('landing-ascii');
+        const ambientCanvas = document.getElementById('ambient');
+
+        if (landingCanvas) {
+          createAsciiLayer(landingCanvas, { interactive: true });
+        }
+        // The ambient layer honours reduced-motion: it is not started
+        // at all rather than animating forever.
+        if (ambientCanvas && !reduced) {
+          createAsciiLayer(ambientCanvas, { interactive: false });
+        }
+      }
+
+      // ---------- Render the snippet, one line per stagger step ----------
+      // The README box resolves line by line, so the code box does too.
+      // Each line becomes a block-level .rv-line and initReveal assigns
+      // it --rv-i, giving the same staggered arrival. Blank lines get a
+      // zero-width space so they still occupy a line box.
+      function renderSnippet() {
+        const snip = document.getElementById('snippet');
+        if (!snip) return;
+        snip.innerHTML = SNIPPET.split('\n').map(function (line) {
+          const body = line ? highlight(line) : '';
+          return '<span class="sample__line rv-line">' + body + '</span>';
+        }).join('');
       }
 
       document.addEventListener('DOMContentLoaded', () => {
-        const snip = document.getElementById('snippet');
-        if (snip) snip.innerHTML = highlight(SNIPPET);
+        renderSnippet();
         renderModules();
         renderReviews();
         initMarquees();
         initNav();
         initReveal();
+        initMorph();
+        initAscii();
       });
     })();
   </script>
