@@ -1,0 +1,1729 @@
+/* ============================================================
+   NEXUS APP SURFACES
+   ------------------------------------------------------------
+   Everything that is not the landing page: the auth screen, the
+   module catalogue, and the dashboard. Same tokens, same glass,
+   same reveal vocabulary as landing.css — same `nt-` namespace,
+   so the two sheets can be read as one system.
+
+   Rules here are additive. landing.css remains the design source
+   of truth for / and is never overridden by this file.
+   ============================================================ */
+
+/* ============================================================
+   PAGE FRAME
+   A root for every non-landing route. It establishes the black
+   canvas, the mono body type, and the fixed grid, so a new page
+   only has to supply its content.
+   ============================================================ */
+.nt-app {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-0);
+  color: var(--fg);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+.nt-app *,
+.nt-app *::before,
+.nt-app *::after {
+  box-sizing: border-box;
+}
+.nt-app ::selection {
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+.nt-app :focus-visible {
+  outline: 2px solid var(--accent-b);
+  outline-offset: 2px;
+}
+.nt-app__main {
+  flex: 1;
+}
+.nt-app__pad {
+  padding-block: var(--sp-8);
+}
+
+/* Footer, shared by every non-landing route. */
+.nt-appfoot {
+  border-top: 1px solid var(--line);
+  padding-block: var(--sp-5);
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+.nt-appfoot a {
+  color: var(--fg-dim);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.nt-appfoot a:hover {
+  color: var(--accent-b);
+}
+
+/* Prose for the longer-form copy on detail pages. */
+.nt-prose {
+  color: var(--fg-muted);
+  font-size: var(--fs-body);
+  max-width: 44rem;
+}
+.nt-prose p {
+  margin: 0 0 var(--sp-4);
+}
+.nt-prose strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+.nt-prose em {
+  color: var(--accent-b);
+  font-style: normal;
+}
+
+/* ============================================================
+   SHARED SMALL PIECES
+   ============================================================ */
+
+/* A status dot + label. One component, four tones. */
+.nt-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+.nt-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.nt-badge--ok {
+  color: var(--ok);
+  border-color: rgba(165, 214, 167, 0.28);
+}
+.nt-badge--warn {
+  color: var(--warn);
+  border-color: rgba(253, 211, 174, 0.28);
+}
+.nt-badge--live {
+  color: var(--accent-b);
+  border-color: var(--accent-line);
+}
+.nt-badge--soon {
+  color: var(--fg-dim);
+}
+
+/* A short note under a control, or a placeholder's disclaimer. */
+.nt-note {
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  line-height: 1.7;
+}
+
+/* A disabled control that still has to read as a button. */
+.nt-btn--off {
+  cursor: not-allowed;
+  opacity: 0.55;
+  pointer-events: none;
+  filter: saturate(0.4);
+}
+
+/* A card that the reveal engine can address. */
+.nt-panel {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  overflow: hidden;
+}
+.nt-panel__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+.nt-panel__body {
+  padding: var(--sp-5);
+}
+
+/* A definition row: label on the left, value on the right. */
+.nt-kv {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--fs-sm);
+}
+.nt-kv:last-child {
+  border-bottom: 0;
+}
+.nt-kv__k {
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+.nt-kv__v {
+  color: var(--fg-muted);
+}
+.nt-kv__v strong {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+/* Horizontal meter, used for password strength and progress. */
+.nt-meter {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+}
+.nt-meter__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-b);
+  transition:
+    width var(--dur-med) var(--ease-out),
+    background-color var(--dur-med) var(--ease-out);
+}
+.nt-meter__fill--weak { background: var(--danger); }
+.nt-meter__fill--fair { background: var(--warn); }
+.nt-meter__fill--good { background: var(--ok); }
+
+/* Segmented progress bar for module completion. */
+.nt-seg {
+  display: flex;
+  gap: 3px;
+}
+.nt-seg__cell {
+  height: 4px;
+  flex: 1;
+  border-radius: 1px;
+  background: var(--line);
+}
+.nt-seg__cell--on {
+  background: var(--accent-b);
+}
+
+/* A section that says "this is not built yet" without hiding the
+   shell that will eventually hold the real thing. */
+.nt-soon {
+  border: 1px dashed var(--line);
+  border-radius: var(--r-md);
+  padding: var(--sp-5);
+  text-align: center;
+  color: var(--fg-dim);
+  font-size: var(--fs-sm);
+}
+
+/* ============================================================
+   FORM CONTROLS
+   Terminal-styled inputs. Every route renders inside one of the
+   three roots above, so these are scoped to .nt-root and match
+   all three by way of the shared root class.
+   ============================================================ */
+.nt-root .nt-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.nt-root .nt-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.nt-root .nt-label__hint {
+  text-transform: none;
+  letter-spacing: var(--tracking);
+  color: var(--fg-dim);
+  opacity: 0.8;
+}
+.nt-root .nt-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.nt-root .nt-input {
+  width: 100%;
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-sm);
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--fg);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: var(--tracking);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+.nt-root .nt-input::placeholder {
+  color: var(--fg-dim);
+  opacity: 0.6;
+}
+.nt-root .nt-input:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+.nt-root .nt-input:focus {
+  outline: none;
+  border-color: var(--accent-b);
+  background: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 0 3px rgba(253, 211, 174, 0.1);
+}
+.nt-root .nt-input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+/* Room for the reveal button when there is one. */
+.nt-root .nt-input-wrap--action .nt-input {
+  padding-right: 4.25rem;
+}
+.nt-root .nt-input-action {
+  position: absolute;
+  right: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-dim);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+.nt-root .nt-input-action:hover {
+  color: var(--accent-b);
+  border-color: var(--accent-line);
+}
+.nt-root .nt-err {
+  font-size: var(--fs-xs);
+  color: var(--danger);
+  letter-spacing: var(--tracking);
+}
+.nt-root .nt-err::before {
+  content: "! ";
+}
+
+/* A checkbox / switch row used across Settings. */
+.nt-root .nt-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  padding: var(--sp-4) var(--sp-5);
+}
+.nt-root .nt-switch-text {
+  min-width: 0;
+}
+.nt-root .nt-switch-text b {
+  display: block;
+  color: var(--fg);
+  font-weight: 500;
+  font-size: var(--fs-sm);
+}
+.nt-root .nt-switch-text span {
+  display: block;
+  color: var(--fg-dim);
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  margin-top: var(--sp-1);
+}
+.nt-root .nt-switch {
+  flex-shrink: 0;
+  width: 42px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-edge);
+  background: rgba(0, 0, 0, 0.4);
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background-color var(--dur-med) var(--ease-out),
+    border-color var(--dur-med) var(--ease-out);
+}
+.nt-root .nt-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+  transition:
+    transform var(--dur-med) var(--ease-out),
+    background-color var(--dur-med) var(--ease-out);
+}
+.nt-root .nt-switch[aria-checked="true"] {
+  background: var(--accent-soft);
+  border-color: var(--hover-edge);
+}
+.nt-root .nt-switch[aria-checked="true"]::after {
+  transform: translateX(20px);
+  background: var(--accent-b);
+}
+.nt-root .nt-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* ============================================================
+   AUTH — /login
+   A full-bleed field with the form floating on it. The ASCII is
+   the landing variant so it reacts to the pointer, which is what
+   makes the screen feel alive rather than wallpaper.
+   ============================================================ */
+.nt-auth {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.85fr);
+  align-items: center;
+  gap: var(--sp-8);
+  padding: var(--sp-8) var(--sp-6);
+  isolation: isolate;
+  overflow: hidden;
+}
+.nt-auth__veil {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 30% 40%,
+    rgba(0, 0, 0, 0.82) 0%,
+    rgba(0, 0, 0, 0.6) 45%,
+    rgba(0, 0, 0, 0.35) 75%,
+    transparent 100%
+  );
+}
+
+/* ---- The pitch column ---- */
+.nt-auth__pitch {
+  position: relative;
+  z-index: 2;
+  max-width: 30rem;
+}
+.nt-auth__mark {
+  display: block;
+  font-weight: 700;
+  font-size: var(--fs-lg);
+  letter-spacing: var(--tracking);
+  margin-bottom: var(--sp-6);
+  text-decoration: none;
+  color: var(--fg);
+}
+.nt-auth__mark .nt-caret {
+  color: var(--accent-b);
+  animation: nt-blink var(--dur-caret) step-end infinite;
+}
+.nt-auth__title {
+  margin: 0 0 var(--sp-5);
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+.nt-auth__lead {
+  color: var(--fg-muted);
+  font-size: var(--fs-body);
+  max-width: 26rem;
+}
+.nt-auth__points {
+  list-style: none;
+  padding: 0;
+  margin: var(--sp-6) 0 0;
+}
+.nt-auth__points li {
+  display: grid;
+  grid-template-columns: 1.5rem 1fr;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+.nt-auth__points li:last-child {
+  border-bottom: 1px solid var(--line-soft);
+}
+.nt-auth__points li::before {
+  content: "->";
+  color: var(--accent-b);
+}
+.nt-auth__stat {
+  display: flex;
+  gap: var(--sp-6);
+  margin-top: var(--sp-6);
+}
+.nt-auth__stat div b {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--accent-b);
+  letter-spacing: -0.02em;
+}
+.nt-auth__stat div span {
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+
+/* ---- The form column ---- */
+.nt-auth__card {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 27rem;
+  justify-self: end;
+  border-radius: var(--r-lg);
+  padding: var(--sp-6);
+}
+.nt-auth__card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    160deg,
+    rgba(253, 211, 174, 0.07) 0%,
+    transparent 38%
+  );
+}
+.nt-auth__tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-1);
+  padding: var(--sp-1);
+  margin-bottom: var(--sp-6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: rgba(0, 0, 0, 0.3);
+}
+/* The lit segment slides behind the labels rather than the labels
+   swapping colour, so the switch reads as one continuous surface. */
+.nt-auth__tab-glide {
+  position: absolute;
+  top: var(--sp-1);
+  left: var(--sp-1);
+  width: calc(50% - var(--sp-1));
+  height: calc(100% - 2 * var(--sp-1));
+  border-radius: 4px;
+  background: linear-gradient(var(--glass-tint-hover), var(--glass-tint-hover)), var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  transition: transform var(--dur-med) var(--ease-out);
+}
+.nt-auth__tab-glide--right {
+  transform: translateX(100%);
+}
+.nt-auth__tab {
+  position: relative;
+  z-index: 1;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  transition: color var(--dur-med) var(--ease-out);
+}
+.nt-auth__tab[aria-selected="true"] {
+  color: var(--fg);
+}
+.nt-auth__title-sm {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.nt-auth__sub {
+  margin: 0 0 var(--sp-5);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+.nt-auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.nt-auth__submit {
+  width: 100%;
+  margin-top: var(--sp-1);
+  text-align: center;
+}
+.nt-auth__legal {
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  line-height: 1.7;
+  text-align: center;
+}
+.nt-auth__legal a {
+  color: var(--fg-muted);
+}
+.nt-auth__switch {
+  margin-top: var(--sp-5);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line-soft);
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+.nt-auth__switch button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--accent-b);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.nt-auth__switch button:hover {
+  color: var(--fg);
+}
+
+/* Social sign-in placeholders. */
+.nt-social {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+}
+.nt-social__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-sm);
+  background: var(--glass-bg);
+  color: var(--fg-dim);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+.nt-social__glyph {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+.nt-or {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  color: var(--fg-dim);
+  text-transform: uppercase;
+}
+.nt-or::before,
+.nt-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+@media (max-width: 900px) {
+  .nt-auth {
+    grid-template-columns: minmax(0, 1fr);
+    align-content: center;
+    gap: var(--sp-6);
+  }
+  .nt-auth__pitch {
+    max-width: none;
+  }
+  .nt-auth__card {
+    justify-self: stretch;
+    max-width: none;
+  }
+  /* The pitch is the first thing to go on a phone — the form is
+     the reason anyone is on this screen. */
+  .nt-auth__stat,
+  .nt-auth__points {
+    display: none;
+  }
+}
+
+/* ============================================================
+   MODULES — /modules and /modules/[code]
+   The catalogue reuses the landing's file-listing rows so a
+   student moving between the two pages sees one continuous
+   system, but the rows gain a price column and action slots.
+   ============================================================ */
+.nt-cat {
+  border-top: 1px solid var(--line);
+}
+.nt-cat__row {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1.25fr) minmax(0, 1.5fr) 6rem auto;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-3);
+  border-bottom: 1px solid var(--line-soft);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    padding-left var(--dur-med) var(--ease-out),
+    border-color var(--dur-med) var(--ease-out),
+    box-shadow var(--dur-med) var(--ease-out);
+}
+.nt-cat__row:hover,
+.nt-cat__row:focus-visible {
+  background: rgba(255, 255, 255, 0.022);
+  padding-left: var(--sp-5);
+  border-color: var(--hover-edge);
+  box-shadow: var(--hover-glow);
+}
+.nt-cat__code {
+  color: var(--accent-b);
+  font-weight: 500;
+  letter-spacing: var(--tracking);
+}
+.nt-cat__name {
+  color: var(--fg-muted);
+  font-size: var(--fs-sm);
+}
+.nt-cat__desc {
+  color: var(--fg-dim);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  margin: 0;
+}
+.nt-cat__price {
+  text-align: right;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+.nt-cat__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  justify-self: end;
+}
+/* The row is a link, so the buttons inside it must not navigate. */
+.nt-cat__actions a,
+.nt-cat__actions button {
+  position: relative;
+  z-index: 2;
+}
+.nt-cat__actions .nt-btn {
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-xs);
+  text-decoration: none;
+}
+.nt-cat__owned {
+  color: var(--ok);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  white-space: nowrap;
+}
+
+.nt-cat__head {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1.25fr) minmax(0, 1.5fr) 6rem auto;
+  gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+@media (max-width: 980px) {
+  .nt-cat__head {
+    display: none;
+  }
+  .nt-cat__row {
+    grid-template-columns: 7rem 1fr auto;
+    row-gap: var(--sp-2);
+  }
+  .nt-cat__desc {
+    grid-column: 1 / -1;
+  }
+  .nt-cat__actions {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    justify-content: flex-start;
+  }
+}
+
+/* The sign-in prompt that stands in for a gated button. */
+.nt-gate {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.nt-gate::before {
+  content: "[";
+  color: var(--accent-line);
+}
+.nt-gate::after {
+  content: "]";
+  color: var(--accent-line);
+}
+.nt-gate:hover {
+  color: var(--accent-b);
+}
+
+/* ---- Catalogue summary + filters ---- */
+.nt-cat__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-5);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+.nt-cat__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-5);
+}
+.nt-chip {
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--fg-dim);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+.nt-chip:hover {
+  color: var(--fg);
+  border-color: var(--accent-line);
+}
+.nt-chip[aria-pressed="true"] {
+  color: var(--fg);
+  border-color: var(--accent-b);
+  background: var(--accent-soft);
+}
+
+/* ---- Improvement request form ---- */
+.nt-imp {
+  display: grid;
+  gap: var(--sp-4);
+}
+.nt-imp__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+}
+.nt-imp__sent {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border: 1px solid rgba(165, 214, 167, 0.28);
+  border-radius: var(--r-sm);
+  background: rgba(165, 214, 167, 0.06);
+  color: var(--ok);
+  font-size: var(--fs-sm);
+}
+@media (max-width: 620px) {
+  .nt-imp__row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Module detail ---- */
+.nt-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20rem;
+  gap: var(--sp-7);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .nt-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.nt-detail__aside {
+  position: sticky;
+  top: var(--sp-6);
+  display: grid;
+  gap: var(--sp-4);
+}
+@media (max-width: 900px) {
+  .nt-detail__aside {
+    position: static;
+  }
+}
+.nt-detail__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+.nt-detail__code {
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--accent-b);
+  line-height: 1;
+}
+.nt-detail__title {
+  margin: 0;
+  font-size: var(--fs-lg);
+  color: var(--fg-muted);
+  font-weight: 400;
+}
+
+/* Table of contents for a populated module. */
+.nt-toc {
+  border-left: 1px solid var(--line);
+  padding-left: var(--sp-4);
+  display: grid;
+  gap: var(--sp-2);
+}
+.nt-toc a {
+  display: flex;
+  gap: var(--sp-3);
+  color: var(--fg-dim);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.nt-toc a:hover {
+  color: var(--accent-b);
+}
+.nt-toc__n {
+  color: var(--fg-dim);
+  opacity: 0.6;
+}
+
+/* A lesson row inside a populated module. */
+.nt-lesson {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr auto;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-3);
+  border-bottom: 1px solid var(--line-soft);
+  transition:
+    background var(--dur-fast) var(--ease-out),
+    padding-left var(--dur-med) var(--ease-out);
+}
+.nt-lesson:hover {
+  background: rgba(255, 255, 255, 0.022);
+  padding-left: var(--sp-5);
+}
+.nt-lesson:last-child {
+  border-bottom: 0;
+}
+.nt-lesson__n {
+  color: var(--fg-dim);
+  font-size: var(--fs-xs);
+}
+.nt-lesson__title {
+  color: var(--fg-muted);
+  font-size: var(--fs-sm);
+}
+.nt-lesson__title b {
+  display: block;
+  color: var(--fg);
+  font-weight: 500;
+}
+.nt-lesson__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+
+/* A worked example, on the landing's syntax palette. */
+.nt-example {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  overflow: hidden;
+}
+.nt-example__bar {
+  display: flex;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+}
+.nt-example__body {
+  margin: 0;
+  padding: var(--sp-5);
+  font-size: var(--fs-sm);
+  line-height: 1.9;
+  overflow-x: auto;
+  white-space: pre;
+}
+.nt-example__body .nt-example__line {
+  display: block;
+  min-height: 1.9em;
+}
+
+/* ============================================================
+   DASHBOARD
+   The overview's shell: a moving ASCII strip above a glass
+   console that covers the rest of the viewport. The strip uses
+   the ambient variant, so it ignores the pointer and never
+   fights the controls underneath.
+   ============================================================ */
+.nt-dash {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-0);
+  color: var(--fg);
+  font-family: var(--nt-font-mono);
+  overflow-x: hidden;
+}
+.nt-dash *,
+.nt-dash *::before,
+.nt-dash *::after {
+  box-sizing: border-box;
+}
+.nt-dash :focus-visible {
+  outline: 2px solid var(--accent-b);
+  outline-offset: 2px;
+}
+
+/* The uncovered strip: 1/5th of the viewport, ASCII running behind
+   the identity block. Fixed flex basis, so the console below
+   always gets the remaining 4/5ths. */
+.nt-dash__strip {
+  position: relative;
+  flex: 0 0 20vh;
+  min-height: 132px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+}
+/* Scrims at both edges so the strip's ends dissolve rather than
+   cut, and the identity block stays legible over the field. */
+.nt-dash__strip::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.55) 0%, transparent 45%),
+    linear-gradient(to right, #000 0%, transparent 14%, transparent 86%, #000 100%);
+}
+.nt-dash__ascii {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: var(--amb-op);
+}
+.nt-dash__id {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  max-width: var(--nt-max-w);
+  margin-inline: auto;
+  padding: var(--sp-4) var(--sp-5);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+}
+/* ---- Avatar: initials now, a real upload later. The component
+   takes the image URL as an optional prop, so swapping in a
+   hosted avatar is a one-line change at the call site. ---- */
+.nt-avatar {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid var(--accent-line);
+  background:
+    radial-gradient(circle at 30% 25%, rgba(253, 211, 174, 0.2), transparent 60%),
+    var(--accent-soft);
+  color: var(--accent-b);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  user-select: none;
+}
+.nt-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.nt-avatar--lg {
+  width: 84px;
+  height: 84px;
+  font-size: 1.7rem;
+}
+.nt-avatar--sm {
+  width: 34px;
+  height: 34px;
+  font-size: 0.8rem;
+}
+.nt-dash__who {
+  min-width: 0;
+}
+.nt-dash__name {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nt-dash__email {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nt-dash__id-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .nt-dash__strip {
+    flex-basis: 26vh;
+  }
+  .nt-dash__id {
+    gap: var(--sp-4);
+  }
+  .nt-dash__id-actions .nt-btn {
+    display: none;
+  }
+}
+
+/* ---- The console: the glass container over the lower 4/5ths ---- */
+.nt-dash__console {
+  flex: 1;
+  margin-top: calc(-1 * var(--sp-4));
+  border-top-left-radius: var(--r-lg);
+  border-top-right-radius: var(--r-lg);
+  border: 1px solid var(--glass-edge);
+  border-bottom: 0;
+  background: rgba(5, 6, 8, 0.72);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  backdrop-filter: blur(20px) saturate(1.3);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen),
+    0 -20px 60px -30px #000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.nt-dash__tabs {
+  display: flex;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-5) 0;
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.nt-dash__tabs::-webkit-scrollbar {
+  display: none;
+}
+.nt-dash__tab {
+  position: relative;
+  padding: var(--sp-3) var(--sp-4);
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: var(--tracking);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.nt-dash__tab:hover {
+  color: var(--fg-muted);
+}
+.nt-dash__tab--on {
+  color: var(--fg);
+}
+.nt-dash__tab--on::after {
+  content: "";
+  position: absolute;
+  left: var(--sp-3);
+  right: var(--sp-3);
+  bottom: -1px;
+  height: 1px;
+  background: var(--accent-b);
+  box-shadow: 0 0 10px 1px rgba(253, 211, 174, 0.45);
+}
+.nt-dash__tab--on::before {
+  content: "";
+  position: absolute;
+  left: var(--sp-4);
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background: var(--accent-b);
+}
+.nt-dash__body {
+  flex: 1;
+  padding: var(--sp-6) var(--sp-5);
+  overflow-y: auto;
+}
+
+/* ---- Stat tiles across the top of a dashboard page ---- */
+.nt-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-3);
+}
+.nt-stat {
+  padding: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  transition:
+    border-color var(--dur-hover) var(--ease-out),
+    transform var(--dur-hover) var(--ease-out),
+    box-shadow var(--dur-hover) var(--ease-out);
+}
+.nt-stat:hover {
+  transform: translateY(var(--hover-lift));
+  border-color: var(--hover-edge);
+  box-shadow: var(--hover-glow);
+}
+.nt-stat__k {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  margin-bottom: var(--sp-3);
+}
+.nt-stat__v {
+  font-size: 1.9rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: var(--fg);
+}
+.nt-stat__v small {
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+  margin-left: var(--sp-2);
+}
+.nt-stat__foot {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+}
+.nt-stat__meter {
+  margin-top: var(--sp-3);
+}
+
+/* ---- A grid of feature tiles: the placeholder surface ---- */
+.nt-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--sp-3);
+}
+.nt-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-5);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition:
+    transform var(--dur-hover) var(--ease-out),
+    border-color var(--dur-hover) var(--ease-out),
+    background-color var(--dur-hover) var(--ease-out),
+    box-shadow var(--dur-hover) var(--ease-out);
+}
+.nt-tile:hover {
+  transform: translateY(var(--hover-lift));
+  border-color: var(--hover-edge);
+  background-color: var(--hover-fill);
+  box-shadow: var(--hover-glow);
+}
+.nt-tile--soon {
+  cursor: not-allowed;
+}
+.nt-tile--soon:hover {
+  transform: none;
+  border-color: var(--line);
+  background-color: var(--panel);
+  box-shadow: none;
+}
+.nt-tile__glyph {
+  font-size: 1.2rem;
+  line-height: 1;
+  color: var(--accent-b);
+}
+.nt-tile__t {
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--fg);
+}
+.nt-tile__d {
+  font-size: var(--fs-xs);
+  line-height: 1.65;
+  color: var(--fg-dim);
+  flex: 1;
+}
+/* The one-line concept of what the button should eventually do. */
+.nt-tile__concept {
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--fg-muted);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line-soft);
+}
+.nt-tile__concept b {
+  color: var(--accent-b);
+  font-weight: 500;
+  letter-spacing: var(--tracking);
+}
+
+/* ---- A wide console block with a title and a body ---- */
+.nt-block {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  overflow: hidden;
+}
+.nt-block + .nt-block {
+  margin-top: var(--sp-4);
+}
+.nt-block__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--line);
+}
+.nt-block__title {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--fg);
+  letter-spacing: var(--tracking);
+}
+.nt-block__sub {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+}
+.nt-block__body {
+  padding: var(--sp-5);
+}
+.nt-block__body--flush {
+  padding: 0;
+}
+
+/* ---- A row in a settings/table list ---- */
+.nt-drow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--line-soft);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.nt-drow:last-child {
+  border-bottom: 0;
+}
+.nt-drow:hover {
+  background: rgba(255, 255, 255, 0.018);
+}
+.nt-drow__t {
+  font-size: var(--fs-sm);
+  color: var(--fg);
+}
+.nt-drow__d {
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  margin-top: var(--sp-1);
+  line-height: 1.6;
+}
+.nt-drow__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.nt-drow__actions .nt-btn {
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-xs);
+  text-decoration: none;
+}
+
+/* ---- Two-column split for wider settings sections ---- */
+.nt-split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--sp-4);
+}
+
+/* ---- Activity feed ---- */
+.nt-feed {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.nt-feed li {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: var(--sp-4);
+  padding: var(--sp-3) 0;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: var(--fs-xs);
+}
+.nt-feed li:last-child {
+  border-bottom: 0;
+}
+.nt-feed__when {
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+.nt-feed__what {
+  color: var(--fg-muted);
+  line-height: 1.7;
+}
+.nt-feed__what b {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+/* ---- Settings page group headings ---- */
+.nt-setgroup {
+  margin-bottom: var(--sp-5);
+}
+.nt-setgroup__h {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--line);
+}
+.nt-setgroup__h h3 {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  letter-spacing: var(--tracking);
+  color: var(--fg);
+}
+.nt-setgroup__h span {
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+}
+.nt-setgroup__body {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+  overflow: hidden;
+}
+
+/* The terminal-style page heading used on the sub-pages. */
+.nt-pagehead {
+  margin-bottom: var(--sp-6);
+}
+.nt-pagehead__path {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+.nt-pagehead__path b {
+  color: var(--accent-c);
+  font-weight: 400;
+}
+.nt-pagehead__title {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-h2);
+  line-height: var(--lh-snug);
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+.nt-pagehead__lead {
+  max-width: 42rem;
+  margin: 0;
+  color: var(--fg-muted);
+}
+
+/* ---- Responsive dashboard padding ---- */
+@media (max-width: 720px) {
+  .nt-dash__body {
+    padding: var(--sp-5) var(--sp-4);
+  }
+  .nt-dash__tabs {
+    padding-inline: var(--sp-4);
+  }
+}
+
+/* ============================================================
+   HEADER — /ai and other in-app routes
+   The old cyan bar, restyled to the terminal theme so the app
+   shell matches everything else.
+   ============================================================ */
+.nt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-5);
+  border-bottom: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-sm);
+  flex-shrink: 0;
+}
+.nt-head__mark {
+  font-weight: 700;
+  letter-spacing: var(--tracking);
+  color: var(--fg);
+  text-decoration: none;
+}
+.nt-head__mark .nt-caret {
+  color: var(--accent-b);
+  animation: nt-blink var(--dur-caret) step-end infinite;
+}
+.nt-head__links {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-5);
+  margin-right: auto;
+  margin-left: var(--sp-6);
+}
+.nt-head__link {
+  color: var(--fg-dim);
+  text-decoration: none;
+  letter-spacing: var(--tracking);
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.nt-head__link:hover {
+  color: var(--accent-b);
+}
+.nt-head__link--on {
+  color: var(--fg);
+}
+.nt-head__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+@media (max-width: 760px) {
+  .nt-head__links {
+    display: none;
+  }
+}
+
+/* A dropdown that still looks like it belongs to the product. The
+   popover itself is rendered by the base-ui dropdown, so only its
+   contents are themed here rather than rebuilding the primitive. */
+.nt-menu__head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+}
+.nt-menu__btn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-sm);
+  background: var(--glass-bg);
+  color: var(--fg-muted);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+.nt-menu__btn:hover {
+  color: var(--fg);
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.nt-menu__name {
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-menu__caret {
+  color: var(--fg-dim);
+  font-size: 0.6rem;
+}
+.nt-menu__item {
+  display: block;
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+.nt-menu__item:hover {
+  color: var(--fg);
+  background: rgba(255, 255, 255, 0.05);
+}
+.nt-menu__item--danger:hover {
+  color: var(--danger);
+  background: rgba(255, 123, 114, 0.08);
+}
+.nt-menu__meta {
+  margin-top: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+  border-top: 1px solid var(--line-soft);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  word-break: break-all;
+}
+
+/* ============================================================
+   MOTION
+   The dashboard is a console, so its blocks resolve line by line
+   rather than fading in as one slab. The keyframes themselves are
+   defined in landing.css and shared.
+   ============================================================ */
+.nt-dash [data-reveal] {
+  opacity: 0;
+}
+.nt-dash .nt-rv-rise,
+.nt-dash .nt-rv-wipe,
+.nt-dash .nt-rv-scan {
+  animation: none;
+}
+.nt-dash .nt-rv-rise.is-in,
+.nt-dash .nt-rv-wipe.is-in,
+.nt-dash .nt-rv-scan.is-in {
+  animation: nt-rv-fade-up 620ms var(--ease-out) forwards;
+}
+.nt-dash .nt-rv-line {
+  opacity: 0;
+}
+.nt-dash .is-in .nt-rv-line {
+  animation: nt-rv-line-in 520ms var(--ease-out) forwards;
+  animation-delay: calc(120ms + var(--rv-i, 0) * var(--rv-stagger));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-app *,
+  .nt-app *::before,
+  .nt-app *::after,
+  .nt-dash *,
+  .nt-dash *::before,
+  .nt-dash *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .nt-app [data-reveal],
+  .nt-app .nt-rv-line,
+  .nt-dash [data-reveal],
+  .nt-dash .nt-rv-line {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+}

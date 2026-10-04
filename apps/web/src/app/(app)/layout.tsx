@@ -1,10 +1,16 @@
+import "@/styles/landing.css";
+
 import Header from "@/components/header";
 
 /**
- * The app shell for every route inside this group. It lives in the (app)
- * route group so the landing page at / can render full-bleed without the
- * header or the fixed viewport grid. Route groups do not affect URLs —
- * /login, /dashboard and /ai are unchanged.
+ * The app shell for every route inside this group. It lives in the
+ * (app) route group so the landing page at / and the full-bleed auth
+ * screen at /login render without the header. Route groups do not
+ * affect URLs — /ai is unchanged.
+ *
+ * Only /ai is left in this group now: the module pages and the whole
+ * dashboard bring their own chrome, and the old fixed-height grid
+ * would fight the dashboard's full-height glass console.
  */
 export default function AppLayout({
   children,
@@ -12,9 +18,9 @@ export default function AppLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="grid h-svh grid-rows-[auto_1fr]">
+    <div className="nt-app">
       <Header />
-      {children}
+      <div className="nt-app__main">{children}</div>
     </div>
   );
 }

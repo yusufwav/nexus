@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export interface ModuleEntry {
   readonly code: string;
   readonly name: string;
@@ -15,6 +17,11 @@ export interface ModuleListProps {
  * expands its description. Ported from IDEAS/index.html, where the rows
  * were injected from a JSON script tag; here they arrive as props so
  * the page renders them server-side instead of after hydration.
+ *
+ * Each row links to that module's detail page. The row is the link
+ * rather than something inside it, so the whole line is one hit
+ * target — which is why the description expands on hover rather than
+ * living behind its own control.
  */
 export default function ModuleList({
   title,
@@ -34,12 +41,16 @@ export default function ModuleList({
         </div>
         <div className="nt-modlist">
           {modules.map((m) => (
-            <div key={m.code} className="nt-modlist__row nt-hoverable">
+            <Link
+              key={m.code}
+              className="nt-modlist__row nt-hoverable"
+              href={`/modules/${m.code}`}
+            >
               <span className="nt-modlist__code">{m.code}</span>
               <span className="nt-modlist__name">{m.name}</span>
-              <span className="nt-modlist__status">available</span>
+              <span className="nt-modlist__status">open</span>
               <p className="nt-modlist__desc">{m.description}</p>
-            </div>
+            </Link>
           ))}
         </div>
       </div>

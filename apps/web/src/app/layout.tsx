@@ -2,6 +2,10 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Playfair_Display } from "next/font/google";
 
 import "../index.css";
+// The design tokens come first so landing.css and app.css both read
+// the same variables off .nt-root regardless of bundle order.
+import "../styles/tokens.css";
+import "../styles/app.css";
 import Providers from "@/components/providers";
 import PwaRegistration from "@/components/pwa-registration";
 

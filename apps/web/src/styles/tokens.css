@@ -1,0 +1,163 @@
+/* ============================================================
+   NEXUS DESIGN TOKENS
+   ------------------------------------------------------------
+   Extracted from the landing page's .nt-root block so every route
+   can adopt the same palette without pulling in the whole landing
+   stylesheet. landing.css still owns everything else the landing
+   renders; this file owns the variables.
+
+   The tokens stay as CSS custom properties because the ASCII and
+   morph engines read them at runtime off .nt-root — changing a
+   value here is all that is needed to retune the look.
+   ============================================================ */
+
+.nt-root {
+  /* ============================================================
+     TOKENS
+     ============================================================ */
+  --bg-0: #000000;
+  --bg-1: #050608;
+  --bg-2: #0a0d11;
+
+  --fg: #f2f4f7;
+  --fg-muted: #a8b0bb;
+  --fg-dim: #6b7280;
+
+  --accent-a: #8b0000;
+  --accent-b: #fdd3aeff;
+  --accent-c: #6b0024ff;
+
+  /* Syntax palette — borrowed from the brand colours so highlighted
+     code still reads as the same product. */
+  --syn-key: #ff7b72;
+  --syn-fn: #fdd3ae;
+  --syn-str: #a5d6a7;
+  --syn-num: #79c0ff;
+  --syn-com: #6b7280;
+  --syn-var: #f2f4f7;
+  --syn-type: #ffa657;
+
+  --line: rgba(255, 255, 255, 0.08);
+  --line-soft: rgba(255, 255, 255, 0.045);
+  --panel: rgba(255, 255, 255, 0.025);
+  --accent-line: rgba(255, 208, 222, 0.27);
+  --accent-soft: rgba(139, 0, 0, 0.34);
+  --grid-line: rgba(255, 255, 255, 0.06);
+  --grid-size: 32px;
+
+  /* Signal colours, derived from the accents so semantic states never
+     introduce a hue that is foreign to the palette. */
+  --ok: #a5d6a7;
+  --warn: #fdd3ae;
+  --danger: #ff7b72;
+
+  --nt-font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --nt-font-sans: var(--font-inter), "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --nt-font-serif: var(--font-playfair), Georgia, serif;
+
+  --fs-xs: 0.7rem;
+  --fs-sm: 0.8rem;
+  --fs-body: 1rem;
+  --fs-lg: 1.1rem;
+  --fs-h1: clamp(2.2rem, 5.2vw, 4.2rem);
+  --fs-h2: clamp(1.5rem, 3vw, 2.2rem);
+
+  --lh-body: 1.65;
+  --lh-snug: 1.3;
+
+  --tracking: 0.02em;
+  --tracking-wide: 0.16em;
+
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.5rem;
+  --sp-6: 2rem;
+  --sp-7: 3rem;
+  --sp-8: 4rem;
+  --sp-9: 6rem;
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 14px;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 160ms;
+  --dur-med: 300ms;
+  --dur-slow: 600ms;
+  --dur-caret: 1.05s;
+
+  --nt-max-w: 1180px;
+  --nt-max-w-narrow: 760px;
+
+  /* ============================================================
+     ASCII ENGINE — every tunable for both background layers.
+     The canvas engine reads these at startup.
+     ============================================================ */
+  --ascii-ramp: " .·:-=+*#%@";
+  --ascii-font: 11px;
+  --ascii-fps: 26;
+  --ascii-scale: 1;
+
+  /* Landing layer — fullscreen, cursor-reactive */
+  --ascii-op: 1;
+  --ascii-low: #000000;
+  --ascii-high: #6b0024;
+  --ascii-speed: 1;
+  --ascii-cursor-radius: 7;
+  --ascii-cursor-power: 1;
+
+  /* Ambient layer — fixed, slow, non-interactive */
+  --amb-ramp: " .·:+=xX#";
+  --amb-font: 10px;
+  --amb-fps: 20;
+  --amb-scale: 0.6;
+  --amb-op: 0.6;
+  --amb-low: #8b0000;
+  --amb-high: #fdd3ae;
+  --amb-speed: 0.2;
+
+  /* Title gradient — the "learn you" phrase */
+  --grad-from: #fdd3ae;
+  --grad-mid: #ffffff;
+  --grad-to: #6b0024;
+  --grad-dur: 9s;
+  --grad-dur-hover: 5s;
+  --grad-bright: 1.15;
+  --grad-sat: 1.35;
+
+  /* Hover states */
+  --hover-lift: -3px;
+  --hover-edge: rgba(255, 0, 43, 0.42);
+  --hover-fill: rgba(253, 211, 174, 0.05);
+  --hover-glow: 0 18px 50px -26px rgba(255, 0, 47, 0.5);
+  --dur-hover: 520ms;
+  --hover-grow: 1.012;
+
+  /* Glassmorphism — shared by buttons and containers. */
+  --glass-bg: rgba(255, 255, 255, 0.028);
+  --glass-bg-hover: rgba(253, 211, 174, 0.05);
+  --glass-blur: 14px;
+  --glass-blur-hover: 22px;
+  --glass-edge: rgba(255, 255, 255, 0.09);
+  --glass-tint: rgba(255, 255, 255, 0.3);
+  --glass-tint-hover: rgba(17, 0, 0, 0.7);
+  --glass-sheen: rgba(255, 0, 0, 0.06);
+
+  /* Morph text — the rotating hero line */
+  --morph-interval: 2.6s;
+  --morph-stagger: 0.55;
+  --morph-blur-in: 14px;
+  --morph-blur-out: 16px;
+  --morph-scale-in: 0.88;
+  --morph-scale-out: 1.12;
+
+  /* Scroll reveals. --rv-i is the per-line stagger index, assigned
+     by the script; the default is line zero. */
+  --rv-stagger: 90ms;
+  --rv-i: 0;
+
+  --bundle-spin: 6s;
+  --bundle-glow: 0 26px 70px -30px rgba(253, 211, 174, 0.5);
+}

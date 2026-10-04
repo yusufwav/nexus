@@ -14,6 +14,7 @@
     "db:push": "turbo run db:push -F @Main/db --",
     "db:studio": "turbo run db:studio -F @Main/db --",
     "db:generate": "turbo run db:generate -F @Main/db --",
+    "db:seed": "turbo run db:seed -F @Main/db --",
     "db:migrate": "turbo run db:migrate -F @Main/db --",
     "deploy:setup": "pnpm dlx vercel link",
     "dev:vercel": "pnpm dlx vercel dev -L",

@@ -1,7 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@source "../../../apps/**/*.{ts,tsx}";
+
+/* Content sources. The app lives outside this package, so point at it
+   explicitly — the previous "../../../apps" glob resolved to
+   packages/apps, which does not exist, and so matched nothing. */
+@source "../../../apps/web/**/*.{ts,tsx}";
 @source "../**/*.{ts,tsx}";
 
 @custom-variant dark (&:is(.dark *));
