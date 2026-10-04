@@ -607,6 +607,54 @@
   min-height: 1.8em;
 }
 
+/* On a phone the code pane is narrower than the longest source line.
+   Wrapping is preferred over a horizontal scroll here: the scrollbar
+   is invisible on touch, so the overflow just read as text cut off at
+   the edge. pre-wrap keeps the indentation that white-space: pre was
+   there for, and breaks long lines between words rather than mid-token
+   where it has to.
+
+   The breakpoint is 860px rather than 720 because the padding on the
+   pane eats into the usable width, so a tablet at 768 still had a few
+   pixels of overflow even though the media query nominally matched. */
+@media (max-width: 860px) {
+  .nt-sample__body {
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  /* Indentation is preserved by pre-wrap's own leading whitespace, so
+     the continuation of a wrapped line lines up under the text rather
+     than restarting at the gutter. */
+  .nt-sample__line {
+    padding-left: 1.5ch;
+    text-indent: -1.5ch;
+  }
+
+  /* Same problem, other block: the terminal's longest source line is
+     wider than a phone. Wrapping beats an invisible scrollbar. The
+     children carry their own white-space: pre (see .nt-term__line), so
+     the override has to name them — inheriting from the body would
+     lose to that. The heading and CTA already opt out of pre and keep
+     their own rules. */
+  .nt-term__body,
+  .nt-term__line,
+  .nt-term__out,
+  .nt-term__prompt {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .nt-term__body {
+    overflow-x: hidden;
+  }
+  .nt-term__out,
+  .nt-term__prompt,
+  .nt-term__line {
+    padding-left: 1.5ch;
+    text-indent: -1.5ch;
+  }
+}
+
 /* ============================================================
    MODULES — a file listing, deliberately NOT cards
    ============================================================ */
@@ -1041,16 +1089,20 @@
      rise — staggered lines lift into place
      scan — a scanline passes, then the block settles
    ============================================================ */
-.nt-root [data-reveal] {
-  opacity: 0;
+/* Content is visible by default. Hiding is opt-in and only applied
+   once JS has confirmed it can drive the reveal — the inline script
+   in layout.tsx sets .js-reveal. Without this, a slow or blocked
+   hydration left every block stuck at opacity 0 with no way back. */
+.js-reveal .nt-root [data-reveal] {
+  opacity: 0.01;
 }
 
 /* Shared entrance: everything fades up as it arrives. Every effect
    is gated on .is-in — without it the animations would fire at
    load and be over long before you scroll to the element. */
-.nt-rv-wipe,
-.nt-rv-rise,
-.nt-rv-scan {
+.js-reveal .nt-rv-wipe,
+.js-reveal .nt-rv-rise,
+.js-reveal .nt-rv-scan {
   animation: none;
 }
 .nt-rv-wipe.is-in,
@@ -1059,21 +1111,21 @@
   animation: nt-rv-fade-up 620ms var(--ease-out) forwards;
 }
 @keyframes nt-rv-fade-up {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0.01; transform: translateY(16px); }
   to   { opacity: 1; transform: none; }
 }
 
 /* Children fade in on a stagger, so a block resolves line by line
    rather than all at once. */
-.nt-rv-line {
-  opacity: 0;
+.js-reveal .nt-rv-line {
+  opacity: 0.01;
 }
 .is-in .nt-rv-line {
   animation: nt-rv-line-in 520ms var(--ease-out) forwards;
   animation-delay: calc(160ms + var(--rv-i, 0) * var(--rv-stagger));
 }
 @keyframes nt-rv-line-in {
-  from { opacity: 0; transform: translateY(8px); filter: blur(3px); }
+  from { opacity: 0.01; transform: translateY(8px); filter: blur(3px); }
   to   { opacity: 1; transform: none; filter: blur(0); }
 }
 

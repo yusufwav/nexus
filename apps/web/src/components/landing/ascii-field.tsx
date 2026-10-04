@@ -153,8 +153,13 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
     // the canvas is stretched back up by CSS. Keeping the backing store
     // below device pixels is the single biggest lever on cost.
     function resize(): void {
-      const w = el.clientWidth || el.offsetWidth || 1;
-      const h = el.clientHeight || el.offsetHeight || 1;
+      // A fixed layer can measure 0 before layout settles (or on a
+      // cold load where hydration is late), and a canvas left at the
+      // element's default 300x150 never repaints itself. Fall back to
+      // the viewport so the field always has a real buffer to draw
+      // into; ResizeObserver corrects it once the element is sized.
+      const w = el.clientWidth || el.offsetWidth || window.innerWidth;
+      const h = el.clientHeight || el.offsetHeight || window.innerHeight;
 
       const renderW = Math.max(1, Math.round(w * scale));
       const renderH = Math.max(1, Math.round(h * scale));

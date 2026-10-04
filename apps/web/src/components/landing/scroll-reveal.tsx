@@ -61,15 +61,52 @@ export default function ScrollReveal(): React.JSX.Element | null {
         } else {
           // Leaving the viewport tears the state down, so the next entry
           // plays the whole sequence again rather than resuming
-          // mid-way.
-          el.classList.remove("is-in");
+          // mid-way. A block taller than the viewport can never
+          // re-enter as a single unit, so those stay revealed.
+          if (el.offsetHeight <= window.innerHeight) {
+            el.classList.remove("is-in");
+          }
         }
       });
-    }, { threshold: 0.12, rootMargin: "0px 0px -6% 0px" });
+      // threshold 0 and no rootMargin: a section taller than the
+      // viewport can never cross a fractional threshold, which left
+      // every tall block stuck at opacity 0 on short screens.
+    }, { threshold: 0, rootMargin: "0px 0px 0px 0px" });
 
     items.forEach((el) => io.observe(el));
 
-    return () => io.disconnect();
+    /*
+     * Signal that JS is alive and driving the reveal, so the inline
+     * script in layout.tsx leaves .js-reveal in place. That class is
+     * what keeps [data-reveal] and .nt-rv-line at their dimmed resting
+     * opacity, so removing it mid-session is what made the text jump to
+     * full opacity and then replay its fade on every scroll pass.
+     *
+     * The marker MUST go on <html>, which is where the inline script
+     * looks for it — not on .nt-root.
+     */
+    document.documentElement.dataset["revealReady"] = "1";
+
+    const onVisibility = (): void => {
+      if (document.hidden) {
+        return;
+      }
+      // Returning to a backgrounded tab: the observer may have missed
+      // entries while throttled, so reveal whatever is on screen rather
+      // than trusting it to have caught up.
+      items.forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.top < window.innerHeight && r.bottom > 0) {
+          el.classList.add("is-in");
+        }
+      });
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      io.disconnect();
+    };
   }, []);
 
   return null;
