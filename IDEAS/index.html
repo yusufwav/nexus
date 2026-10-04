@@ -735,7 +735,7 @@
       border-radius: var(--r-sm);
       font-family: var(--font-mono);
       font-size: var(--fs-sm);
-      color: var(--fg);
+      color: var(--fg-muted);
       cursor: pointer;
       user-select: none;
       -webkit-tap-highlight-color: transparent;
@@ -970,11 +970,11 @@
     .price-row__amount small {
       font-size: var(--fs-xs);
       font-weight: 400;
-      color: var(--fg-dim);
+      color: var(--accent-b);
       margin-left: var(--sp-2);
       letter-spacing: var(--tracking);
     }
-    .price-row--bundle .price-row__amount { color: var(--accent-b); }
+    .price-row--bundle .price-row__amount { color: var(--fg); }
     .price-note {
       max-width: 42rem;
       margin: var(--sp-4) auto 0;
@@ -1179,14 +1179,13 @@
       <div class="landing__veil" aria-hidden="true"></div>
 
       <div class="landing__inner">
-        <span class="landing__eyebrow">first-year CS · NMU</span>
+        <span class="landing__eyebrow">Computer Science · NMU</span>
         <h1 class="landing__title landing__title--morph" id="morph-title">
           <span class="morph__word grad" data-morph-word>Notes that learn you</span>
           <span class="morph__word grad" data-morph-word>as you learn them</span>
         </h1>
         <p class="landing__sub">
-          I took the notes we get, took them apart, and rebuilt them so you
-          understand why each step works instead of just copying it.
+          The notes we got were good enough.</br>But I made them better.
         </p>
         <div class="landing__cta">
           <a class="btn" href="#modules">open modules</a>
@@ -1210,11 +1209,12 @@
             <span class="term__title">nexus ~/zsh 120x40</span>
           </div>
           <div class="term__body">
-            <span class="term__line rv-line"><span class="t-com"># first-year CS, Nelson Mandela University</span></span>
+            <span class="term__line rv-line"><span class="t-com"># Computer Science, Nelson Mandela University</span></span>
             <span class="term__line term__prompt rv-line">$ cat manifesto.md</span>
             <span class="term__line term__h1 term__h1--sm rv-line">the <em>readme</em></span>
-            <span class="term__line term__out rv-line">Everything below is the working part: the modules that exist,</span>
-            <span class="term__line term__out rv-line">how the study partner thinks, and what it costs. Start anywhere.</span>
+            <span class="term__line term__out rv-line">Nexus Tutoring is an AI-powered study platform leveraging RAG to improve student learning.</span>
+            <span class="term__line term__out rv-line">Powered by an intelligent chatbot and shared study notes,</span>
+            <span class="term__line term__out rv-line">it helps students master coursework with contextual AI support.</span>
             <span class="term__line term__cta rv-line">
               <a class="btn" href="#modules">open modules</a>
               <a class="btn btn--ghost" href="#mission">why this exists</a>
@@ -1250,15 +1250,15 @@
         <!-- Each block reveals on its own so they load in sequence as
 you scroll: reach point 02 and only what sits above it has landed. -->
         <div class="mission__body">
-          <p data-reveal="rise">Nexus exists to bring first year Computer Science students at Nelson Mandela University up to the level the rest of the world is already working at, starting with the modules sitting on your desk right now.</p>
-          <p data-reveal="rise">And the uncomfortable part nobody in academia wants to say out loud: most people do not have the attention span to learn from a textbook. Courses are still built on the assumption that they do, and that assumption is exactly why capable students fall behind.</p>
+          <p data-reveal="rise">Nexus exists to bring Computer Science students at Nelson Mandela University up to the level the rest of the world is already working at, starting with the modules sitting infront of you right now.</p>
+          <p data-reveal="rise">And the uncomfortable part nobody in academia wants to say out loud: most people no longer have the attention span to open a textbook. Courses are still built on the assumption that they do, and that assumption is exactly why capable students fall behind.</p>
           <ul class="mission__points">
-            <li data-reveal="rise"><span class="mission__idx">01</span><span><strong>The notes we get are sufficient.</strong> They really are. But sufficient is not the same as understanding, so I took them apart and rebuilt them with clearer structure and worked examples.</span></li>
+            <li data-reveal="rise"><span class="mission__idx">01</span><span><strong>The notes we get are sufficient.</strong> They really are. But sufficient is not the equivalent to being understood, so I took them apart and rebuilt them with clearer structure and worked examples, specifically to target building intuition as you go.</span></li>
             <li data-reveal="rise"><span class="mission__idx">02</span><span><strong>AI fluency is quietly becoming a requirement</strong> that universities have not yet decided how to qualify. Learning these tools now, while you are still studying, is the difference between catching up and leading.</span></li>
             <li data-reveal="rise"><span class="mission__idx">03</span><span><strong>Everything is aimed at one outcome:</strong> making you genuinely competitive with students anywhere in the world, at a price a student can actually afford.</span></li>
-            <li data-reveal="rise"><span class="mission__idx">04</span><span><strong>For some of us learning just clicks.</strong> For the rest it takes hearing the same idea a different way, in our own words, at our own pace. That is what the study partner is for.</span></li>
+            <li data-reveal="rise"><span class="mission__idx">04</span><span><strong>For some of us, learning just clicks.</strong> For the rest, it takes hearing the same idea a different way, in our own words, or at our own pace. That is what a study partner is for.</span></li>
           </ul>
-          <p data-reveal="rise">A quick word about me: I am a first year CS student at NMU building this in my own time because I remember how disorienting that first semester is. If something here is wrong or unclear, tell me and I will fix it.</p>
+          <p data-reveal="rise">A quick word about me: I am a first year CS student at NMU building this in my own time, because I remember how disorienting that first semester was. If something here is wrong or unclear, tell me and I will fix it.</p>
         </div>
       </div>
     </section>
@@ -1273,7 +1273,7 @@ you scroll: reach point 02 and only what sits above it has landed. -->
             <span class="sec-head__path">~/nexus</span>
             <span>/modules/</span>
           </div>
-          <h2 class="sec-head__title">13 modules, one semester</h2>
+          <h2 class="sec-head__title">13 modules total, for every semester I've done.</h2>
           <p class="sec-head__lead">Hover any line to see what it actually covers. The list grows as I finish each set of notes.</p>
         </div>
         <div class="modlist" id="modlist"></div>
@@ -1308,7 +1308,7 @@ you scroll: reach point 02 and only what sits above it has landed. -->
             <span>/partner</span>
           </div>
           <h2 class="sec-head__title">It learns you back</h2>
-          <p class="sec-head__lead">Not a search box returning a definition. A study partner that adapts to how you actually understand things.</p>
+          <p class="sec-head__lead">Not a search box returning a definition. A study partner that explains topics like it's the first time you're hearing it.</p>
         </div>
 
         <!-- Wipe + per-message stagger, same as the README box. Each
@@ -1317,11 +1317,15 @@ you scroll: reach point 02 and only what sits above it has landed. -->
         <div class="chat glass hoverable" data-reveal="wipe">
           <div class="chat__msg rv-line">
             <span class="chat__who">student</span>
-            <span class="chat__text">why does the chain rule work? i just dont get it</span>
+            <span class="chat__text">how does the chain rule work? explain like im 5</span>
           </div>
           <div class="chat__msg chat__msg--you rv-line">
             <span class="chat__who">partner</span>
-            <span class="chat__text">It comes from two things: the chain rule itself, and the fact that <b>y</b> is a function of <b>x</b>. Because <b>y</b> depends on <b>x</b>, and <b>x</b> depends on <b>u</b>, the rate of change multiplies. You already know this from velocity and acceleration: if <b>v</b> changes with time, acceleration is the derivative of <b>v</b> with respect to time. Same shape of idea.</span>
+            <span class="chat__text">The chain rule is an onion you peel one layer at a time.
+            </br>If a function is inside another f(<b>g(x)</b>) pretend you only have <b>f(x)</b>
+            </br>then differentiate it. now you have <b>f'(</b>g(x)<b>)</b> and once again,
+            </br>differentiate <b>g(x)</b> on its own and multiply the two derivatives together,
+            </br>and you'll get something that looks like this! <b>f'(</b>g(x)<b>)   ×   g'(x)</b></span>
           </div>
           <div class="chat__msg rv-line">
             <span class="chat__who">student</span>
@@ -1329,7 +1333,9 @@ you scroll: reach point 02 and only what sits above it has landed. -->
           </div>
           <div class="chat__msg chat__msg--you rv-line">
             <span class="chat__who">partner</span>
-            <span class="chat__text">Let <b>x = u²</b> and <b>y = 3x</b>. Then dy/du = dy/dx × dx/du = 3 × 2u = 6u. At u = 2: dy/du = 12.</span>
+            <span class="chat__text">Let <b>f(x) = 5 × g(x)²</b> and <b>g(x) = x³</b> Then <b>f'(x) = f'(g(x)) × g'(x)</b>.
+            </br>so substitute in the variables, <b>(5 × 2(x³) ) × (3x²)</b> and simplify,
+            </br><b>(10x³)×(3x²) = 30x⁵</b> done! Want to try one on your own?</span>
           </div>
         </div>
         <p class="price-note">In development, launching with the notes.</p>
@@ -1351,13 +1357,13 @@ you scroll: reach point 02 and only what sits above it has landed. -->
         <!-- Wipe + per-row stagger, same as the README box. -->
         <div class="price-table glass hoverable" data-reveal="wipe">
           <div class="price-row hoverable rv-line">
-            <span class="price-row__label">single module, single semester</span>
+            <span class="price-row__label">one module, one semester</span>
             <span class="price-row__amount">R50</span>
           </div>
           <div class="price-row price-row--bundle rv-line">
             <span class="price-row__sheen" aria-hidden="true"></span>
-            <span class="price-row__label">all 13 modules, full semester</span>
-            <span class="price-row__amount">R250 <small>SAVE R400</small></span>
+            <span class="price-row__label">all 7 modules, one semester</span>
+            <span class="price-row__amount"><small>SAVE R100</small> R250</span>
           </div>
         </div>
         <p class="price-note">Notes stay yours either way. Pick what you need, or take the lot.</p>
