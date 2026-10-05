@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 import { authClient } from "@/lib/auth-client";
 
+import ThemeToggle from "./theme-toggle";
 import UserMenu from "./user-menu";
 
 const LINKS = [
@@ -52,6 +53,7 @@ export default function Header(): React.JSX.Element {
             sign in
           </Link>
         )}
+        <ThemeToggle />
       </div>
     </header>
   );

@@ -6,13 +6,14 @@ import { ThemeProvider } from "./theme-provider";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
-    /* Dark only for now. The palette was designed against black and
-       has no light counterpart yet, so `enableSystem` is off — a light
-       OS setting must not half-apply. Both are in IDEAS/TODO.md. */
+    /* Both palettes now exist (see styles/tokens.css), so a light OS
+       setting can be honoured rather than pinned to dark. The toggle
+       still names light and dark explicitly, and "system" tracks the
+       OS from there. */
     <ThemeProvider
       attribute="class"
       defaultTheme="dark"
-      enableSystem={false}
+      enableSystem
       disableTransitionOnChange
     >
       {children}

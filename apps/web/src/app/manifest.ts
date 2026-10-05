@@ -2,12 +2,15 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Main",
-    short_name: "Main",
-    description: "my pwa app",
+    name: "Nexus",
+    short_name: "Nexus",
+    description: "Computer Science notes for NMU students",
     start_url: "/",
     display: "standalone",
-    background_color: "#ffffff",
+    // These were #ffffff / #000000, which fought each other on a
+    // dark-only site. Both now match the dark palette, which is what
+    // an installed app launches into.
+    background_color: "#000000",
     theme_color: "#000000",
     icons: [
       {

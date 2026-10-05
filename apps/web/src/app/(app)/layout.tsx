@@ -18,7 +18,11 @@ export default function AppLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <div className="nt-app">
+    /* nt-root is the only scope where the design tokens are defined,
+       and .nt-app reads them for its background, colour and font.
+       Without it every var(--bg-0)-style reference on this route
+       resolved to undefined and the shell rendered transparent. */
+    <div className="nt-root nt-app">
       <Header />
       <div className="nt-app__main">{children}</div>
     </div>

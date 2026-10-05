@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
 
+import ThemeToggle from "@/components/theme-toggle";
+
 const LINKS = [
   { href: "#mission", label: "~/readme" },
   { href: "#modules", label: "~/modules" },
@@ -49,6 +51,7 @@ export default function LandingNav(): React.JSX.Element {
             sign in
           </Link>
         )}
+        <ThemeToggle />
       </div>
     </nav>
   );

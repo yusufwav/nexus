@@ -5,6 +5,7 @@ import type { Session } from "@Main/auth";
 
 import Avatar from "./avatar";
 import SignOutButton from "./sign-out-button";
+import ThemeToggle from "./theme-toggle";
 
 /**
  * THE DASHBOARD SHELL
@@ -63,6 +64,7 @@ export default function DashboardShell({
             <Link className="nt-btn nt-btn--ghost" href="/modules">
               browse modules
             </Link>
+            <ThemeToggle />
             <SignOutButton />
           </div>
         </div>

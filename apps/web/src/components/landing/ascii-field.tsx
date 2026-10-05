@@ -125,6 +125,34 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
     const lutR = new Uint8Array(STEPS);
     const lutG = new Uint8Array(STEPS);
     const lutB = new Uint8Array(STEPS);
+
+    /*
+     * The ramp is built from the tokens once at mount, so a theme
+     * switch would otherwise leave dark-mode pixels sitting on a
+     * light page. retint() re-reads the colour tokens off .nt-root
+     * and rebuilds the lookup table; morph-title.tsx reads its own
+     * tokens the same way.
+     */
+    function retint(): void {
+      const next = readTokens([`--${P}-low`, `--${P}-high`, `--${P}-op`]);
+      const lo = hexToRgb(next[`${P}-low`]);
+      const hi = hexToRgb(next[`${P}-high`]);
+      const o = Number.parseFloat(next[`${P}-op`]);
+      el.style.opacity = String(Number.isNaN(o) ? 1 : o);
+      for (let i = 0; i < STEPS; i++) {
+        const f = i / (STEPS - 1);
+        lutR[i] = lo[0] + (hi[0] - lo[0]) * f;
+        lutG[i] = lo[1] + (hi[1] - lo[1]) * f;
+        lutB[i] = lo[2] + (hi[2] - lo[2]) * f;
+      }
+      // The frame loop reads the LUT every tick, so the next painted
+      // frame already carries the new colours. When the layer is
+      // paused there is no next frame, so clear the stale one.
+      if (!running) {
+        context.clearRect(0, 0, el.width, el.height);
+      }
+    }
+
     for (let i = 0; i < STEPS; i++) {
       const f = i / (STEPS - 1);
       lutR[i] = low[0] + (high[0] - low[0]) * f;
@@ -335,6 +363,21 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
     }
     document.addEventListener("visibilitychange", onVisibilityChange);
 
+    // next-themes swaps class="dark"/"light" on <html>. Watching that
+    // attribute is what lets the field repaint in the new palette
+    // instead of holding the colours it booted with.
+    const themeObserver = typeof MutationObserver !== "undefined"
+      ? new MutationObserver(() => {
+          retint();
+        })
+      : null;
+    if (themeObserver !== null) {
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ["class"],
+      });
+    }
+
     resize();
     start();
 
@@ -346,6 +389,9 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
       }
       if (io !== null) {
         io.disconnect();
+      }
+      if (themeObserver !== null) {
+        themeObserver.disconnect();
       }
       window.removeEventListener("resize", resize);
       document.removeEventListener("visibilitychange", onVisibilityChange);

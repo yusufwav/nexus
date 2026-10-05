@@ -50,6 +50,50 @@ Last updated: 4 October 2026.
       gate is on `/api/trial`, not on the file itself. Once real notes exist,
       move them to private storage — see `apps/web/src/app/api/trial/route.ts`.
 
+## Topic PDFs — users must pay before they get any of them
+
+The module page breaks a module's notes into per-topic PDFs
+(`apps/web/src/content/module-topics.ts`) and lists them under the free
+sample preview. A student downloads the one topic they are stuck on rather
+than the whole module.
+
+**Nothing here is finished. The gate is built; the content is not.**
+
+- [ ] **No topic PDF exists.** All 78 topics across the 13 modules have
+      `pdf: null`, so every row renders "coming soon". Adding a topic is one
+      entry in `module-topics.ts` plus the file at `public/topics/`.
+- [ ] **Every topic is behind a purchase that cannot happen yet.** Checkout
+      does not exist (see Payments above), so no one can own a module, so
+      `getOwnedCodes()` returns empty for every user and every topic is
+      unreachable. The 403 path is the only one a real user can hit today.
+- [ ] **Access is per-module, not per-topic, by design.** Paying for MATT101
+      unlocks all six of its topics; there is no way to buy a single topic.
+      If per-topic pricing is ever wanted, the check in
+      `app/api/topics/[slug]/route.ts` is the seam — it currently tests
+      `owned.has(moduleCode)` and nothing finer-grained exists.
+- [ ] **Nothing stops a paid user downloading every topic.** Each request is
+      gated independently, so a user who paid R50 can script six GETs and
+      have the whole module. That matches what they paid for, but it means
+      per-topic watermarking or signed per-request URLs would be needed
+      before a topic could be sold on its own.
+- [ ] **Topic PDFs will sit in `/public` and be fetchable directly.**
+      `/api/topics/<slug>` is the intended way in and the only gated one, but
+      `/topics/<file>.pdf` is served statically to anyone who guesses the
+      name. This is the same gap as the sample above, and the same fix:
+      private storage once real notes exist.
+- [ ] **The slugs are provisional.** Every one of the 78 was invented to show
+      the structure — `matt101-limits`, `stas102-ttest`, and so on. They appear
+      in download URLs, so renaming one after release orphans whatever links
+      point at it.
+- [ ] **Slugs must stay unique across ALL modules, not just within one.**
+      `app/api/topics/[slug]/route.ts` resolves a slug by scanning the whole
+      registry, so two modules claiming the same slug would make the download
+      URL ambiguous and whichever came second would win. Every slug is
+      therefore prefixed with its module code. `node scripts/check-topics.mjs`
+      from `apps/web` asserts this and fails the build if it is ever broken.
+- [ ] **Page counts in `module-topics.ts` are invented** and will not match
+      the real files.
+
 ## Module content — 1 of 13 written
 
 - [ ] **Only MATT101 has content.** `apps/web/src/content/module-content.ts`
@@ -128,7 +172,16 @@ visible.
       `next dev` is unaffected. Nothing in this app has been verified through
       a production build.
 - [ ] **`pnpm db:seed` is untested** for the same reason — it has never
-      reached a live database.
+      reached a live database. Until it runs, `packages/db/src/module-catalog.ts`
+      edits do NOT show up in the app: `lib/modules.ts` only falls back to the
+      bundled catalogue when the `modules` table is **empty**, so a table
+      holding one stale row silently wins over the file. The 13 module rows
+      currently in the database were written by hand to work around this. Run
+      the seed once it is unblocked and the two agree again.
+- [ ] **Catalogue changes need two edits, not one.** `apps/web/src/app/page.tsx`
+      keeps a second hardcoded copy of the 13 modules as a plain array (`MODULES`,
+      ~line 66) so the landing page renders with no database. `module-catalog.ts`
+      and that array are kept in step by hand. See `apps/web/MODULES-GUIDE.md`.
 - [ ] **The `modules` fallback is silent.** If Postgres is unreachable,
       `apps/web/src/lib/modules.ts` falls back to the bundled catalogue
       without saying so. Log it once in development.

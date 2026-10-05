@@ -144,6 +144,59 @@
   --glass-tint: rgba(255, 255, 255, 0.3);
   --glass-tint-hover: rgba(17, 0, 0, 0.7);
   --glass-sheen: rgba(255, 0, 0, 0.06);
+  /* The dashboard console is a deeper well than the surrounding
+     glass, so it gets its own tint rather than reusing --glass-bg. */
+  --glass-console: rgba(5, 6, 8, 0.72);
+
+  /* ============================================================
+     RAISED SURFACES
+     ------------------------------------------------------------
+     Hover fills, bar strips and inset wells used to be written as
+     one-off rgba(255,255,255,0.018–0.05) literals at each site.
+     They are pulled out here so a light theme has something to
+     override: a white-alpha fill is invisible on white, and these
+     become an ink-alpha fill instead.
+     ============================================================ */
+  --surface-raised: rgba(255, 255, 255, 0.02);
+  --surface-hover: rgba(255, 255, 255, 0.022);
+  --surface-bar: rgba(255, 255, 255, 0.018);
+
+  /* Scrims — the translucent black layers that sit over the ASCII
+     field so text stays readable. They darken the canvas rather
+     than tint it, so light mode swaps them for a white wash. */
+  --scrim: rgba(0, 0, 0, 0.7);
+  --scrim-soft: rgba(0, 0, 0, 0.45);
+  --scrim-bar: rgba(0, 0, 0, 0.3);
+  --scrim-deep: rgba(0, 0, 0, 0.9);
+  --bg-fade: #000000;
+
+  /* Elevation. Kept as full box-shadow values so a theme can change
+     the shadow colour without each call site knowing about it. */
+  --shadow-sm: 0 10px 34px -26px rgba(0, 0, 0, 0.9);
+  --shadow-md: 0 14px 40px -22px rgba(0, 0, 0, 0.75);
+  --shadow-lg: 0 30px 80px -40px #000000;
+  --shadow-console: 0 -20px 60px -30px #000000;
+
+  /* Accent glow — the warm bloom around ctas and reveal effects. */
+  --glow-accent: rgba(253, 211, 174, 0.16);
+  --glow-accent-strong: rgba(253, 211, 174, 0.45);
+  --glow-accent-breathe: rgba(253, 211, 174, 0.14);
+  --glow-accent-soft: rgba(253, 211, 174, 0.05);
+  --glow-accent-a: rgba(139, 0, 0, 0.28);
+
+  /* Form controls. The tracks were pure black at three different
+     alphas; one token keeps them consistent. */
+  --input-bg: rgba(0, 0, 0, 0.32);
+  --input-bg-focus: rgba(0, 0, 0, 0.5);
+  --input-line-hover: rgba(255, 255, 255, 0.16);
+  --switch-track: rgba(0, 0, 0, 0.4);
+
+  /* Semantic borders, derived from the signal colours. */
+  --ok-line: rgba(165, 214, 167, 0.28);
+  --ok-fill: rgba(165, 214, 167, 0.06);
+  --warn-line: rgba(253, 211, 174, 0.28);
+  --danger-fill: rgba(255, 123, 114, 0.08);
+  --accent-dot: rgba(139, 0, 0, 0.8);
 
   /* Morph text — the rotating hero line */
   --morph-interval: 2.6s;
@@ -160,4 +213,135 @@
 
   --bundle-spin: 6s;
   --bundle-glow: 0 26px 70px -30px rgba(253, 211, 174, 0.5);
+}
+
+/* ============================================================
+   LIGHT PALETTE
+   ------------------------------------------------------------
+   next-themes writes class="light" / class="dark" onto <html>,
+   and .nt-root is a descendant, so this block wins on specificity
+   (0,2,0 against 0,1,0) without needing !important anywhere.
+
+   These are NOT an inversion of the dark values. The dark palette
+   was built around a cream accent on near-black; on paper that
+   cream disappears, so the warm accent deepens to a burnt sienna
+   and the syntax family moves to a light-background set. Every
+   value here was picked for contrast against --bg-0 rather than
+   flipped mechanically.
+
+   Spacing, type scale, radii, motion and layout tokens are
+   theme-invariant and deliberately not repeated.
+
+   The four ASCII ramp colours must stay hex — ascii-field.tsx
+   parses them with a hex-only reader.
+   ============================================================ */
+.light .nt-root {
+  /* Surfaces — warm paper rather than clinical white, so the
+     terminal aesthetic softens instead of glaring. */
+  --bg-0: #faf8f6;
+  --bg-1: #ffffff;
+  --bg-2: #f0ece7;
+
+  --fg: #1a1614;
+  --fg-muted: #5c5450;
+  --fg-dim: #8a807a;
+
+  /* The crimson reads as-is on paper. The cream cannot, so it
+     deepens to burnt sienna and keeps the brand's warmth. */
+  --accent-a: #8b0000;
+  --accent-b: #7a2e12;
+  --accent-c: #5c001f;
+
+  /* Syntax — a light-background family. The dark set is pastel and
+     washes out against white; these are all >=4.5:1. */
+  --syn-key: #cf222e;
+  --syn-fn: #8250df;
+  --syn-str: #0a3069;
+  --syn-num: #0550ae;
+  --syn-com: #6e7781;
+  --syn-var: #1a1614;
+  --syn-type: #953800;
+
+  --line: rgba(26, 22, 20, 0.11);
+  --line-soft: rgba(26, 22, 20, 0.06);
+  --panel: rgba(26, 22, 20, 0.035);
+  --accent-line: rgba(139, 0, 0, 0.3);
+  --accent-soft: rgba(139, 0, 0, 0.1);
+  --grid-line: rgba(26, 22, 20, 0.055);
+
+  --ok: #1a7f37;
+  --warn: #9a6700;
+  --danger: #cf222e;
+
+  /* ASCII engine — the ramp now runs from near-paper to deep
+     crimson, so the field reads as pale fog rather than soot.
+     Hex only; hexToRgb() in ascii-field.tsx parses nothing else. */
+  --ascii-op: 0.55;
+  --ascii-low: #e8e2db;
+  --ascii-high: #8b0000;
+
+  --amb-op: 0.4;
+  --amb-low: #c9a0a0;
+  --amb-high: #6b0024;
+
+  /* Title gradient re-anchored: the dark run leans on white as
+     its midpoint, which vanishes on paper. */
+  --grad-from: #8b0000;
+  --grad-mid: #b45309;
+  --grad-to: #5c001f;
+
+  /* Hover — the dark glows are tuned against black. On white the
+     same alphas disappear, so they darken and tighten. */
+  --hover-edge: rgba(139, 0, 0, 0.34);
+  --hover-fill: rgba(139, 0, 0, 0.045);
+  --hover-glow: 0 18px 50px -26px rgba(139, 0, 0, 0.28);
+
+  /* Glass on white is the inverse of glass on black: a dark tint
+     with a light edge, not a light tint with a light edge. */
+  --glass-bg: rgba(26, 22, 20, 0.022);
+  --glass-bg-hover: rgba(139, 0, 0, 0.05);
+  --glass-edge: rgba(26, 22, 20, 0.1);
+  --glass-tint: rgba(26, 22, 20, 0.32);
+  --glass-tint-hover: rgba(255, 250, 245, 0.82);
+  --glass-sheen: rgba(139, 0, 0, 0.04);
+  --glass-console: rgba(240, 236, 231, 0.82);
+
+  /* Raised surfaces — the dark set is a white-alpha lift, which is
+     invisible on white. These become an ink-alpha tint. */
+  --surface-raised: rgba(26, 22, 20, 0.022);
+  --surface-hover: rgba(26, 22, 20, 0.032);
+  --surface-bar: rgba(26, 22, 20, 0.018);
+
+  /* Scrims wash the canvas toward paper instead of toward black. */
+  --scrim: rgba(250, 248, 246, 0.78);
+  --scrim-soft: rgba(250, 248, 246, 0.55);
+  --scrim-bar: rgba(250, 248, 246, 0.35);
+  --scrim-deep: rgba(250, 248, 246, 0.9);
+  --bg-fade: #faf8f6;
+
+  /* Shadows soften: a hard black shadow on paper reads as a smudge. */
+  --shadow-sm: 0 10px 34px -26px rgba(26, 22, 20, 0.5);
+  --shadow-md: 0 14px 40px -22px rgba(26, 22, 20, 0.42);
+  --shadow-lg: 0 30px 80px -40px rgba(26, 22, 20, 0.55);
+  --shadow-console: 0 -20px 60px -30px rgba(26, 22, 20, 0.4);
+
+  /* Glows become tints rather than light sources. */
+  --glow-accent: rgba(139, 0, 0, 0.1);
+  --glow-accent-strong: rgba(139, 0, 0, 0.34);
+  --glow-accent-breathe: rgba(139, 0, 0, 0.1);
+  --glow-accent-soft: rgba(139, 0, 0, 0.05);
+  --glow-accent-a: rgba(139, 0, 0, 0.16);
+
+  --input-bg: rgba(26, 22, 20, 0.035);
+  --input-bg-focus: rgba(26, 22, 20, 0.055);
+  --input-line-hover: rgba(26, 22, 20, 0.24);
+  --switch-track: rgba(26, 22, 20, 0.16);
+
+  --ok-line: rgba(26, 127, 55, 0.34);
+  --ok-fill: rgba(26, 127, 55, 0.08);
+  --warn-line: rgba(154, 103, 0, 0.34);
+  --danger-fill: rgba(207, 34, 46, 0.08);
+  --accent-dot: rgba(139, 0, 0, 0.72);
+
+  --bundle-glow: 0 26px 70px -30px rgba(139, 0, 0, 0.22);
 }

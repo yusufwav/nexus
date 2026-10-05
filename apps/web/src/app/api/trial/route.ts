@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import type { NextRequest } from "next/server";
+
 import { getSession } from "@/lib/session";
 import { TRIAL_PDF_PATH } from "@/lib/trial-pdf";
 
@@ -15,7 +17,7 @@ import { TRIAL_PDF_PATH } from "@/lib/trial-pdf";
  * private storage so the static path is not the only thing standing
  * between the notes and anyone who guesses it. See IDEAS/TODO.md.
  */
-export async function GET(): Promise<Response> {
+export async function GET(req: NextRequest): Promise<Response> {
   const user = await getSession();
   if (!user) {
     return new Response("Sign in to preview the sample.", {
@@ -23,6 +25,11 @@ export async function GET(): Promise<Response> {
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
   }
+
+  // Same gate, two verbs: the bare URL is embedded in the module
+  // page's <iframe>, ?download=1 is what its button links to.
+  const asDownload = req.nextUrl.searchParams.get("download") === "1";
+  const filename = TRIAL_PDF_PATH.split("/").pop() ?? "sample.pdf";
 
   try {
     const file = await readFile(
@@ -34,7 +41,14 @@ export async function GET(): Promise<Response> {
         // The sample is a preview, not the product — do not let a
         // shared proxy hold on to one user's copy.
         "cache-control": "private, no-store",
-        "content-disposition": `inline; filename="${TRIAL_PDF_PATH.split("/").pop() ?? "sample.pdf"}"`,
+        // The filename is only attached when the caller asked to
+        // download. Chrome downloads *any* PDF that carries a
+        // filename in this header, inline or not, which means an
+        // `inline; filename=` here silently turns the preview
+        // iframe into a download on page load.
+        ...(asDownload
+          ? { "content-disposition": `attachment; filename="${filename}"` }
+          : {}),
       },
     });
   } catch {

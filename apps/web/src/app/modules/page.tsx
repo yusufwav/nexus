@@ -6,6 +6,7 @@ import ModuleCatalogue, {
   type CatalogueRow,
 } from "@/components/landing/module-catalogue";
 import ScrollReveal from "@/components/landing/scroll-reveal";
+import ThemeToggle from "@/components/theme-toggle";
 import { getOwnedCodes, listModules } from "@/lib/modules";
 import { getSession } from "@/lib/session";
 
@@ -70,6 +71,7 @@ export default async function ModulesPage(): Promise<React.JSX.Element> {
               sign in
             </Link>
           )}
+          <ThemeToggle />
         </div>
       </nav>
 

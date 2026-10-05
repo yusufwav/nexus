@@ -49,44 +49,58 @@
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
   --glass-shadow-strong: 0 16px 48px 0 rgba(0, 0, 0, 0.7);
 
-  /* Strict palette: pure black, pure white, single cyan accent */
-  --nexus-cyan: #00E5FF;
-  --nexus-cyan-soft: rgba(0, 229, 255, 0.6);
-  --nexus-cyan-faint: rgba(0, 229, 255, 0.15);
+  /* Strict palette: warm paper surfaces, single crimson accent.
+     This used to pair --background: #000000 with pure-white cards,
+     which is incoherent — flipping the theme produced white shadcn
+     panels on a black page. These are now a real light palette,
+     and the accent matches the .nt-* brand rather than the old
+     unrelated cyan. */
+  --nexus-cyan: #8b0000;
+  --nexus-cyan-soft: rgba(139, 0, 0, 0.7);
+  --nexus-cyan-faint: rgba(139, 0, 0, 0.12);
 
-  /* shadcn/lyra base tokens — overridden to the strict palette */
-  --background: #000000;
-  --foreground: #FFFFFF;
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.58 0.22 27);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  /* shadcn base tokens — light */
+  --background: #faf8f6;
+  --foreground: #1a1614;
+  --card: #ffffff;
+  --card-foreground: #1a1614;
+  --popover: #ffffff;
+  --popover-foreground: #1a1614;
+  --primary: #1a1614;
+  --primary-foreground: #faf8f6;
+  --secondary: #f0ece7;
+  --secondary-foreground: #1a1614;
+  --muted: #f0ece7;
+  --muted-foreground: #5c5450;
+  --accent: #f0ece7;
+  --accent-foreground: #1a1614;
+  --destructive: #cf222e;
+  --border: rgba(26, 22, 20, 0.12);
+  --input: rgba(26, 22, 20, 0.16);
+  --ring: #8b0000;
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #f4f1ed;
+  --sidebar-foreground: #1a1614;
+  --sidebar-primary: #1a1614;
+  --sidebar-primary-foreground: #faf8f6;
+  --sidebar-accent: #ece7e1;
+  --sidebar-accent-foreground: #1a1614;
+  --sidebar-border: rgba(26, 22, 20, 0.12);
+  --sidebar-ring: #8b0000;
+
+  /* Light-mode glass is a dark tint with a light edge, not the
+     white-alpha treatment the dark theme uses. */
+  --glass-border: rgba(26, 22, 20, 0.1);
+  --glass-border-strong: rgba(26, 22, 20, 0.16);
+  --glass-fill: rgba(255, 255, 255, 0.72);
+  --glass-fill-strong: rgba(255, 255, 255, 0.85);
+  --glass-shadow: 0 8px 32px 0 rgba(26, 22, 20, 0.16);
+  --glass-shadow-strong: 0 16px 48px 0 rgba(26, 22, 20, 0.22);
 }
 
 .dark {
@@ -125,7 +139,9 @@
 
   /* NEXUS dark-mode glass + accents */
   --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-border-strong: rgba(0, 229, 255, 0.18);
+  --glass-border-strong: rgba(253, 211, 174, 0.18);
+  --glass-fill: rgba(0, 0, 0, 0.45);
+  --glass-fill-strong: rgba(0, 0, 0, 0.55);
 }
 
 @theme inline {
@@ -248,7 +264,7 @@
 
   /* Glassmorphism (strict palette) */
   .glass {
-    background-color: rgba(0, 0, 0, 0.45);
+    background-color: var(--glass-fill);
     backdrop-filter: blur(var(--glass-blur)) saturate(180%);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(180%);
     border: 1px solid var(--glass-border);
@@ -256,7 +272,7 @@
   }
 
   .glass-strong {
-    background-color: rgba(0, 0, 0, 0.55);
+    background-color: var(--glass-fill-strong);
     backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
     -webkit-backdrop-filter: blur(var(--glass-blur-strong)) saturate(200%);
     border: 1px solid var(--glass-border-strong);

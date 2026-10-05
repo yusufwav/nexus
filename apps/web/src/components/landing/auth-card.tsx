@@ -10,6 +10,8 @@ import z from "zod";
 
 import { authClient } from "@/lib/auth-client";
 
+import ThemeToggle from "@/components/theme-toggle";
+
 import { PasswordField, PasswordMeter } from "./password-meter";
 
 type Mode = "signin" | "signup";
@@ -130,6 +132,13 @@ function AuthCardInner(): React.JSX.Element {
         <Link className="nt-auth__mark" href="/">
           nexus<span className="nt-caret">_</span>
         </Link>
+
+        {/* This screen sits outside the (app) shell so it gets no
+            header either — without a toggle here, /login is a dead
+            end for anyone who landed on it in the other palette. */}
+        <div className="nt-auth__theme">
+          <ThemeToggle />
+        </div>
 
         <h1 className="nt-auth__title">
           Notes that learn you

@@ -109,13 +109,10 @@ export default function ModuleCatalogue({
               ) : m.owned ? (
                 <span className="nt-cat__owned">owned · open</span>
               ) : m.hasTrialPdf ? (
-                m.signedIn ? (
-                  <a className="nt-btn nt-btn--ghost" href="/api/trial">
-                    preview
-                  </a>
-                ) : (
-                  <span className="nt-gate">sign in to preview</span>
-                )
+                /* The row itself is a link to /modules/<code>, which
+                   is where the sample now lives — nesting an anchor
+                   here would be an <a> inside a <Link>. */
+                <span className="nt-cat__owned">sample</span>
               ) : null}
 
               {m.status === "available" && !m.owned ? (
