@@ -17,15 +17,35 @@ function DropdownMenuTrigger({ ...props }: MenuPrimitive.Trigger.Props) {
   return <MenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />;
 }
 
+/*
+ * `anchor`, `positionMethod` and `collisionAvoidance` are forwarded
+ * rather than hardcoded because a menu is not always anchored to its
+ * trigger. Pointing the positioner at a virtual element whose rect is
+ * the top of the viewport turns this same primitive into a panel that
+ * drops down from the top edge, which is what the user menu wants on a
+ * tall screen — no second component, no hand-rolled fixed popup.
+ */
 function DropdownMenuContent({
   align = "start",
   alignOffset = 0,
   side = "bottom",
   sideOffset = 4,
+  anchor,
+  positionMethod,
+  collisionAvoidance,
   className,
   ...props
 }: MenuPrimitive.Popup.Props &
-  Pick<MenuPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
+  Pick<
+    MenuPrimitive.Positioner.Props,
+    | "align"
+    | "alignOffset"
+    | "side"
+    | "sideOffset"
+    | "anchor"
+    | "positionMethod"
+    | "collisionAvoidance"
+  >) {
   return (
     <MenuPrimitive.Portal>
       <MenuPrimitive.Positioner
@@ -34,6 +54,9 @@ function DropdownMenuContent({
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
+        anchor={anchor}
+        positionMethod={positionMethod}
+        collisionAvoidance={collisionAvoidance}
       >
         <MenuPrimitive.Popup
           data-slot="dropdown-menu-content"

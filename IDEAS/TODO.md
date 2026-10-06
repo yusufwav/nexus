@@ -3,7 +3,7 @@
 Everything in this file is unfinished, stubbed, or known-wrong. Check items
 off as they get built. New gaps go at the bottom of their section.
 
-Last updated: 4 October 2026.
+Last updated: 6 October 2026.
 
 ---
 
@@ -121,7 +121,10 @@ visible.
 
 - [ ] Continue reading (per-lesson position)
 - [ ] Practice problems (question bank, marked answers)
-- [ ] Study partner history (chat threads that survive a reload)
+- [x] Study partner history (chat threads that survive a reload). Built in
+      `packages/db/src/schema/chat.ts`, `/api/chat` and the save effect in
+      `ai-tutor.tsx`. Verified: a question survives navigate-away-and-back even
+      when the tutor fails to answer it. Open items are under AI tutor below.
 - [ ] Weak spots (rank sections by wrong answers)
 - [ ] Spaced revision (cards on a forgetting curve)
 - [ ] Notes in your own words (summary compared to source)
@@ -129,6 +132,46 @@ visible.
 - [ ] Offline copies (per-user signed download)
 - [ ] Download / re-download per module
 - [ ] Library management tools
+
+## AI tutor — chat history
+
+- [x] **History is saved, and no longer waits on the turn.** The save effect
+      was gated on `status === "ready"`, so a turn that errored wrote nothing
+      and the whole conversation was lost. The newest message is now written as
+      soon as it is complete — the question on the render it lands, the reply
+      once no stream is running — keyed on `${threadId}:${last.id}` and sent one
+      row at a time so a replay is a no-op rather than a full re-send.
+- [x] **The truncated-answer guard is kept**, as the `isSending` early return:
+      mid-stream the last message is a partial bubble, so nothing is written
+      until the stream settles. An interrupted turn keeps its question.
+- [x] **The `savedRef` reset effect is deleted rather than reordered.** It
+      reset the guard a render *after* the save it protected, because effects
+      run in declaration order. It was also unnecessary: the key carries the
+      thread id, so switching threads changes the key by itself.
+- [x] **Message ids are read back off the chat, never predicted.** An earlier
+      attempt predicted the `<timestamp><random>` shape the SDK's ids read
+      like and guessed wrong on every send, which wrote each question twice.
+      `sendMessage` also ignores an `id` you pass it, so there is nothing to
+      predict from. Both were found by watching the network, not by reading.
+- [ ] **`gemini-2.5-flash` has been retired by Google for new keys.** Every
+      turn fails with `AI_APICallError: This model ... is no longer available
+      to new users`, so the tutor answers nothing at all on this project, and
+      the error path is the only path this has ever exercised — the success
+      path (question stored, then the reply stored alongside it) is unverified
+      against a live model. Google names `gemini-3.8-flash` as the
+      replacement; changing the literal at `apps/web/src/app/api/ai/route.ts:66`
+      is the whole fix. It was left alone here rather than changed silently.
+- [ ] **Reopening a thread has a timing hazard worth knowing about.**
+      `loadThread` calls `setThreadId` then `setMessages`, and `useChat` is
+      keyed by `id` — so the `setMessages` captured by that callback belongs to
+      the *outgoing* chat until React commits the rekey. There is now a
+      `setTimeout(0)` between them. It works and it is fragile: it relies on a
+      macrotask being long enough for the commit. The durable fix is to own the
+      `Chat` instance (`useChat({ chat })`), so there is one instance and no
+      rekey to race.
+- [ ] **`chat_threads` / `chat_messages` were created by hand** with
+      `packages/db/scripts/create-chat-tables.mjs`, not by `db:push`, which is
+      still broken — see Database and tooling.
 
 ## Dashboard Settings — every option is a placeholder
 
@@ -273,3 +316,7 @@ Things that work and should not be disturbed:
   `/login?next=<path>`.
 - `/api/trial` correctly returns 401 when logged out.
 - The ASCII engine respects `prefers-reduced-motion`.
+- The landing nav shows `<UserMenu>` — identity block, the five account links,
+  and sign out — for signed-in visitors, and exactly one `sign in` link when
+  logged out. Sign-out works from both there and the dashboard's identity strip
+  (`useSignOut` is shared; neither nests a button inside another).

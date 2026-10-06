@@ -314,6 +314,19 @@ export const MODULE_TOPICS: Readonly<Record<string, ReadonlyArray<ModuleTopic>>>
 
   MAPV112: [
     {
+      slug: "mapv112-bisection-method",
+      title: "The bisection method",
+      description:
+        "Halving an interval until it is small enough to call, and the one question the method keeps asking: is the answer above or below the midpoint?",
+      // Lives in apps/web/private-assets/topics/, not /public. A file
+      // under /public is served by URL with no auth in the request
+      // path, which would make the purchase gate decorative.
+      pdf: "/topics/Bisection_Method.pdf",
+      // Counted from the file itself — 20 page objects in its object
+      // streams — rather than guessed like the entries below.
+      pages: 20,
+    },
+    {
       slug: "mapv112-multivariable",
       title: "Multivariable calculus",
       description:

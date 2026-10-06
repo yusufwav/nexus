@@ -1065,9 +1065,16 @@
     linear-gradient(to bottom, var(--scrim-soft) 0%, transparent 45%),
     linear-gradient(to right, var(--bg-fade) 0%, transparent 14%, transparent 86%, var(--bg-fade) 100%);
 }
-.nt-dash__ascii {
+/* The ambient field inside the dashboard strip.
+   .nt-ambient-bg is position:fixed with z-index:-2, which lets the
+   canvas fall behind .nt-dash's own opaque background -- it renders,
+   but is never seen. Re-anchor it to the strip and lift it to z-index:0
+   so it sits above that background while the identity block (z-index:2)
+   still floats over the field. */
+.nt-dash__strip > canvas.nt-ambient-bg {
   position: absolute;
   inset: 0;
+  z-index: 0;
   width: 100%;
   height: 100%;
   pointer-events: none;
@@ -1120,8 +1127,33 @@
   height: 34px;
   font-size: 0.8rem;
 }
+/* Radial vignette behind the identity text so the moving ASCII
+   field doesn't fight readability. Fades from the page background
+   colour at the centre out to transparent at the edges.
+   z-index: -1 puts it behind the name/email: the ::before is a
+   positioned box, so without a negative z-index it would paint ON
+   TOP of the non-positioned <h1>/<p> rather than under them. */
+.nt-dash__who::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  border-radius: var(--r-lg);
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    var(--bg-1) 0%,
+    var(--bg-1) 30%,
+    transparent 75%
+  );
+}
 .nt-dash__who {
+  position: relative;
   min-width: 0;
+  /* The gutter the vignette bleeds into, so the gradient fades out
+     before the text block ends rather than cutting at its edge. */
+  padding: var(--sp-3) var(--sp-5);
+  margin: calc(var(--sp-3) * -1) calc(var(--sp-5) * -1);
 }
 .nt-dash__name {
   margin: 0;
@@ -1193,6 +1225,9 @@
 .nt-dash__tab {
   position: relative;
   padding: var(--sp-3) var(--sp-4);
+  /* Every tab reserves a gutter on the right for the active dot, so
+     switching tabs does not shift the labels sideways. */
+  padding-right: calc(var(--sp-4) + 14px);
   border: 0;
   background: transparent;
   color: var(--fg-dim);
@@ -1223,7 +1258,9 @@
 .nt-dash__tab--on::before {
   content: "";
   position: absolute;
-  left: var(--sp-4);
+  /* Seated in the gutter the padding-right opened up, centred on the
+     text's optical midline so it never sits over the label. */
+  right: var(--sp-4);
   top: 50%;
   width: 5px;
   height: 5px;
@@ -1606,6 +1643,52 @@
 /* A dropdown that still looks like it belongs to the product. The
    popover itself is rendered by the base-ui dropdown, so only its
    contents are themed here rather than rebuilding the primitive. */
+/* The user menu drops from the top of the viewport and scales with it.
+   Scoped under .nt-root rather than written bare because the primitive
+   sets w-(--anchor-width) on the popup, and that utility would win
+   against a single class on specificity alone. Two classes beat it. */
+/* The class is doubled rather than written once, and it is deliberately
+   NOT written as a descendant selector. Two mistakes this replaces:
+   (1) `.nt-root .nt-menu__panel` needs the panel to sit under an
+   .nt-root ANCESTOR, but both classes are on the same element, so the
+   rule matched nothing and the panel rendered full-viewport-width with
+   square corners.
+   (2) Written bare, the primitive's own utilities — w-(--anchor-width),
+   rounded-none — are single-class and win or lose on order alone. Two
+   classes on one element beats both without needing !important. */
+.nt-menu__panel.nt-menu__panel {
+  /* Overrides w-(--anchor-width) from the primitive. Fluid rather than a
+     fixed rem value so the panel is genuinely a fraction of the screen:
+     near-full width on a phone, a readable column on a desktop. The
+     clamp's upper bound stops it stretching across a wide monitor. */
+  width: clamp(16rem, 92vw, 26rem);
+  /* The anchor is a zero-height rect at the very top, so this panel's top
+     edge sits on the top edge of the screen. Rounding only the bottom
+     corners reads as a header dropping in; rounding all four would leave
+     slivers of background showing above it. */
+  border-radius: 0 0 var(--r-md) var(--r-md);
+  max-height: calc(100dvh - var(--sp-4));
+  transform-origin: top center;
+  animation-name: nt-menu-drop;
+}
+
+@keyframes nt-menu-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-menu__panel.nt-menu__panel {
+    animation-name: none;
+  }
+}
+
 .nt-menu__head {
   display: flex;
   align-items: center;
@@ -1775,4 +1858,515 @@
   position: absolute;
   top: 0;
   right: 0;
+}
+
+/* ============================================================
+   AI TUTOR — /ai
+   A slow ambient ASCII field runs behind the whole conversation.
+   The header and the composer are glass panels floating over it,
+   so the field reads as depth behind the UI rather than as
+   decoration beside it.
+   ============================================================ */
+
+.nt-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.nt-ai {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-0);
+  color: var(--fg);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* The canvas. Same re-anchor as the dashboard strip: .nt-ambient-bg
+   is fixed at z-index -2, which would drop it behind this opaque
+   background, so pull it into normal flow above it. */
+.nt-ai > canvas.nt-ambient-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: var(--amb-op);
+}
+
+/* The veil, between the field and the text.
+   ::after rather than ::before because the canvas is a real child:
+   among siblings that share z-index:0 the later one paints on top, and
+   ::after is the last child. The shell sits at z-index:1 so it is
+   above the veil and unaffected by it. */
+.nt-ai::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--ai-veil);
+}
+
+.nt-ai__shell {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 56rem;
+  margin-inline: auto;
+  padding: var(--sp-5) var(--sp-5) var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+/* ---- Header: a glass bar floating over the field ---- */
+.nt-ai__head {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-lg);
+}
+.nt-ai__head-txt {
+  min-width: 0;
+}
+.nt-ai__title {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--fg);
+}
+.nt-ai__title svg {
+  width: 1.1em;
+  height: 1.1em;
+  color: var(--accent-b);
+}
+.nt-ai__sub {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+.nt-ai__head > .nt-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.nt-ai__head > .nt-btn svg {
+  width: 1em;
+  height: 1em;
+  margin-right: 0.4em;
+}
+
+/* ---- Header tools: three icon-only buttons ----
+   Square, centred glyphs, and no shell prompt. .nt-btn is built for a
+   text label — it pads by sp-3/sp-5 and paints "$ " before the text —
+   so these override both rather than sitting inside it awkwardly. */
+.nt-ai__tools {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-shrink: 0;
+}
+.nt-ai__tool {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border-radius: var(--r-sm);
+  color: var(--fg-muted);
+}
+.nt-ai__tool::before {
+  content: none;
+}
+.nt-ai__tool svg {
+  display: block;
+  width: 1.05rem;
+  height: 1.05rem;
+  margin: auto;
+}
+.nt-ai__tool:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+/* Delete is the one control here that loses work, so it is tinted only
+   on hover — enough to separate it, not enough to shout. */
+.nt-ai__tool--danger:hover,
+.nt-ai__tool--danger:focus-visible {
+  color: #fca5a5;
+  border-color: color-mix(in srgb, #f87171 45%, transparent);
+}
+
+/* ---- History pane ----
+   A glass list directly under the header, inside the shell. It takes
+   the conversation's width rather than floating over the transcript,
+   so opening it never hides the answer being read. */
+.nt-ai__pane {
+  flex-shrink: 0;
+  border-radius: var(--r-lg);
+  padding: var(--sp-2);
+}
+.nt-ai__pane-note {
+  margin: 0;
+  padding: var(--sp-3) var(--sp-4);
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+.nt-ai__threads {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* Capped so a long history scrolls inside the panel rather than
+     pushing the composer off the bottom of the screen. */
+  max-height: 15rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nt-ai__thread {
+  width: 100%;
+  display: grid;
+  /* icon · title · date. The middle column takes the slack so a long
+     title truncates instead of shoving the date off the edge. */
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  font-family: inherit;
+  font-size: var(--fs-xs);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+.nt-ai__thread:hover,
+.nt-ai__thread:focus-visible {
+  color: var(--fg);
+  background: var(--accent-soft);
+}
+.nt-ai__thread--on {
+  color: var(--fg);
+  background: var(--accent-soft);
+}
+.nt-ai__thread svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  color: var(--fg-dim);
+}
+.nt-ai__thread-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-ai__thread-when {
+  color: var(--fg-dim);
+  white-space: nowrap;
+}
+
+/* ---- Transcript ----
+   The transcript scrolls; the header and composer stay put. */
+.nt-ai__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-block: var(--sp-2);
+}
+.nt-ai__thread-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.nt-ai__msg {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  max-width: 88%;
+}
+.nt-ai__msg--me {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+/* The label, in the app's usual quiet mono. */
+.nt-ai__who {
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+  text-transform: lowercase;
+  padding-inline: var(--sp-1);
+}
+.nt-ai__bubble {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--fg-muted);
+  overflow-wrap: anywhere;
+}
+.nt-ai__msg--me .nt-ai__bubble {
+  color: var(--fg);
+  border-color: var(--accent-line);
+}
+.nt-ai__bubble--bad {
+  color: var(--fg);
+  border-color: var(--accent-line);
+}
+/* Long answers sit over a moving field; a soft radial keeps them
+   readable without hiding what is behind. */
+.nt-ai__bubble p:first-child {
+  margin-top: 0;
+}
+.nt-ai__bubble p:last-child {
+  margin-bottom: 0;
+}
+.nt-ai__bubble code {
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent-b);
+  font-size: 0.95em;
+}
+.nt-ai__bubble pre {
+  padding: var(--sp-3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.35);
+  overflow-x: auto;
+}
+.nt-ai__bubble pre code {
+  background: none;
+  padding: 0;
+  color: var(--fg-muted);
+}
+.nt-ai__thinking {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  color: var(--fg-dim);
+}
+.nt-ai__spin {
+  width: 1em;
+  height: 1em;
+  animation: nt-spin 900ms linear infinite;
+}
+@keyframes nt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ---- Empty state ---- */
+.nt-ai__empty {
+  max-width: 38rem;
+  margin-inline: auto;
+  padding-block: var(--sp-6);
+}
+.nt-ai__greet {
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+}
+.nt-ai__empty-lead {
+  margin: var(--sp-2) 0 var(--sp-5);
+  font-size: var(--fs-sm);
+  color: var(--fg-dim);
+}
+.nt-ai__starters {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.nt-ai__starter {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  backdrop-filter: blur(var(--glass-blur));
+  color: var(--fg-muted);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.nt-ai__starter span {
+  flex: 1;
+  min-width: 0;
+}
+.nt-ai__starter svg {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  opacity: 0;
+  color: var(--accent-b);
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.nt-ai__starter:hover {
+  border-color: var(--accent-line);
+  color: var(--fg);
+  transform: translateX(2px);
+}
+.nt-ai__starter:hover svg,
+.nt-ai__starter:focus-visible svg {
+  opacity: 1;
+}
+
+/* ---- Composer: glass, pinned to the bottom ---- */
+.nt-ai__foot {
+  flex-shrink: 0;
+}
+.nt-ai__composer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+}
+.nt-ai__input {
+  flex: 1;
+  min-width: 0;
+  /* Grows with its content up to a ceiling, then scrolls — so a long
+     question does not push the composer off the screen. */
+  field-sizing: content;
+  max-height: 9rem;
+  resize: none;
+  border: 0;
+  background: transparent;
+  color: var(--fg);
+  font-family: inherit;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  padding: var(--sp-2) 0;
+}
+.nt-ai__input:focus {
+  outline: none;
+}
+.nt-ai__input::placeholder {
+  color: var(--fg-dim);
+}
+.nt-ai__input:disabled {
+  opacity: 0.6;
+}
+/* Doubled class for the same reason as the ::below rule: every property
+   here that .nt-btn also sets — display, padding — is (0,1,0) against
+   (0,1,0) in landing.css, which is imported later and was winning. The
+   button was rendering 50x36 instead of 36x36 because landing.css's
+   `padding: 12px 24px` survived, squashing the circle and pushing the
+   arrow off-centre. Specificity beats import order. */
+.nt-ai__send.nt-ai__send {
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+}
+/* .nt-btn paints a "$ " shell prompt on ::before. That is right for a
+   text button and wrong here: under display:grid the pseudo-element
+   becomes a second grid item, so it takes the first cell and shoves
+   the arrow into the second, off-centre. Cancelled rather than hidden,
+   so it occupies no cell at all.
+
+   Doubled class on purpose. The base rule in landing.css is a bare
+   `.nt-btn::before` at specificity (0,1,0) — the same as a single class
+   here — so the winner came down to stylesheet order, and landing.css
+   is imported after this file and won. The "$" was still painting on
+   the send button. Two classes beat one regardless of order, which is
+   what this needs. */
+.nt-ai__send.nt-ai__send::before {
+  content: none;
+}
+.nt-ai__send.nt-ai__send svg {
+  width: 1.05em;
+  height: 1.05em;
+  /* Grid items stretch by default, which lets the inline SVG's own
+     baseline sit the drawing off-centre inside the circle. Block plus
+     auto margins pins the arrow where the eye expects it. The negative
+     inline margin that .nt-btn applies to its svg is dropped for the
+     same reason as the padding: it is sized for a text button and
+     dragged the icon sideways here. */
+  display: block;
+  margin: auto;
+}
+.nt-ai__note {
+  margin: var(--sp-2) 0 0;
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+  letter-spacing: var(--tracking);
+}
+
+@media (max-width: 640px) {
+  .nt-ai__shell {
+    padding: var(--sp-4) var(--sp-3) var(--sp-3);
+  }
+  .nt-ai__sub {
+    display: none;
+  }
+  .nt-ai__msg {
+    max-width: 96%;
+  }
+  .nt-ai__note {
+    display: none;
+  }
+}
+
+/* Honour the OS setting: the field already refuses to animate, and
+   the spinner should stop with it rather than spin forever on a
+   static page. */
+@media (prefers-reduced-motion: reduce) {
+  .nt-ai__spin {
+    animation: none;
+  }
+  .nt-ai__starter {
+    transition: none;
+  }
 }

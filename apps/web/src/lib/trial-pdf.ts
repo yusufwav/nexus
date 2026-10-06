@@ -12,8 +12,18 @@
  * TODO: write the real MATT101 sample. See IDEAS/TODO.md.
  */
 
-/** Served by /api/trial, which gates it behind a session. */
-export const TRIAL_PDF_PATH = "/sample-matt101.pdf";
+/**
+ * Served by /api/trial, which gates it behind a session.
+ *
+ * Deliberately NOT under /public. Next serves /public as static files
+ * by URL, with no code of ours in the request path, so a PDF that
+ * lives there is readable by anyone who guesses the name no matter
+ * what the route handler checks. This one used to sit at
+ * /public/sample-matt101.pdf and returned 200 to anonymous callers
+ * while the route meant to protect it returned 401. It now lives in
+ * private-assets/, which Next never serves.
+ */
+export const TRIAL_PDF_PATH = "/topics/matt101-sample.pdf";
 
 /** Per-module samples, keyed by modules.code. Only MATT101 has one. */
 export const TRIAL_PDFS: Readonly<

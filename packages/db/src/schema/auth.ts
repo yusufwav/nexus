@@ -1,5 +1,5 @@
 import { defineRelationsPart } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, integer, bigint } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -73,7 +73,34 @@ export const verification = pgTable(
   (table) => [index("verification_identifier_idx").on(table.identifier)],
 );
 
-export const authRelations = defineRelationsPart({ user, session, account, verification }, (r) => ({
+/**
+ * Rate limiting, back-ended by the database so the budget survives a
+ * restart — an in-memory store would hand an attacker a fresh
+ * allowance every time the process cycled. better-auth writes and
+ * reads this table itself; it exists here because
+ * `rateLimit: { storage: "database" }` in packages/auth fails closed
+ * with SCHEMA_MISMATCH if the table is absent, which turns every
+ * sign-in and sign-up into a 500 rather than leaving the limit off.
+ */
+export const rateLimit = pgTable(
+  "rateLimit",
+  {
+    id: text("id").primaryKey(),
+    key: text("key").notNull().unique(),
+    count: integer("count").notNull(),
+    // better-auth stores this as a bigint millisecond epoch
+    // (Date.now()), not a timestamp — see get-tables.mjs, where
+    // lastRequest is { type: "number", bigint: true }. A timestamp
+    // column here fails at runtime with "value.toISOString is not a
+    // function".
+    lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+  },
+  (table) => [index("rateLimit_key_idx").on(table.key)],
+);
+
+export const authRelations = defineRelationsPart(
+  { user, session, account, verification, rateLimit },
+  (r) => ({
   user: {
     sessions: r.many.session({
       from: r.user.id,

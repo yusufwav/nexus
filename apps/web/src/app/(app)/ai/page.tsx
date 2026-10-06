@@ -1,204 +1,26 @@
-"use client";
+import { requireSession } from "@/lib/session";
 
-import { useChat } from "@ai-sdk/react";
-import { Bubble, BubbleContent } from "@Main/ui/components/bubble";
-import { Button } from "@Main/ui/components/button";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@Main/ui/components/empty";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupButton,
-  InputGroupTextarea,
-} from "@Main/ui/components/input-group";
-import { Message, MessageContent as MessageBody, MessageHeader } from "@Main/ui/components/message";
-import {
-  MessageScroller,
-  MessageScrollerButton,
-  MessageScrollerContent,
-  MessageScrollerItem,
-  MessageScrollerProvider,
-  MessageScrollerViewport,
-} from "@Main/ui/components/message-scroller";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@Main/ui/components/tooltip";
-import { DefaultChatTransport } from "ai";
-import { ArrowUpIcon, Loader2, MessageCircleDashedIcon, RotateCwIcon } from "lucide-react";
-import { useState, type FormEvent, type KeyboardEvent } from "react";
-import { Streamdown } from "streamdown";
+import AiTutor from "./ai-tutor";
 
-import { ENV } from "../../../env";
-
-export default function AIPage() {
-  const [input, setInput] = useState("");
-  const { messages, sendMessage, status, setMessages } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/ai",
-    }),
-  });
-  const isSending = status === "submitted" || status === "streaming";
-
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || isSending) return;
-    sendMessage({ text });
-    setInput("");
-  };
-
-  const handlePromptKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      e.currentTarget.form?.requestSubmit();
-    }
-  };
-
-  const resetConversation = () => {
-    setInput("");
-    setMessages([]);
-  };
-
-  return (
-    <MessageScrollerProvider>
-      <div className="flex h-full min-h-0 w-full flex-col">
-        <header className="shrink-0 border-b px-4 py-3">
-          <div className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-sm font-medium">New Chat</h1>
-              <p className="text-xs/relaxed text-muted-foreground">How can I help you today?</p>
-            </div>
-            <div className="shrink-0">
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon-sm"
-                      aria-label="Reset conversation"
-                      onClick={resetConversation}
-                      disabled={isSending}
-                    />
-                  }
-                >
-                  <RotateCwIcon />
-                </TooltipTrigger>
-                <TooltipContent>Reset</TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        </header>
-        <main className="min-h-0 flex-1">
-          {messages.length === 0 && !isSending ? (
-            <Empty className="mx-auto h-full max-w-3xl px-4">
-              <EmptyHeader>
-                <EmptyMedia variant="icon">
-                  <MessageCircleDashedIcon />
-                </EmptyMedia>
-                <EmptyTitle>Morning, Main!</EmptyTitle>
-                <EmptyDescription>What are we working on today?</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          ) : (
-            <MessageScroller>
-              <MessageScrollerViewport>
-                <MessageScrollerContent
-                  aria-busy={isSending}
-                  className="mx-auto w-full max-w-3xl px-4 py-6"
-                >
-                  {messages.map((message) => {
-                    const isUser = message.role === "user";
-
-                    return (
-                      <MessageScrollerItem key={message.id} scrollAnchor={isUser}>
-                        <Message align={isUser ? "end" : "start"}>
-                          <MessageBody>
-                            <MessageHeader>{isUser ? "You" : "AI Assistant"}</MessageHeader>
-                            <Bubble
-                              align={isUser ? "end" : "start"}
-                              variant={isUser ? "default" : "secondary"}
-                            >
-                              <BubbleContent>
-                                {message.parts?.map((part, index) => {
-                                  if (part.type === "text") {
-                                    return (
-                                      <Streamdown
-                                        key={index}
-                                        isAnimating={
-                                          status === "streaming" && message.role === "assistant"
-                                        }
-                                      >
-                                        {part.text}
-                                      </Streamdown>
-                                    );
-                                  }
-                                  return null;
-                                })}
-                              </BubbleContent>
-                            </Bubble>
-                          </MessageBody>
-                        </Message>
-                      </MessageScrollerItem>
-                    );
-                  })}
-                  {status === "submitted" && (
-                    <MessageScrollerItem>
-                      <Message align="start">
-                        <MessageBody>
-                          <Bubble variant="secondary">
-                            <BubbleContent className="flex items-center gap-2">
-                              <Loader2 className="size-3.5 animate-spin" />
-                              <span className="shimmer">Thinking...</span>
-                            </BubbleContent>
-                          </Bubble>
-                        </MessageBody>
-                      </Message>
-                    </MessageScrollerItem>
-                  )}
-                  <MessageScrollerItem scrollAnchor />
-                </MessageScrollerContent>
-              </MessageScrollerViewport>
-              <MessageScrollerButton />
-            </MessageScroller>
-          )}
-        </main>
-        <footer className="shrink-0 border-t px-4 py-3">
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
-            <form onSubmit={handleSubmit} className="w-full">
-              <InputGroup>
-                <InputGroupTextarea
-                  name="prompt"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handlePromptKeyDown}
-                  placeholder="Type your message..."
-                  className="max-h-32 min-h-14"
-                  rows={1}
-                  autoComplete="off"
-                  autoFocus
-                  disabled={isSending}
-                />
-                <InputGroupAddon align="block-end" className="pt-1">
-                  <InputGroupButton
-                    type="submit"
-                    variant="default"
-                    size="icon-sm"
-                    disabled={isSending || !input.trim()}
-                    className="ml-auto"
-                  >
-                    {isSending ? <Loader2 className="animate-spin" /> : <ArrowUpIcon />}
-                    <span className="sr-only">Send</span>
-                  </InputGroupButton>
-                </InputGroupAddon>
-              </InputGroup>
-            </form>
-          </div>
-        </footer>
-      </div>
-    </MessageScrollerProvider>
-  );
+/**
+ * AI TUTOR — /ai
+ * ------------------------------------------------------------
+ * Auth required. This page was the only route in the app that never
+ * called getSession()/requireSession(), so it rendered a full chat UI
+ * to anyone who asked for it, and the API it talks to had no gate
+ * either.
+ *
+ * The check lives here as well as in /api/ai on purpose. This one
+ * stops an anonymous visitor seeing the page; the one in the route
+ * stops a direct call to the endpoint. Either alone leaves a hole —
+ * the UI's check is bypassable with curl, and the API's check alone
+ * still ships a dead chat shell to logged-out visitors.
+ *
+ * The page itself is a thin server component so the redirect happens
+ * before any of the chat UI is sent to the browser. The interactive
+ * half lives in ./ai-tutor.
+ */
+export default async function AIPage(): Promise<React.JSX.Element> {
+  const user = await requireSession("/ai");
+  return <AiTutor name={user.name} />;
 }

@@ -1,10 +1,8 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-
 import type { NextRequest } from "next/server";
 
 import { MODULE_TOPICS, type ModuleTopic } from "@/content/module-topics";
 import { getOwnedCodes } from "@/lib/modules";
+import { assetFilename, readPrivateAsset } from "@/lib/private-assets";
 import { getSession } from "@/lib/session";
 
 /**
@@ -28,13 +26,13 @@ import { getSession } from "@/lib/session";
  *                  a 404 rather than a 403: there is nothing to gate.
  *
  * The slug is looked up in the registry rather than joined onto a
- * path, so a request cannot escape /public by crafting "../..".
+ * path, so a request cannot escape the asset root by crafting "../..".
  * Only `topic.pdf` reaches the filesystem, and it is developer-set.
  *
- * TODO: move these out of /public into private storage. While they
- * sit there, /topics/<file>.pdf is fetchable by anyone who guesses
- * the name — this route is the intended way in, not the only one.
- * See IDEAS/TODO.md.
+ * The PDFs live in private-assets/, not /public. That is what makes
+ * these gates real: a file under /public is served straight off disk
+ * by URL, so the 401 and 403 below would not have applied to anyone
+ * who simply asked for /topics/<file>.pdf.
  */
 
 type Params = { readonly params: Promise<{ slug: string }> };
@@ -83,35 +81,28 @@ export async function GET(_req: NextRequest, { params }: Params): Promise<Respon
 
   // --- gate 3: the file itself ---
   // The path comes from the registry, never from the request, so it
-  // cannot traverse. The check is belt-and-braces anyway.
-  const rel = found.topic.pdf.replace(/^\/+/, "");
-  if (rel.includes("..")) {
-    return new Response("Not found.", {
-      status: 404,
-      headers: { "content-type": "text/plain; charset=utf-8" },
-    });
-  }
-
-  try {
-    const file = await readFile(path.join(process.cwd(), "public", rel));
-    const filename = rel.split("/").pop() ?? `${found.topic.slug}.pdf`;
-
-    return new Response(new Uint8Array(file), {
-      headers: {
-        "content-type": "application/pdf",
-        "cache-control": "private, no-store",
-        // Topics are only ever fetched to be saved, so this is always
-        // an attachment. The preview iframe deliberately points at
-        // /api/trial instead, which serves with no filename at all —
-        // Chrome downloads any PDF that carries one, which would turn
-        // the preview into a download on page load.
-        "content-disposition": `attachment; filename="${filename}"`,
-      },
-    });
-  } catch {
+  // cannot traverse; readPrivateAsset re-checks after resolving all
+  // the same. These PDFs live in private-assets/, NOT /public — a
+  // file under /public is served by URL with no handler in the path,
+  // which would make both gates above decorative.
+  const file = await readPrivateAsset(found.topic.pdf);
+  if (file === null) {
     return new Response("That PDF has not been written yet.", {
       status: 404,
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
   }
+
+  return new Response(file, {
+    headers: {
+      "content-type": "application/pdf",
+      "cache-control": "private, no-store",
+      // Topics are only ever fetched to be saved, so this is always
+      // an attachment. The preview iframe deliberately points at
+      // /api/trial instead, which serves with no filename at all —
+      // Chrome downloads any PDF that carries one, which would turn
+      // the preview into a download on page load.
+      "content-disposition": `attachment; filename="${assetFilename(found.topic.pdf)}"`,
+    },
+  });
 }

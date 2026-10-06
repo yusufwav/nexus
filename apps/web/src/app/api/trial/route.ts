@@ -1,21 +1,20 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-
 import type { NextRequest } from "next/server";
 
+import { assetFilename, readPrivateAsset } from "@/lib/private-assets";
 import { getSession } from "@/lib/session";
 import { TRIAL_PDF_PATH } from "@/lib/trial-pdf";
 
 /**
  * TRIAL PDF — auth gated
  * ------------------------------------------------------------
- * Serves the sample to signed-in users only. The file lives in
- * /public so Next will also serve it statically, but nothing links
- * to that path directly; this route is the intended way in.
+ * Serves the sample to signed-in users only.
  *
- * TODO: once the real samples exist, move them out of /public into
- * private storage so the static path is not the only thing standing
- * between the notes and anyone who guesses it. See IDEAS/TODO.md.
+ * The file lives in private-assets/, NOT in /public. That is the
+ * whole point: Next serves /public by URL with no handler in the
+ * request path, so while this file sat in /public the gate below was
+ * decorative — /sample-matt101.pdf returned 200 to anonymous callers
+ * even though this route correctly returned 401 to them. Moving it
+ * out of /public is what makes this the only way in.
  */
 export async function GET(req: NextRequest): Promise<Response> {
   const user = await getSession();
@@ -29,32 +28,28 @@ export async function GET(req: NextRequest): Promise<Response> {
   // Same gate, two verbs: the bare URL is embedded in the module
   // page's <iframe>, ?download=1 is what its button links to.
   const asDownload = req.nextUrl.searchParams.get("download") === "1";
-  const filename = TRIAL_PDF_PATH.split("/").pop() ?? "sample.pdf";
+  const filename = assetFilename(TRIAL_PDF_PATH);
 
-  try {
-    const file = await readFile(
-      path.join(process.cwd(), "public", TRIAL_PDF_PATH.replace(/^\//, "")),
-    );
-    return new Response(new Uint8Array(file), {
-      headers: {
-        "content-type": "application/pdf",
-        // The sample is a preview, not the product — do not let a
-        // shared proxy hold on to one user's copy.
-        "cache-control": "private, no-store",
-        // The filename is only attached when the caller asked to
-        // download. Chrome downloads *any* PDF that carries a
-        // filename in this header, inline or not, which means an
-        // `inline; filename=` here silently turns the preview
-        // iframe into a download on page load.
-        ...(asDownload
-          ? { "content-disposition": `attachment; filename="${filename}"` }
-          : {}),
-      },
-    });
-  } catch {
+  const file = await readPrivateAsset(TRIAL_PDF_PATH);
+  if (file === null) {
     return new Response("Sample not available yet.", {
       status: 404,
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
   }
+
+  return new Response(file, {
+    headers: {
+      "content-type": "application/pdf",
+      // The sample is a preview, not the product — do not let a
+      // shared proxy hold on to one user's copy.
+      "cache-control": "private, no-store",
+      // The filename is only attached when the caller asked to
+      // download. Chrome downloads *any* PDF that carries a
+      // filename in this header, inline or not, which means an
+      // `inline; filename=` here silently turns the preview
+      // iframe into a download on page load.
+      ...(asDownload ? { "content-disposition": `attachment; filename="${filename}"` } : {}),
+    },
+  });
 }

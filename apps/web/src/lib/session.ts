@@ -35,9 +35,20 @@ export async function getSession(): Promise<Session["user"] | null> {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     return session?.user ?? null;
-  } catch {
-    // An unreachable auth database must not take the public pages
-    // down with it; the dashboard's own gate catches the miss.
+  } catch (err) {
+    /*
+     * An unreachable auth database must not take the public pages
+     * down with it, so this still returns null and reads as "logged
+     * out". Failing closed is the right direction — a user with a
+     * broken database gets no access rather than all access.
+     *
+     * What it used to do was swallow the error silently, which made
+     * an outage indistinguishable from a visitor who simply never
+     * signed in: every page renders its logged-out variant and
+     * nothing says why. It is logged now, so a broken auth database
+     * shows up in the terminal instead of quietly degrading the site.
+     */
+    console.error("[auth] getSession failed; treating as logged out:", err);
     return null;
   }
 }

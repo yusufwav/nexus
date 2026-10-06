@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { authClient } from "@/lib/auth-client";
 
 import ThemeToggle from "@/components/theme-toggle";
+import UserMenu from "@/components/user-menu";
 
 const LINKS = [
   { href: "#mission", label: "~/readme" },
@@ -16,7 +17,7 @@ const LINKS = [
 
 /**
  * The design's fixed nav, with its right side driven by the session:
- * "sign in" when logged out, a dashboard link when logged in. The
+ * "sign in" when logged out, the user's own menu when logged in. The
  * design shipped without either, which left no way into the app from
  * the landing page.
  */
@@ -43,9 +44,26 @@ export default function LandingNav(): React.JSX.Element {
           </a>
         ))}
         {session?.user ? (
-          <Link className="nt-btn nt-btn--ghost" href="/dashboard">
-            dashboard
-          </Link>
+          <>
+            {/* The tutor was reachable only by typing /ai — nothing in
+                the product linked to it. It is an app feature rather
+                than a public page, so it appears for signed-in users
+                only; /ai still redirects anyone else to the login. */}
+            <Link className="nt-btn nt-btn--ghost" href="/ai">
+              ~/ai
+            </Link>
+            {/* The identity block, not a bare "dashboard" link. The
+                landing page is where people arrive first, so it is the
+                one place worth saying who they are — and it puts the
+                dashboard, the settings and sign-out one click away
+                instead of on a separate nav bar the visitor has to
+                find first.
+
+                No sign-in branch alongside it: UserMenu renders its own
+                when the session is still resolving or empty, so a
+                second link here would be the same destination twice. */}
+            <UserMenu />
+          </>
         ) : (
           <Link className="nt-btn nt-btn--ghost" href="/login">
             sign in

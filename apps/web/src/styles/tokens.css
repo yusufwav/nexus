@@ -118,6 +118,12 @@
   --amb-high: #fdd3ae;
   --amb-speed: 0.2;
 
+  /* Veil over the ambient field on the /ai transcript only. The field
+     renders at --amb-op 0.6 with bright glyphs, which is a lot to read
+     a page of LaTeX against. 0.4 sits in the 30-40% the tutor needs
+     without hiding the field, which is the point of having it. */
+  --ai-veil: rgba(0, 0, 0, 0.4);
+
   /* Title gradient — the "learn you" phrase */
   --grad-from: #fdd3ae;
   --grad-mid: #ffffff;
@@ -283,6 +289,10 @@
   --amb-op: 0.4;
   --amb-low: #c9a0a0;
   --amb-high: #6b0024;
+
+  /* Paper, not ink: the veil has to wash the field toward the
+     background rather than darken it, or light mode turns muddy. */
+  --ai-veil: rgba(250, 248, 246, 0.4);
 
   /* Title gradient re-anchored: the dark run leans on white as
      its midpoint, which vanishes on paper. */

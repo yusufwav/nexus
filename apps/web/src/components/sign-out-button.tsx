@@ -1,34 +1,20 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-
-import { authClient } from "@/lib/auth-client";
+import useSignOut from "@/lib/use-sign-out";
 
 /**
- * SIGN OUT
- * Split out of user-menu.tsx so the dashboard's identity strip can
- * reuse the handler without pulling the whole dropdown along.
+ * SIGN OUT, as a button.
+ *
+ * Kept for the dashboard's identity strip, which wants a plain ghost
+ * button. The behaviour lives in useSignOut so the user menu can offer
+ * the same thing as a dropdown item without nesting one button inside
+ * another — see that hook for why the two cannot share a component.
  */
 export default function SignOutButton(): React.JSX.Element {
-  const router = useRouter();
+  const signOut = useSignOut();
 
   return (
-    <button
-      type="button"
-      className="nt-btn nt-btn--ghost"
-      onClick={() => {
-        authClient.signOut({
-          fetchOptions: {
-            onSuccess: () => {
-              router.push("/");
-              // The dashboard is server-rendered off the session, so
-              // the tree has to be rebuilt rather than just navigated.
-              router.refresh();
-            },
-          },
-        });
-      }}
-    >
+    <button type="button" className="nt-btn nt-btn--ghost" onClick={signOut}>
       sign out
     </button>
   );
