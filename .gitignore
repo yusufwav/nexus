@@ -17,6 +17,23 @@ local.db-*
 .env
 .env*.local
 
+# Paid / private content
+#
+# The PDFs a signed-in user may download. They are deliberately NOT under
+# /public — that directory is served by URL to anyone who asks, which is
+# what made /sample-matt101.pdf world-readable until it was moved here.
+#
+# These still must not be committed. "Not served by Next" and "not in the
+# repository" are different guarantees, and only the second one keeps
+# them off GitHub. Two are already in history; see
+# apps/web/src/lib/private-assets.ts for how they are read at runtime.
+#
+# Consequence of ignoring this: a Vercel build has no copies, so
+# readPrivateAsset() returns null and the download routes answer
+# "not found". To ship real content, put it in blob storage (Vercel Blob
+# or S3) and fetch it there instead of from the filesystem.
+apps/web/private-assets/
+
 # IDEs and editors
 .vscode/*
 !.vscode/settings.json
