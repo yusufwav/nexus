@@ -5,10 +5,12 @@ import { notFound } from "next/navigation";
 import ScrollReveal from "@/components/landing/scroll-reveal";
 import TopicList from "@/components/landing/topic-list";
 import ThemeToggle from "@/components/theme-toggle";
+import UserMenu from "@/components/user-menu";
 import { topicsFor } from "@/content/module-topics";
 import { getModuleByCode, getOwnedCodes } from "@/lib/modules";
 import { getSession } from "@/lib/session";
 import { TRIAL_PDFS } from "@/lib/trial-pdf";
+import { SparklesIcon } from "lucide-react";
 
 import "@/styles/landing.css";
 
@@ -72,9 +74,27 @@ export default async function ModuleDetailPage({
             ~/modules
           </Link>
           {user ? (
-            <Link className="nt-btn nt-btn--ghost" href="/dashboard">
-              dashboard
-            </Link>
+            <>
+              {/* Same rule as the catalogue and the landing nav: an app
+                  feature, offered only to a signed-in visitor, because
+                  /ai redirects anyone else to the login. Icon rather
+                  than a `~/ai` path, with the name on aria-label —
+                  an icon on its own announces nothing. */}
+              <Link
+                className="nt-btn nt-btn--ghost nt-btn--icon"
+                href="/ai"
+                aria-label="AI tutor"
+                title="AI tutor"
+              >
+                <SparklesIcon aria-hidden="true" />
+              </Link>
+              {/* The identity menu rather than a bare "dashboard" link,
+                  matching every other signed-in nav. Unlike the
+                  catalogue, ~/modules is kept above: here it points at
+                  /modules, so it is a real "back to the list" step
+                  rather than a detour to the landing page. */}
+              <UserMenu />
+            </>
           ) : (
             <Link className="nt-btn nt-btn--ghost" href="/login">
               sign in

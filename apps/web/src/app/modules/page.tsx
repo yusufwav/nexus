@@ -7,6 +7,8 @@ import ModuleCatalogue, {
 } from "@/components/landing/module-catalogue";
 import ScrollReveal from "@/components/landing/scroll-reveal";
 import ThemeToggle from "@/components/theme-toggle";
+import UserMenu from "@/components/user-menu";
+import { SparklesIcon } from "lucide-react";
 import { getOwnedCodes, listModules } from "@/lib/modules";
 import { getSession } from "@/lib/session";
 
@@ -56,16 +58,42 @@ export default async function ModulesPage(): Promise<React.JSX.Element> {
           nexus<span className="nt-caret">_</span>
         </Link>
         <div className="nt-nav__links">
+          {/* No ~/modules here. This IS the catalogue, and that link
+              pointed at `/#modules` on the landing page — sending a
+              reader off this page, to a shorter, less complete list of
+              the same modules, to arrive back where they started. */}
           <Link className="nt-nav__link" href="/">
             ~/
           </Link>
-          <Link className="nt-nav__link" href="/#modules">
-            ~/modules
-          </Link>
           {user ? (
-            <Link className="nt-btn nt-btn--ghost" href="/dashboard">
-              dashboard
-            </Link>
+            <>
+              {/* The tutor is an app feature rather than a public page,
+                  and /ai sends anyone without a session back to the
+                  login — so it is offered only to signed-in visitors,
+                  the same rule the landing nav follows.
+
+                  An icon rather than a `~/ai` label: this row is
+                  otherwise plain paths, and a path is not what this is.
+                  `aria-label` carries the name, because an icon on its
+                  own announces nothing. The spark is the glyph the
+                  tutor's own heading uses, so the two read as one
+                  feature wherever they turn up. */}
+              <Link
+                className="nt-btn nt-btn--ghost nt-btn--icon"
+                href="/ai"
+                aria-label="AI tutor"
+                title="AI tutor"
+              >
+                <SparklesIcon aria-hidden="true" />
+              </Link>
+              {/* The identity menu rather than a bare "dashboard" link,
+                  so this row matches every other signed-in nav in the
+                  product. The dashboard is the first item in that menu,
+                  so nothing is lost by not linking it twice, and the
+                  reader gains sign-out and the settings they otherwise
+                  had no way to reach from the catalogue. */}
+              <UserMenu />
+            </>
           ) : (
             <Link className="nt-btn nt-btn--ghost" href="/login">
               sign in

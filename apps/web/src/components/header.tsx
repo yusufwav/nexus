@@ -2,17 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { SparklesIcon } from "lucide-react";
 
 import { authClient } from "@/lib/auth-client";
 
 import ThemeToggle from "./theme-toggle";
 import UserMenu from "./user-menu";
 
+/**
+ * Destinations, in the order they appear. `icon` is set on the one that
+ * is a feature rather than a location: the tutor is not another
+ * directory to `cd` into, and drawing it as a spark keeps it legible as
+ * the thing it is instead of a fifth path competing with the other four.
+ */
 const LINKS = [
   { to: "/", label: "~/" },
   { to: "/modules", label: "~/modules" },
   { to: "/dashboard", label: "~/dashboard" },
-  { to: "/ai", label: "~/ai" },
+  { to: "/ai", label: "~/ai", icon: true },
 ] as const;
 
 /**
@@ -34,15 +41,25 @@ export default function Header(): React.JSX.Element {
       </Link>
 
       <nav className="nt-head__links" aria-label="Main">
-        {LINKS.map(({ to, label }) => (
-          <Link
-            key={to}
-            className={`nt-head__link${pathname === to ? " nt-head__link--on" : ""}`}
-            href={to}
-          >
-            {label}
-          </Link>
-        ))}
+        {LINKS.map(({ to, label, ...rest }) => {
+          const on = pathname === to;
+          const icon = "icon" in rest && rest.icon === true;
+
+          return (
+            <Link
+              key={to}
+              className={`nt-head__link${on ? " nt-head__link--on" : ""}${icon ? " nt-head__link--icon" : ""}`}
+              href={to}
+              /* An icon with no label announces nothing, so the name is
+                 carried here. The visible text is swapped out below,
+                 not merely hidden from layout. */
+              aria-label={icon ? "AI tutor" : undefined}
+              title={icon ? "AI tutor" : undefined}
+            >
+              {icon ? <SparklesIcon aria-hidden="true" /> : label}
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="nt-head__actions">

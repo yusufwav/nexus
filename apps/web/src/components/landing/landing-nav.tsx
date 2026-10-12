@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SparklesIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
@@ -48,9 +49,18 @@ export default function LandingNav(): React.JSX.Element {
             {/* The tutor was reachable only by typing /ai — nothing in
                 the product linked to it. It is an app feature rather
                 than a public page, so it appears for signed-in users
-                only; /ai still redirects anyone else to the login. */}
-            <Link className="nt-btn nt-btn--ghost" href="/ai">
-              ~/ai
+                only; /ai still redirects anyone else to the login.
+
+                Icon rather than a `~/ai` path, so it reads as a feature
+                and not as one more directory. The name lives on
+                aria-label, because an icon alone announces nothing. */}
+            <Link
+              className="nt-btn nt-btn--ghost nt-btn--icon"
+              href="/ai"
+              aria-label="AI tutor"
+              title="AI tutor"
+            >
+              <SparklesIcon aria-hidden="true" />
             </Link>
             {/* The identity block, not a bare "dashboard" link. The
                 landing page is where people arrive first, so it is the

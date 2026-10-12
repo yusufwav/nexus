@@ -5,11 +5,17 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@Main/ui/components/dropdown-menu";
 import Link from "next/link";
+import {
+  BookOpenIcon,
+  CompassIcon,
+  LayoutDashboardIcon,
+  LogOutIcon,
+  ReceiptIcon,
+  SettingsIcon,
+} from "lucide-react";
 import { useMemo } from "react";
 
 import { authClient } from "@/lib/auth-client";
@@ -44,16 +50,35 @@ function topEdgeAnchor() {
 }
 
 /**
- * USER MENU
+ * USER MENU — a horizontal bar of icons
  * ------------------------------------------------------------
- * The trigger shows the user's name and their initials avatar.
- * Clicking it opens a dropdown whose first item is the dashboard —
- * the identity block is the way into the app, so navigating from it
- * should not require hunting through a menu for the obvious choice.
+ * It used to be a vertical dropdown: an identity block, an "Account"
+ * heading, then five rows of text, dropping from the top of the screen.
+ * That is a tall column hanging off a header to reach six destinations,
+ * and most of those labels were repeating the icon already beside them.
+ *
+ * It is now a landscape bar: the avatar at one end, the destinations
+ * side by side across it, and sign-out at the far end past a divider —
+ * so the whole set reads in one glance instead of one row at a time, and
+ * the bar is short enough not to cover the page.
+ *
+ * ICON-ONLY IS A REAL COST, so it is paid deliberately and then paid
+ * back. Every item carries an `aria-label` (the visible text is gone,
+ * the accessible name is not) and a `data-label` the stylesheet turns
+ * into a tooltip on hover AND on :focus-visible. The second arm is not
+ * optional: someone tabbing the bar has no pointer to hover with, so
+ * without it the labels would be unreachable by keyboard — which is why
+ * this pattern needs the aria-label and the tooltip together rather than
+ * either one alone.
+ *
+ * The account's name and email are no longer written anywhere on screen.
+ * The avatar carries the identity and the trigger's accessible name
+ * still says whose it is, and the bar stays narrow enough to be read at
+ * a glance rather than scanned.
  *
  * It signs the user out as well, because on the landing page it is the
- * only header there is: without this, being signed in on `/` meant
- * there was nowhere to sign out from.
+ * only header there is: without this, being signed in on `/` meant there
+ * was nowhere to sign out from.
  */
 export default function UserMenu(): React.JSX.Element {
   const { data: session, isPending } = authClient.useSession();
@@ -78,9 +103,11 @@ export default function UserMenu(): React.JSX.Element {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="nt-menu__btn">
+      <DropdownMenuTrigger
+        className="nt-menu__btn nt-menu__btn--icon"
+        aria-label={`Account menu for ${session.user.name ?? "you"}`}
+      >
         <Avatar name={session.user.name} image={session.user.image} size="sm" />
-        <span className="nt-menu__name">{session.user.name}</span>
         <span className="nt-menu__caret" aria-hidden="true">
           ▼
         </span>
@@ -89,9 +116,10 @@ export default function UserMenu(): React.JSX.Element {
       {/* Descends from the top of the viewport rather than from the
           trigger. `shift` on both axes rather than the default `flip` is
           the point: with flipping, a short window would send the panel
-          upward, which is the opposite of what was asked for. Width comes
-          from .nt-menu__panel, which is viewport-relative so it grows with
-          the screen rather than sitting at one fixed size. */}
+          upward, which is the opposite of what was asked for. The bar
+          sizes itself from its own contents — see .nt-menu__bar — so it
+          stays a slim, fixed-height strip on any screen instead of
+          stretching to fill the viewport like the column did. */}
       <DropdownMenuContent
         align="center"
         anchor={anchor}
@@ -99,69 +127,78 @@ export default function UserMenu(): React.JSX.Element {
         positionMethod="fixed"
         side="bottom"
         sideOffset={0}
-        className="nt-root nt-menu__panel"
+        className="nt-root nt-menu__bar"
       >
-        <div className="nt-menu__head">
-          <Avatar name={session.user.name} image={session.user.image} />
-          <span style={{ minWidth: 0 }}>
-            <span
-              style={{
-                display: "block",
-                fontSize: "var(--fs-sm)",
-                color: "var(--fg)",
-              }}
-            >
-              {session.user.name}
-            </span>
-            <span
-              style={{
-                display: "block",
-                fontSize: "var(--fs-xs)",
-                color: "var(--fg-dim)",
-                wordBreak: "break-all",
-              }}
-            >
-              {session.user.email}
-            </span>
-          </span>
-        </div>
+        <Avatar name={session.user.name} image={session.user.image} size="sm" />
 
-        <DropdownMenuSeparator />
+        <span className="nt-menu__rule" aria-hidden="true" />
 
-        <DropdownMenuGroup>
-          <DropdownMenuLabel style={{ fontSize: "var(--fs-xs)" }}>Account</DropdownMenuLabel>
-
-          <DropdownMenuItem render={<Link href="/dashboard" />} className="nt-menu__item">
-            Dashboard
+        {/* A base-ui Group rather than a bare div: the menu wires keyboard
+            navigation through Group/Item roles, so wrapping the items in
+            a plain element would leave the arrows and typeahead working
+            by accident at best. The group is laid out as a row by
+            .nt-menu__rail. */}
+        <DropdownMenuGroup className="nt-menu__rail">
+          <DropdownMenuItem
+            render={<Link href="/dashboard" />}
+            className="nt-menu__ico"
+            aria-label="Dashboard"
+            data-label="Dashboard"
+          >
+            <LayoutDashboardIcon aria-hidden="true" />
           </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href="/dashboard/modules" />} className="nt-menu__item">
-            My modules
+          <DropdownMenuItem
+            render={<Link href="/dashboard/modules" />}
+            className="nt-menu__ico"
+            aria-label="My modules"
+            data-label="My modules"
+          >
+            <BookOpenIcon aria-hidden="true" />
           </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href="/dashboard/purchases" />} className="nt-menu__item">
-            Purchases
+          <DropdownMenuItem
+            render={<Link href="/dashboard/purchases" />}
+            className="nt-menu__ico"
+            aria-label="Purchases"
+            data-label="Purchases"
+          >
+            <ReceiptIcon aria-hidden="true" />
           </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href="/dashboard/settings" />} className="nt-menu__item">
-            Settings
+          <DropdownMenuItem
+            render={<Link href="/dashboard/settings" />}
+            className="nt-menu__ico"
+            aria-label="Settings"
+            data-label="Settings"
+          >
+            <SettingsIcon aria-hidden="true" />
           </DropdownMenuItem>
-          <DropdownMenuItem render={<Link href="/modules" />} className="nt-menu__item">
-            Browse catalogue
+          <DropdownMenuItem
+            render={<Link href="/modules" />}
+            className="nt-menu__ico"
+            aria-label="Browse catalogue"
+            data-label="Browse catalogue"
+          >
+            <CompassIcon aria-hidden="true" />
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
-        {/* Below a separator and outside the Account group: signing out
-            is not one of the places you can go, so it does not belong
-            among the links. The same hook the dashboard's sign-out
-            button uses — a <SignOutButton /> in here would be a button
-            nested inside the menu item's own button. */}
-        <DropdownMenuSeparator />
+        {/* Its own divider, because signing out is not one of the places
+            you can go and should not sit shoulder to shoulder with them.
+            A span rather than DropdownMenuSeparator: that is a horizontal
+            rule by construction, and a divider in a horizontal bar has to
+            be vertical or it cuts the icons in half. The same hook the
+            dashboard's sign-out button uses — a <SignOutButton /> in here
+            would be a button nested inside the item's own button. */}
+        <span className="nt-menu__rule" aria-hidden="true" />
 
-        <DropdownMenuGroup>
+        <DropdownMenuGroup className="nt-menu__rail">
           <DropdownMenuItem
             onClick={signOut}
             variant="destructive"
-            className="nt-menu__item nt-menu__item--danger"
+            className="nt-menu__ico nt-menu__ico--danger"
+            aria-label="Sign out"
+            data-label="Sign out"
           >
-            Sign out
+            <LogOutIcon aria-hidden="true" />
           </DropdownMenuItem>
         </DropdownMenuGroup>
       </DropdownMenuContent>

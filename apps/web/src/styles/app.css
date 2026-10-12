@@ -1629,6 +1629,46 @@
 .nt-head__link--on {
   color: var(--fg);
 }
+/* The tutor, drawn as the spark the AI page's own heading uses. Sized
+   and centred so it sits on the same optical line as the neighbouring
+   paths instead of shifting them along. */
+.nt-head__link--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding-block: 0.15em;
+}
+.nt-head__link--icon svg {
+  width: 1.05em;
+  height: 1.05em;
+}
+
+/* A button whose only content is a glyph. Squares the hit area up so
+   an icon does not present a smaller target than the text buttons
+   beside it, and keeps the glyph optically centred.
+
+   Doubled for the same reason as .nt-ai__tool: written at one class it
+   lost to `.nt-btn` in landing.css and the button measured
+   `display: block`, `padding: 12px 24px`, 50x36, with the icon 8px
+   right and 3px low of centre. */
+.nt-btn--icon.nt-btn--icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  text-decoration: none;
+}
+/* Doubled for the same reason as .nt-ai__tool: keeps the "$ " prompt
+   from surviving as a grid/flex item in front of the glyph. */
+.nt-btn--icon.nt-btn--icon::before {
+  content: none;
+}
+.nt-btn--icon svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
 .nt-head__actions {
   display: flex;
   align-items: center;
@@ -1656,45 +1696,172 @@
    (2) Written bare, the primitive's own utilities — w-(--anchor-width),
    rounded-none — are single-class and win or lose on order alone. Two
    classes on one element beats both without needing !important. */
-.nt-menu__panel.nt-menu__panel {
-  /* Overrides w-(--anchor-width) from the primitive. Fluid rather than a
-     fixed rem value so the panel is genuinely a fraction of the screen:
-     near-full width on a phone, a readable column on a desktop. The
-     clamp's upper bound stops it stretching across a wide monitor. */
-  width: clamp(16rem, 92vw, 26rem);
-  /* The anchor is a zero-height rect at the very top, so this panel's top
-     edge sits on the top edge of the screen. Rounding only the bottom
-     corners reads as a header dropping in; rounding all four would leave
-     slivers of background showing above it. */
+/* The user menu. A bar, not a column: it drops from the top edge as a
+   slim horizontal strip of icons, so the destinations are visible at once
+   instead of one row at a time.
+   Written with a doubled class and NOT as a descendant selector, the
+   same two traps called out above: `.nt-root .nt-menu__bar` would need
+   the two classes on separate elements when they share one, and written
+   bare the primitive's own `w-(--anchor-width)` / `rounded-none`
+   utilities are single-class and win or lose on order alone. Two classes
+   on one element beats both without !important. */
+.nt-menu__bar.nt-menu__bar {
+  /* Overrides the primitive's w-(--anchor-width), which would otherwise
+     stretch the bar to the full viewport. Sized to its contents instead,
+     with a floor so it does not pinch shut on a small screen and a cap
+     so six icons never sprawl across a wide monitor. */
+  width: auto;
+  max-width: calc(100vw - var(--sp-4));
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  /* The anchor is a zero-height rect at the very top, so the bar's top
+     edge sits on the top edge of the screen. Only the bottom corners are
+     rounded: rounding all four would leave slivers of background showing
+     above it. */
   border-radius: 0 0 var(--r-md) var(--r-md);
   max-height: calc(100dvh - var(--sp-4));
+  /* The primitive sizes the popup against the space available below the
+     anchor, and on a short window that leaves the box with a min-height
+     of its own — so the bar came out 600px tall with the dividers
+     stretched down it, which is the column shape all over again. The
+     content decides the height here; max-height above still caps it when
+     the bar really would not fit. */
+  min-height: 0;
+  height: auto;
+  /* The primitive sets `overflow-x-hidden overflow-y-auto` on the popup so
+     a long menu can scroll inside its own bounds. That clips the
+     per-item tooltips, which hang below the bar and were being cut off
+     at the bar's own edge. Safe to drop here precisely because this menu
+     is six fixed items in one row: it is never taller than its content
+     and so never needs to scroll. Doubled class again, to beat those
+     single-class utilities. */
+  overflow: visible;
   transform-origin: top center;
-  animation-name: nt-menu-drop;
+  /* Overrides the primitive's own data-open:animate-in / fade-in-0 /
+     zoom-in-95 utilities. Those are a 100ms fade-and-shrink on a
+     single class, which would win on order and undo the slide below;
+     `animation` resets name, timing and fill in one declaration. */
+  animation: nt-menu-drop var(--dur-med) var(--ease-out) both;
 }
 
+/* The slide. Starts fully above the top edge and travels down into
+   place, with opacity and a touch of scale so it reads as arriving from
+   the header rather than fading in on the spot. `both` fill mode is what
+   lets the `from` frame apply during the delay, without which the bar
+   would flash at its final position before animating. */
 @keyframes nt-menu-drop {
   from {
     opacity: 0;
-    transform: translateY(-0.5rem);
+    transform: translateY(-100%) scaleY(0.85);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scaleY(1);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .nt-menu__panel.nt-menu__panel {
-    animation-name: none;
+  .nt-menu__bar.nt-menu__bar {
+    animation: none;
+  }
+  .nt-menu__ico::after {
+    animation: none;
+    transition: none;
   }
 }
 
-.nt-menu__head {
+/* A row of items. Group carries the role base-ui needs for keyboard
+   navigation, so it stays a real element and is laid out here rather
+   than replaced with a div. */
+.nt-menu__rail {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+/* The vertical divider between the avatar, the destinations and
+   sign-out. */
+.nt-menu__rule {
+  display: block;
+  width: 1px;
+  align-self: stretch;
+  margin-inline: var(--sp-1);
+  background: var(--line);
+}
+
+/* One destination. Square-ish and centred, since the only content is an
+   icon and the label lives in the tooltip and the aria-label.
+   `position: relative` is here rather than below because it is the
+   containing block the tooltip is positioned against. */
+.nt-menu__ico {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-3);
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
 }
+.nt-menu__ico svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+.nt-menu__ico:hover,
+.nt-menu__ico[data-highlighted] {
+  color: var(--fg);
+  background: var(--surface-raised);
+}
+.nt-menu__ico:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+}
+.nt-menu__ico--danger:hover,
+.nt-menu__ico--danger[data-highlighted] {
+  color: var(--danger);
+  background: var(--danger-fill);
+}
+
+/* The label, on hover and on keyboard focus.
+   Focus-visible is what makes this reachable without a pointer — see the
+   note on the component about why icon-only needs both arms. */
+.nt-menu__ico::after {
+  content: attr(data-label);
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  translate: -50% var(--sp-1);
+  z-index: 1;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-raised);
+  color: var(--fg);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.nt-menu__ico:hover::after,
+.nt-menu__ico:focus-visible::after {
+  opacity: 1;
+}
+
 .nt-menu__btn {
   display: flex;
   align-items: center;
@@ -1718,50 +1885,23 @@
   border-color: var(--accent-line);
   background: var(--accent-soft);
 }
-.nt-menu__name {
-  max-width: 10rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* The trigger carries the avatar and nothing else — the name moved into
+   its accessible name, and the bar that opens is where the destinations
+   now live. */
+.nt-menu__btn--icon {
+  gap: var(--sp-1);
+  padding: var(--sp-1);
 }
 .nt-menu__caret {
   color: var(--fg-dim);
   font-size: 0.6rem;
 }
-.nt-menu__item {
-  display: block;
-  width: 100%;
-  padding: var(--sp-2) var(--sp-3);
-  border: 0;
-  border-radius: var(--r-sm);
-  background: transparent;
-  color: var(--fg-muted);
-  font-family: var(--nt-font-mono);
-  font-size: var(--fs-xs);
-  letter-spacing: var(--tracking);
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-  transition:
-    color var(--dur-fast) var(--ease-out),
-    background-color var(--dur-fast) var(--ease-out);
-}
-.nt-menu__item:hover {
-  color: var(--fg);
-  background: var(--surface-raised);
-}
-.nt-menu__item--danger:hover {
-  color: var(--danger);
-  background: var(--danger-fill);
-}
-.nt-menu__meta {
-  margin-top: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3) var(--sp-3);
-  border-top: 1px solid var(--line-soft);
-  font-size: var(--fs-xs);
-  color: var(--fg-dim);
-  word-break: break-all;
-}
+
+/* .nt-menu__item, .nt-menu__item:hover, .nt-menu__item--danger:hover,
+   .nt-menu__head, .nt-menu__name and .nt-menu__meta were the vertical
+   column's rules and are gone with it — no component references any of
+   them. .nt-menu__ico replaced them, and .nt-menu__btn--icon replaced
+   .nt-menu__name on the trigger. */
 
 /* ============================================================
    MOTION
@@ -1991,7 +2131,17 @@
   gap: var(--sp-2);
   flex-shrink: 0;
 }
-.nt-ai__tool {
+/* The header tools. DOUBLED selector, and it is load-bearing.
+   `.nt-btn` lives in landing.css, which lands AFTER this file, and at
+   one class each it wins on order. Two symptoms, both measured: the
+   button came out `display: block` with `padding: 12px 24px` instead of
+   a 2.25rem square, and the icon sat 8px right and 3px low of centre.
+   That 8px was not the layout at all — it was `.nt-btn::before`'s shell
+   prompt (`content: "$ "`) beating `content: none` below and rendering
+   in front of the glyph. The 3px was an inline SVG on the text baseline.
+   `.nt-ai__send.nt-ai__send` has always been doubled for this reason
+   and has always measured dead centre. */
+.nt-ai__tool.nt-ai__tool {
   display: grid;
   place-items: center;
   width: 2.25rem;
@@ -2000,7 +2150,12 @@
   border-radius: var(--r-sm);
   color: var(--fg-muted);
 }
-.nt-ai__tool::before {
+/* Doubled for the same reason, and because under `display: grid` this
+   pseudo-element is not merely cosmetic: if `.nt-btn::before` wins, the
+   shell prompt survives as a real grid item, takes the first cell and
+   pushes the glyph into the second row — which measured 4px low. This
+   is exactly why `.nt-ai__send` has always doubled its ::before too. */
+.nt-ai__tool.nt-ai__tool::before {
   content: none;
 }
 .nt-ai__tool svg {
@@ -2134,7 +2289,14 @@
   border-radius: var(--r-lg);
   font-size: var(--fs-sm);
   line-height: var(--lh-body);
-  color: var(--fg-muted);
+  /*
+   * Full-brightness, not --fg-muted. The tutor's answers were set in the
+   * muted grey, which against a black canvas reads as disabled rather
+   * than as prose, and the whole point of the page is that the working
+   * is the content. --fg rather than a literal white so the light theme
+   * still gets dark-on-light instead of white-on-cream.
+   */
+  color: var(--fg);
   overflow-wrap: anywhere;
 }
 .nt-ai__msg--me .nt-ai__bubble {
@@ -2170,7 +2332,44 @@
 .nt-ai__bubble pre code {
   background: none;
   padding: 0;
-  color: var(--fg-muted);
+  /* Same reason as the bubble itself: a code block is content here, not
+     chrome, so it gets the full-brightness ink rather than the muted
+     grey the pre-block text used to inherit. */
+  color: var(--fg);
+}
+/* ---- LaTeX ----
+   KaTeX lays an expression out as nested inline-block spans that are
+   already sized and positioned. Inheriting `overflow-wrap: anywhere`
+   from the bubble lets the line breaker cut inside those spans, which
+   shears a fraction away from its bar and drops fractions out of their
+   alignment. So the bubble keeps it for prose and math opts out.
+   Long expressions scroll instead of wrapping, because a wrapped
+   equation reads as two unrelated ones. */
+/* KaTeX sets no colour of its own — the only declaration in its
+   stylesheet is `border-color: currentColor` — so every glyph, rule and
+   fraction bar inherits from here. One declaration repaints the whole
+   expression, and `--accent-b` is the same ink the inline-code spans
+   already use, so a formula reads as marked-up material sitting in
+   white prose rather than as a stray colour on the page. */
+.nt-ai__bubble .katex,
+.nt-ai__bubble .katex-display {
+  color: var(--accent-b);
+  overflow-wrap: normal;
+  word-break: normal;
+}
+/* Streamdown renders a display equation as a block; a wide one needs
+   its own scrollbar rather than pushing the whole bubble sideways. */
+.nt-ai__bubble .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: var(--sp-1);
+}
+/* KaTeX colours its errors itself, which is a raw hex that has no
+   relationship to this palette. Repoint it at the dim foreground so a
+   malformed expression reads as "not my fault" rather than as a
+   stray colour from somewhere else on the page. */
+.nt-ai__bubble .katex-error {
+  color: var(--fg-dim);
 }
 .nt-ai__thinking {
   display: flex;

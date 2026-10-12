@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import AsciiField from "@/components/landing/ascii-field";
+import { SparklesIcon } from "lucide-react";
 import type { Session } from "@Main/auth";
 
 import Avatar from "./avatar";
@@ -61,6 +62,29 @@ export default function DashboardShell({
           </div>
 
           <div className="nt-dash__id-actions">
+            {/* The tutor had no way in from anywhere in the dashboard:
+                five pages, none of them linking to it, so the only route
+                to /ai was typing the path or arriving from another nav.
+                Here rather than in the tab bar below, because the tabs
+                are this console's own sections and the tutor is a
+                destination outside the dashboard — the same distinction
+                that keeps "browse modules" up here too.
+
+                Icon rather than a `~/ai` label, with the name on
+                aria-label: an icon on its own announces nothing, and the
+                spark is the glyph the tutor's own heading uses.
+
+                Unconditional, unlike the public pages: this shell only
+                renders for a signed-in user, so there is no state in
+                which the link would be a dead end. */}
+            <Link
+              className="nt-btn nt-btn--ghost nt-btn--icon"
+              href="/ai"
+              aria-label="AI tutor"
+              title="AI tutor"
+            >
+              <SparklesIcon aria-hidden="true" />
+            </Link>
             <Link className="nt-btn nt-btn--ghost" href="/modules">
               browse modules
             </Link>

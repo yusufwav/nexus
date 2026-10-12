@@ -1,2 +1,13 @@
 @import "@Main/ui/globals.css";
+/*
+ * KaTeX's own stylesheet, for the AI tutor's equations.
+ *
+ * Streamdown's MathPlugin declares a `getStyles()` hook that returns the
+ * path to this file, but nothing in the shipped bundle ever calls it —
+ * it exists only in the .d.ts. So the import has to be explicit, and
+ * katex has to be a direct dependency for this specifier to resolve
+ * (it is otherwise only reachable as a transitive dep of
+ * @streamdown/math, which pnpm does not hoist).
+ */
+@import "katex/dist/katex.min.css";
 @source "../node_modules/streamdown/dist/*.js";

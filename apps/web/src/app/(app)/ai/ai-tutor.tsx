@@ -2,6 +2,7 @@
 
 import AsciiField from "@/components/landing/ascii-field";
 import { useChat } from "@ai-sdk/react";
+import { createMathPlugin } from "@streamdown/math";
 import { DefaultChatTransport } from "ai";
 import {
   ArrowUpIcon,
@@ -63,6 +64,84 @@ const STARTERS = [
   "Quiz me on the difference between a limit and a value at a point.",
 ] as const;
 
+/**
+ * LaTeX — KaTeX via Streamdown's math plugin.
+ *
+ * Both of these are module-level constants on purpose. Streamdown keys
+ * its parsed-markdown cache off the identity of the plugin lists it is
+ * given, so an object rebuilt on every render misses that cache on every
+ * render — which during a stream means re-parsing and re-running KaTeX
+ * over the whole answer for each token that arrives.
+ *
+ * `singleDollarTextMath` is turned on deliberately. It defaults to false,
+ * which means only `$$…$$` is treated as math, and an inline `$f'(x)$`
+ * would reach the reader as literal dollar signs. Since the tutor's whole
+ * subject is calculus, inline math is not the exception here, it is most
+ * of the output. The cost is that a bare currency amount can be read as
+ * an unclosed formula, which is why the system prompt on the server asks
+ * for money to be written without a leading `$`.
+ */
+const MATH = createMathPlugin({ singleDollarTextMath: true });
+
+/**
+ * Applied to the tutor's half of the conversation only.
+ *
+ * The reader's own text goes through the same markdown renderer without
+ * this, so a question about a price, or anything else containing a `$`,
+ * is never re-interpreted as mathematics on its way back to them.
+ */
+const TUTOR_PLUGINS = { math: MATH } as const;
+
+/**
+ * How long a single turn may run before the client gives up on it.
+ *
+ * Deliberately shorter than the server's `maxDuration` (60). The client
+ * therefore always wins the race, and that is the better of the two
+ * endings: aborting here tears the request down deliberately and the
+ * reader gets an explanation, whereas a turn that hits the platform
+ * ceiling is severed mid-stream and looks like the app hung. The server
+ * ceiling stays as the backstop for a turn that is still running when
+ * the tab is closed or the network drops.
+ *
+ * Thirty seconds is chosen so a reader is told something is wrong while
+ * they are still waiting rather than minutes later. It does mean a
+ * genuinely long derivation gets cut off, so it is a real ceiling on
+ * answer length, not just a failure detector.
+ */
+const WATCHDOG_MS = 30_000;
+
+/**
+ * What to tell the reader when a turn fails.
+ *
+ * Provider failures are already the server's job — see
+ * `explainProviderFailure` in api/ai/route.ts, which is the only place
+ * the real cause still exists, since the SDK strips it to "An error
+ * occurred." before it crosses the wire. So this deliberately does NOT
+ * try to re-classify quota, keys or outages: by the time an error
+ * reaches the client it has already been turned into a sentence, and
+ * re-deriving a second, different sentence from that text would
+ * overwrite a good one with a worse guess.
+ *
+ * What is left here is the class the server cannot see at all, because
+ * it never reached the server: a request the browser abandoned, a
+ * connection that dropped, or the watchdog stopping a turn.
+ *
+ * "An error occurred." is matched explicitly. It is the SDK's generic
+ * mask, so its arrival means the error arrived without a description —
+ * showing it verbatim would be strictly worse than saying something.
+ */
+function failureMessage(err: unknown): string {
+  const text = err instanceof Error ? err.message : String(err ?? "");
+
+  if (text.includes("abort") || text.includes("timed out") || text.includes("timeout")) {
+    return "That took too long and was stopped. Try a smaller question.";
+  }
+  if (text.trim() && text.trim() !== "An error occurred.") {
+    return text.trim();
+  }
+  return "The tutor could not answer that. Try again.";
+}
+
 /** One row of the history pane. Mirrors ChatThreadSummary in the db package. */
 type ThreadSummary = {
   readonly id: string;
@@ -122,11 +201,78 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
   const [paneOpen, setPaneOpen] = useState(false);
   const [paneBusy, setPaneBusy] = useState(false);
 
-  const { messages, sendMessage, status, setMessages, error } = useChat({
+  /**
+   * The transcript to open `threadId` with, or null for an empty chat.
+   *
+   * useChat seeds a chat from its `messages` option, but ONLY at
+   * construction, and it constructs exactly once per distinct `id`:
+   *
+   *   const { chat } = useMemo(() => ({ chat: new Chat(chatOptions) }), [chatKey]);
+   *   // chatKey === options.id
+   *
+   * `setMessages` cannot be used to load a stored transcript instead. It
+   * is `useCallback(..., [chat])` writing `chat.messages` on one specific
+   * Chat instance, so after switching threads it targets the instance
+   * being switched away from — and its setter only assigns
+   * `state.messages`, notifying nobody, so even the current instance
+   * would not repaint. Between them that is why opening a stored chat
+   * needed two clicks: the first closed the pane and restored nothing.
+   *
+   * So the rows ride along as state and are handed to useChat, which
+   * applies them on the render where `threadId` turns over. Both states
+   * are set in the same continuation, so React batches them into that
+   * one render and the new chat is built pre-seeded — no extra round
+   * trip and no flash of empty conversation.
+   */
+  const [seed, setSeed] = useState<ReadonlyArray<StoredMessage> | null>(null);
+
+  const { messages, sendMessage, status, setMessages, error, stop, clearError } = useChat({
     id: threadId,
+    messages: seed === null ? undefined : toUiMessages(seed),
     transport: new DefaultChatTransport({ api: "/api/ai" }),
   });
   const isSending = status === "submitted" || status === "streaming";
+
+  /**
+   * WATCHDOG — a turn that never ends
+   * ------------------------------------------------------------
+   * There was nothing here, and a turn that did not finish simply
+   * never finished. The composer stayed disabled behind the "thinking"
+   * bubble with no way out, which is indistinguishable from a hung app:
+   * no error, no spinner that stops, no message. It is easy to hit,
+   * because the failure that causes it is not exotic. A rate-limited
+   * or out-of-quota key makes the AI SDK retry with exponential
+   * backoff for minutes before giving up, and a dropped connection
+   * mid-answer looks identical.
+   *
+   * So the budget is enforced on the client, where it can be undone.
+   * `stop()` aborts the in-flight request and returns the chat to idle,
+   * which re-enables the composer and lets the reader try again.
+   *
+   * Keyed on `isSending` alone, NOT on `status`. The status flips from
+   * "submitted" to "streaming" when the first token lands, so depending
+   * on it would restart the clock at exactly the moment the model is
+   * generating the long tail — the one part where the budget is
+   * supposed to be running.
+   *
+   * `stalled` is deliberately NOT cleared when sending ends. `stop()`
+   * is what ends the turn, so resetting on that would wipe the
+   * explanation on the same tick it is raised and the reader would see
+   * the spinner vanish and nothing replace it — the same dead end this
+   * is here to remove. It is cleared when the next turn starts instead,
+   * which is the only other place it can be wrong.
+   */
+  const [stalled, setStalled] = useState(false);
+  useEffect(() => {
+    if (!isSending) {
+      return;
+    }
+    const t = window.setTimeout(() => {
+      setStalled(true);
+      stop();
+    }, WATCHDOG_MS);
+    return () => window.clearTimeout(t);
+  }, [isSending, stop]);
 
   // Follow the stream, but only when the reader is already at the
   // bottom — yanking the viewport on every token would fight anyone
@@ -166,7 +312,16 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
     }
   }, [paneOpen]);
 
-  /** Reopen a stored conversation. */
+  /** Stored rows in the shape useChat renders them back. */
+function toUiMessages(rows: ReadonlyArray<StoredMessage>) {
+  return rows.map((m) => ({
+    id: m.id,
+    role: m.role,
+    parts: [{ type: "text" as const, text: m.content }],
+  }));
+}
+
+/** Reopen a stored conversation. */
   const loadThread = useCallback(
     async (id: string) => {
       setPaneBusy(true);
@@ -178,33 +333,34 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
           return;
         }
         const thread = (await res.json()) as { id: string; messages?: StoredMessage[] };
-        // Rekey, then wait for the chat to actually be the one that was
-        // opened, and only then restore into it.
+        // Rekey, then restore — but not here.
         //
-        // The two steps have to be in this order and separated by a
-        // render, and the reason is in useChat: the `id` it returns
-        // identifies a different Chat instance per value, and both the
-        // instance and the `setMessages` it hands back change with it.
-        // The `setMessages` captured by this callback therefore belongs
-        // to whichever chat was current when the callback was created —
-        // the one on screen, not the one just opened. It writes into
-        // that instance's store, nothing re-renders (the setter assigns
-        // state without notifying subscribers), and the restored
-        // transcript never appears. Restoring into the stale instance is
-        // also a silent way to write the wrong thread's messages.
-        setThreadId(thread.id);
-        // A macrotask, not a microtask: React has to commit the render
-        // that swaps the chat instance for this `setMessages` to be the
-        // new one. A microtask resolves in the same tick, before React
-        // has done that work, and restores into the outgoing chat.
-        await new Promise((r) => setTimeout(r, 0));
-        setMessages(
-          (thread.messages ?? []).map((m) => ({
-            id: m.id,
-            role: m.role,
-            parts: [{ type: "text" as const, text: m.content }],
-          })),
-        );
+        // `setMessages` is `useCallback(..., [chat])` and writes to
+        // `chat.messages` on ONE specific Chat instance; useChat memoises
+        // that instance on its `id`, so changing `threadId` builds a new
+        // one and a new `setMessages` with it. The `setMessages` in scope
+        // here belongs to the chat being switched AWAY from, so writing
+        // to it lands on an object nothing renders any more and the
+        // transcript silently never appears.
+        //
+        // It used to try to dodge this with a `setTimeout(0)` between
+        // the two steps, reasoning that React would commit a render in
+        // the gap and rebind the variable. A closure does not rebind
+        // itself — `setMessages` was captured when this callback was
+        // created and still points at the old chat however long you
+        // wait. The delay bought nothing, which is why opening a stored
+        // chat needed two clicks: the first closed the pane and restored
+        // nothing. The write is handed to the effect below instead.
+        const rows = thread.messages ?? [];
+
+        // Both in one batch: the chat is built on the render where
+        // `threadId` turns over, and it picks up `seed` on that same
+        // render. Reopening the thread already on screen changes neither,
+        // and needs neither — its transcript is what is on screen.
+        if (thread.id !== threadId) {
+          setSeed(rows);
+          setThreadId(thread.id);
+        }
         setPaneOpen(false);
       } catch {
         // Leave the current conversation alone: a failed load should
@@ -213,7 +369,7 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
         setPaneBusy(false);
       }
     },
-    [setMessages],
+    [setMessages, threadId],
   );
 
   /** Forget the conversation on screen. The server cascades to its messages. */
@@ -221,8 +377,10 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
     const id = threadId;
     // Start a fresh chat immediately rather than leaving an empty
     // transcript beside a delete button that no longer means anything.
+    // The new id builds a new chat, so clearing the seed is what keeps the
+    // deleted transcript out of it.
+    setSeed(null);
     setThreadId(newThreadId());
-    setMessages([]);
     setInput("");
     setThreads((prev) => prev?.filter((t) => t.id !== id) ?? null);
     try {
@@ -231,7 +389,7 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
       // Gone from the screen either way, and there is nothing the
       // reader could do about it from here.
     }
-  }, [threadId, setMessages]);
+  }, [threadId]);
 
   /**
    * Write rows to the server.
@@ -355,6 +513,11 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
     if (!body || isSending) {
       return;
     }
+    // Clear the previous failure before starting the next turn, so a
+    // stale quota or timeout message cannot sit above a fresh answer.
+    // `clearError` is safe to call when there is no error.
+    setStalled(false);
+    clearError();
     // The message is persisted by the effect below as soon as it lands
     // in `messages`, which is the first render after this call — not
     // when a reply comes back.
@@ -363,9 +526,15 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
   };
 
   const startNewChat = () => {
+    // The seed has to go with the new id. Left set, the fresh chat would
+    // be built with the previous transcript already in it.
+    setSeed(null);
     setThreadId(newThreadId());
-    setMessages([]);
     setInput("");
+    // A failure belongs to the conversation it happened in; carrying it
+    // into a fresh thread would blame the new one for it.
+    setStalled(false);
+    clearError();
   };
 
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
@@ -515,6 +684,7 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
                           <Streamdown
                             key={i}
                             isAnimating={status === "streaming" && !isUser}
+                            plugins={isUser ? undefined : TUTOR_PLUGINS}
                           >
                             {part.text}
                           </Streamdown>
@@ -535,11 +705,13 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
                 </li>
               )}
 
-              {error && (
+              {(error || stalled) && (
                 <li className="nt-ai__msg">
                   <div className="nt-ai__who">error</div>
                   <div className="nt-ai__bubble nt-ai__bubble--bad nt-glass">
-                    The tutor could not answer that. Try again.
+                    {stalled
+                      ? "That took too long and was stopped. Try a smaller question."
+                      : failureMessage(error)}
                   </div>
                 </li>
               )}
