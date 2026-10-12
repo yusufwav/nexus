@@ -1,8 +1,10 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import type { Database } from ".";
 import { chatMessages, chatThreads } from "./schema/chat";
 import { modules, purchases } from "./schema/modules";
+import { noteChunks, noteTopics } from "./schema/notes";
+import { providerKeys } from "./schema/provider-keys";
 
 /**
  * READS
@@ -51,6 +53,359 @@ export async function listPurchases(db: Database, userId: string) {
     .innerJoin(modules, eq(purchases.moduleId, modules.id))
     .where(eq(purchases.userId, userId))
     .orderBy(asc(purchases.createdAt));
+}
+
+/* ============================================================
+   PROVIDER KEYS — a reader's own model credential
+   ============================================================
+   Every function takes `userId` as its FIRST argument and filters on
+   it, including the ones that take a key id. Same reason as the chat
+   history above, and the stakes are higher: a key id is guessable, so
+   looking one up by id alone would hand one reader's credential to
+   another. Scoping by user means the worst a wrong id can do is look
+   like a key that does not exist.
+
+   `listProviderKeys` deliberately selects NO credential column. The
+   settings page has no reason to hold key material, so it never
+   receives it — a leak prevented by the query rather than by
+   remembering not to use the value.
+   ============================================================ */
+
+/** What the settings page is shown: enough to recognise a key, never to use one. */
+export type ProviderKeySummary = {
+  readonly id: string;
+  readonly provider: string;
+  readonly label: string;
+  readonly lastFour: string;
+  readonly modelId: string;
+  readonly updatedAt: Date;
+};
+
+/** This reader's credentials, most recently touched first. No key material. */
+export async function listProviderKeys(
+  db: Database,
+  userId: string,
+): Promise<ReadonlyArray<ProviderKeySummary>> {
+  return db
+    .select({
+      id: providerKeys.id,
+      provider: providerKeys.provider,
+      label: providerKeys.label,
+      lastFour: providerKeys.lastFour,
+      modelId: providerKeys.modelId,
+      updatedAt: providerKeys.updatedAt,
+    })
+    .from(providerKeys)
+    .where(eq(providerKeys.userId, userId))
+    .orderBy(desc(providerKeys.updatedAt));
+}
+
+/**
+ * Store or replace one credential.
+ *
+ * Keyed on (userId, provider) so pasting a rotated key replaces the old
+ * one instead of accumulating rows nobody can tell apart.
+ */
+export async function upsertProviderKey(
+  db: Database,
+  key: {
+    readonly id: string;
+    readonly userId: string;
+    readonly provider: string;
+    readonly label: string;
+    readonly encryptedKey: string;
+    readonly lastFour: string;
+    readonly modelId: string;
+  },
+): Promise<void> {
+  await db
+    .insert(providerKeys)
+    .values(key)
+    .onConflictDoUpdate({
+      target: [providerKeys.userId, providerKeys.provider],
+      set: {
+        label: key.label,
+        encryptedKey: key.encryptedKey,
+        lastFour: key.lastFour,
+        modelId: key.modelId,
+        updatedAt: new Date(),
+      },
+    });
+}
+
+/**
+ * This reader's credential for one provider, WITH the sealed value —
+ * the only query in this file that returns `encrypted_key`, and the
+ * only reason it exists is to hand the credential to its provider.
+ */
+export async function getProviderKey(
+  db: Database,
+  userId: string,
+  provider: string,
+): Promise<{ readonly encryptedKey: string; readonly modelId: string } | null> {
+  const rows = await db
+    .select({
+      encryptedKey: providerKeys.encryptedKey,
+      modelId: providerKeys.modelId,
+    })
+    .from(providerKeys)
+    .where(and(eq(providerKeys.userId, userId), eq(providerKeys.provider, provider)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Remove one of this reader's credentials. False when there was nothing to remove. */
+export async function deleteProviderKey(
+  db: Database,
+  userId: string,
+  provider: string,
+): Promise<boolean> {
+  const rows = await db
+    .delete(providerKeys)
+    .where(and(eq(providerKeys.userId, userId), eq(providerKeys.provider, provider)))
+    .returning({ id: providerKeys.id });
+  return rows.length > 0;
+}
+
+/* ============================================================
+   NOTES RETRIEVAL — the tutor's corpus
+   ============================================================
+   THIS BLOCK IS THE ENTITLEMENT BOUNDARY. Everything below is written
+   so that there is exactly one way to read note content and that one
+   way requires a set of module codes the caller resolved themselves.
+
+   The rule every function here obeys: `accessibleCodes` is a parameter,
+   never derived inside from anything the caller supplied about itself.
+   The caller resolves it from the session — see
+   apps/web/src/lib/notes-access.ts — so a caller cannot widen it by
+   passing a different argument, because there is no argument that does
+   that. An empty set returns nothing rather than everything; the
+   fail-closed direction is the only safe direction for paid content.
+
+   Note what is NOT selected anywhere below: `noteTopics.sourcePath`.
+   It exists so ingestion can re-read a file and an operator can trace a
+   citation. It must never appear in a result bound for a prompt or a
+   response — a model shown a filename can be asked for it back and will
+   answer. Only display names leave this file.
+   ============================================================ */
+
+/** A retrieved passage, already reduced to what a model is allowed to see. */
+export type RetrievedNote = {
+  readonly topicId: string;
+  readonly slug: string;
+  /** Display name. The only title that ever leaves the server. */
+  readonly title: string;
+  /**
+   * Course code, e.g. MATT101. A display name, so it is safe to return —
+   * and carried explicitly rather than derived from the slug, which would
+   * give "mapv112" where the catalogue says "MAPV112".
+   */
+  readonly moduleCode: string;
+  readonly description: string;
+  readonly heading: string | null;
+  readonly content: string;
+  /** Cosine distance; lower is closer. Carried so callers can show a score. */
+  readonly distance: number;
+};
+
+/** What a caller needs to know about a topic without reading its content. */
+export type NoteTopicSummary = {
+  readonly id: string;
+  readonly moduleCode: string;
+  readonly slug: string;
+  readonly title: string;
+  readonly description: string;
+  readonly chunkCount: number;
+};
+
+/** Insert or update a topic from an ingestion run. */
+export async function upsertNoteTopic(
+  db: Database,
+  topic: {
+    readonly id: string;
+    readonly moduleCode: string;
+    readonly slug: string;
+    readonly title: string;
+    readonly description: string;
+    /** Server-side only. Never selected into anything the client sees. */
+    readonly sourcePath: string;
+    readonly contentHash: string;
+    readonly pageCount?: number | null;
+  },
+): Promise<void> {
+  await db
+    .insert(noteTopics)
+    .values({
+      id: topic.id,
+      moduleCode: topic.moduleCode,
+      slug: topic.slug,
+      title: topic.title,
+      description: topic.description,
+      sourcePath: topic.sourcePath,
+      contentHash: topic.contentHash,
+      pageCount: topic.pageCount ?? null,
+    })
+    .onConflictDoUpdate({
+      target: noteTopics.id,
+      set: {
+        moduleCode: topic.moduleCode,
+        title: topic.title,
+        description: topic.description,
+        sourcePath: topic.sourcePath,
+        contentHash: topic.contentHash,
+        pageCount: topic.pageCount ?? null,
+      },
+    });
+}
+
+/**
+ * Replace a topic's chunks wholesale.
+ *
+ * Wholesale rather than incremental because a chunk boundary moves
+ * whenever the text above it is edited, so "insert chunk 3" is not a
+ * meaningful operation — the only correct result of re-ingesting an
+ * edited note is the new set, not the old set plus an insert. The unique
+ * index on (topic_id, chunk_index) is what makes a re-run idempotent
+ * instead of duplicating.
+ */
+export async function replaceTopicChunks(
+  db: Database,
+  topic: { readonly topicId: string; readonly moduleCode: string },
+  chunks: ReadonlyArray<{
+    readonly chunkIndex: number;
+    readonly heading: string | null;
+    readonly content: string;
+    readonly tokenEstimate: number;
+    readonly embedding: readonly number[];
+  }>,
+): Promise<void> {
+  await db.delete(noteChunks).where(eq(noteChunks.topicId, topic.topicId));
+  if (chunks.length === 0) {
+    return;
+  }
+  await db.insert(noteChunks).values(
+    chunks.map((c) => ({
+      id: `${topic.topicId}#${c.chunkIndex}`,
+      topicId: topic.topicId,
+      // Denormalised deliberately — it is the column the entitlement
+      // filter reads, so it has to be on the chunk row itself.
+      moduleCode: topic.moduleCode,
+      chunkIndex: c.chunkIndex,
+      heading: c.heading,
+      content: c.content,
+      tokenEstimate: c.tokenEstimate,
+      embedding: c.embedding as number[],
+    })),
+  );
+}
+
+/** Every topic with its chunk count, for the ingestion report. */
+export async function listNoteTopics(db: Database): Promise<ReadonlyArray<NoteTopicSummary>> {
+  const rows = await db
+    .select({
+      id: noteTopics.id,
+      moduleCode: noteTopics.moduleCode,
+      slug: noteTopics.slug,
+      title: noteTopics.title,
+      description: noteTopics.description,
+      chunkCount: sql<number>`count(${noteChunks.id})::int`,
+    })
+    .from(noteTopics)
+    .leftJoin(noteChunks, eq(noteChunks.topicId, noteTopics.id))
+    .groupBy(noteTopics.id);
+  return rows;
+}
+
+/**
+ * Rank note chunks against a query embedding, restricted to modules the
+ * reader may read.
+ *
+ * THE FILTER IS IN THE SQL AND IT IS NOT OPTIONAL. The obvious
+ * alternative — take the global top-k and drop anything unauthorised in
+ * JS — looks equivalent and is not. It leaks existence through result
+ * counts and latency, and it silently returns nothing when the best
+ * passages happen to belong to modules the reader has not bought, which
+ * reads to the model as "these notes do not cover this" rather than "you
+ * may not read these". Both failures are quiet, which is what makes them
+ * dangerous.
+ *
+ * `accessibleCodes` empty returns no rows, never all of them.
+ */
+export async function searchNoteChunks(
+  db: Database,
+  accessibleCodes: ReadonlySet<string>,
+  queryEmbedding: readonly number[],
+  opts: {
+    readonly topicSlug?: string | undefined;
+    readonly limit?: number;
+  } = {},
+): Promise<ReadonlyArray<RetrievedNote>> {
+  if (accessibleCodes.size === 0) {
+    return [];
+  }
+  const limit = Math.min(Math.max(opts.limit ?? 6, 1), 20);
+
+  const vector = `[${queryEmbedding.join(",")}]`;
+
+  const rows = await db
+    .select({
+      topicId: noteTopics.id,
+      slug: noteTopics.slug,
+      title: noteTopics.title,
+      moduleCode: noteTopics.moduleCode,
+      description: noteTopics.description,
+      heading: noteChunks.heading,
+      content: noteChunks.content,
+      // `<=>` is cosine distance in pgvector. The HNSW index is built on
+      // vector_cosine_ops to match; an l2 index here would be wrong
+      // rather than merely slower.
+      distance: sql<number>`${noteChunks.embedding} <=> ${vector}::vector`,
+    })
+    .from(noteChunks)
+    .innerJoin(noteTopics, eq(noteChunks.topicId, noteTopics.id))
+    .where(
+      and(
+        inArray(noteChunks.moduleCode, [...accessibleCodes]),
+        opts.topicSlug ? eq(noteTopics.slug, opts.topicSlug) : undefined,
+      ),
+    )
+    .orderBy(sql`${noteChunks.embedding} <=> ${vector}::vector`)
+    .limit(limit);
+
+  return rows.map((r) => ({ ...r, distance: Number(r.distance) }));
+}
+
+/**
+ * Topics the reader may read, for routing the question to a subject
+ * before any chunk is read.
+ *
+ * Same filter as the search above, at topic grain, and for the same
+ * reason: routing over ALL topics would let the citation UI name a
+ * module the reader has never bought, which discloses both that it
+ * exists and roughly what it covers.
+ */
+export async function listAccessibleTopics(
+  db: Database,
+  accessibleCodes: ReadonlySet<string>,
+): Promise<ReadonlyArray<NoteTopicSummary>> {
+  if (accessibleCodes.size === 0) {
+    return [];
+  }
+  const rows = await db
+    .select({
+      id: noteTopics.id,
+      moduleCode: noteTopics.moduleCode,
+      slug: noteTopics.slug,
+      title: noteTopics.title,
+      description: noteTopics.description,
+      chunkCount: sql<number>`count(${noteChunks.id})::int`,
+    })
+    .from(noteTopics)
+    .innerJoin(noteChunks, eq(noteChunks.topicId, noteTopics.id))
+    .where(inArray(noteTopics.moduleCode, [...accessibleCodes]))
+    .groupBy(noteTopics.id)
+    .orderBy(asc(noteTopics.moduleCode), asc(noteTopics.slug));
+  return rows;
 }
 
 /* ============================================================

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import AsciiField from "@/components/landing/ascii-field";
+import ScrollReveal from "@/components/landing/scroll-reveal";
 import { SparklesIcon } from "lucide-react";
 import type { Session } from "@Main/auth";
 
@@ -22,6 +23,15 @@ import ThemeToggle from "./theme-toggle";
  *
  * .nt-root carries the tokens AsciiField and the reveal engine read;
  * .nt-dash is the layout shell defined in styles/app.css.
+ *
+ * ScrollReveal is mounted here, and it has to be. styles/app.css hides
+ * every [data-reveal] inside .nt-dash at opacity: 0 and only lifts it
+ * for elements carrying .is-in — a class this component adds. It used
+ * to be mounted solely on the landing page, so on every dashboard
+ * route the hide had no matching reveal: overview, my modules,
+ * purchases, settings and support all rendered their headings and then
+ * nothing at all. The markup was correct the whole time; the CSS was
+ * simply waiting for an engine that was not there.
  */
 
 export const DASH_TABS = [
@@ -108,6 +118,11 @@ export default function DashboardShell({
             </Link>
           ))}
         </nav>
+
+        {/* Renders nothing. Lives here because the .nt-dash reveal rules
+            in styles/app.css are gated on the .is-in class it adds —
+            without it the page body below stays at opacity 0. */}
+        <ScrollReveal />
 
         <div className="nt-dash__body">{children}</div>
       </div>

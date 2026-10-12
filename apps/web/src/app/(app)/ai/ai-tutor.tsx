@@ -1,6 +1,7 @@
 "use client";
 
 import AsciiField from "@/components/landing/ascii-field";
+import { ModelPicker, useModelPicker, type ModelPick } from "@/components/model-picker";
 import { useChat } from "@ai-sdk/react";
 import { createMathPlugin } from "@streamdown/math";
 import { DefaultChatTransport } from "ai";
@@ -16,6 +17,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -226,34 +228,76 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
    */
   const [seed, setSeed] = useState<ReadonlyArray<StoredMessage> | null>(null);
 
+  /*
+   * THE MODEL PICK, AND WHY THE TRANSPORT IS A REF
+   * ------------------------------------------------------------
+   * The reader's choice is read at request time through a ref rather
+   * than captured in the transport's `body`. `body` is evaluated once
+   * when the transport is built, so a value baked into it would be the
+   * model chosen when the chat mounted, not the one currently selected.
+   * That failure is quiet and perfectly plausible-looking: the picker
+   * would appear to work, the picker would even show the new value, and
+   * every answer would still come from the old model.
+   *
+   * `prepareSendMessagesRequest` runs per request, which is exactly the
+   * lifetime the choice needs.
+   */
+  const picker = useModelPicker();
+  const pickRef = useRef<ModelPick>(picker.pick);
+  pickRef.current = picker.pick;
+
+  const chatTransport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/ai",
+        prepareSendMessagesRequest: ({ messages: msgs }) => ({
+          body: { messages: msgs, model: pickRef.current },
+        }),
+      }),
+    [],
+  );
+
   const { messages, sendMessage, status, setMessages, error, stop, clearError } = useChat({
     id: threadId,
     messages: seed === null ? undefined : toUiMessages(seed),
-    transport: new DefaultChatTransport({ api: "/api/ai" }),
+    transport: chatTransport,
   });
   const isSending = status === "submitted" || status === "streaming";
+  /**
+   * The watchdog guards the WAIT FOR A FIRST TOKEN, not the turn.
+   *
+   * This is a correction, and the comment it replaces argued for the
+   * behaviour that had to go. That comment claimed keying the timer on
+   * `isSending` was deliberate because depending on `status` would
+   * "restart the clock at exactly the moment the model is generating
+   * the long tail". Restarting the clock IS the correct behaviour, for
+   * the reason the comment had backwards: the failure this exists to
+   * catch is *no response at all* — a retry loop with exponential
+   * backoff after a rate-limit, a connection that never delivers. A
+   * model producing tokens steadily for a minute is not that; it is a
+   * long answer, and killing it truncates a perfectly healthy reply
+   * mid-sentence with "that took too long, try something smaller".
+   *
+   * So the budget is 30 seconds to FIRST TOKEN. The moment `status`
+   * becomes "streaming" the effect's cleanup disarms the timer and it
+   * never re-arms for that turn. A genuinely dead mid-stream
+   * connection is no longer caught by this — that is the cost of the
+   * change, and it is the right trade: a truncated answer is a certain
+   * failure, whereas a hung stream is rare and the reader can reload.
+   */
+  const awaitingFirstToken = status === "submitted";
 
   /**
-   * WATCHDOG — a turn that never ends
+   * WATCHDOG — a turn that never starts
    * ------------------------------------------------------------
    * There was nothing here, and a turn that did not finish simply
    * never finished. The composer stayed disabled behind the "thinking"
    * bubble with no way out, which is indistinguishable from a hung app:
-   * no error, no spinner that stops, no message. It is easy to hit,
-   * because the failure that causes it is not exotic. A rate-limited
-   * or out-of-quota key makes the AI SDK retry with exponential
-   * backoff for minutes before giving up, and a dropped connection
-   * mid-answer looks identical.
+   * no error, no spinner that stops, no message.
    *
    * So the budget is enforced on the client, where it can be undone.
    * `stop()` aborts the in-flight request and returns the chat to idle,
    * which re-enables the composer and lets the reader try again.
-   *
-   * Keyed on `isSending` alone, NOT on `status`. The status flips from
-   * "submitted" to "streaming" when the first token lands, so depending
-   * on it would restart the clock at exactly the moment the model is
-   * generating the long tail — the one part where the budget is
-   * supposed to be running.
    *
    * `stalled` is deliberately NOT cleared when sending ends. `stop()`
    * is what ends the turn, so resetting on that would wipe the
@@ -264,7 +308,7 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
    */
   const [stalled, setStalled] = useState(false);
   useEffect(() => {
-    if (!isSending) {
+    if (!awaitingFirstToken) {
       return;
     }
     const t = window.setTimeout(() => {
@@ -272,7 +316,7 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
       stop();
     }, WATCHDOG_MS);
     return () => window.clearTimeout(t);
-  }, [isSending, stop]);
+  }, [awaitingFirstToken, stop]);
 
   // Follow the stream, but only when the reader is already at the
   // bottom — yanking the viewport on every token would fight anyone
@@ -576,6 +620,17 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>) {
               these lose their label without losing their meaning for
               anyone who cannot see the glyph. */}
           <div className="nt-ai__tools">
+            {/* The model picker sits with the tools rather than under
+                the composer: it changes how the NEXT turn is answered,
+                and it belongs where the reader is already looking when a
+                provider starts failing. */}
+            <ModelPicker
+              pick={picker.pick}
+              onPick={picker.setPick}
+              models={picker.models}
+              hasKey={picker.hasKey}
+              disabled={isSending}
+            />
             <button
               type="button"
               className="nt-btn nt-btn--ghost nt-ai__tool"
@@ -710,7 +765,7 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>) {
                   <div className="nt-ai__who">error</div>
                   <div className="nt-ai__bubble nt-ai__bubble--bad nt-glass">
                     {stalled
-                      ? "That took too long and was stopped. Try a smaller question."
+                      ? "No reply arrived within 30 seconds. The model provider may be rate-limiting this key, or the request never got through. Try again, or pick a different model."
                       : failureMessage(error)}
                   </div>
                 </li>

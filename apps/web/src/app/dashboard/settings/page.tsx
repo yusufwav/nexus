@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import DashboardShell from "@/components/dashboard-shell";
+import ProviderKeys from "@/components/provider-keys";
 import {
   PlaceholderAction,
   PlaceholderField,
@@ -46,7 +47,8 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
         </div>
         <h2 className="nt-pagehead__title">Settings</h2>
         <p className="nt-pagehead__lead">
-          Nothing on this page saves yet. Every control below is a placeholder for a layout, not a
+          Profile, the model provider the tutor answers with, and the rest. Only the model
+          provider saves today — every other control below is a placeholder for a layout, not a
           working setting.
         </p>
       </div>
@@ -82,6 +84,18 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             action="delete account"
             danger
           />
+        </div>
+      </section>
+
+      {/* ---- Model provider ---- */}
+      <section className="nt-setgroup" data-reveal="rise">
+        <div className="nt-setgroup__h">
+          <h3>model provider</h3>
+          <span>use your own key for the tutor</span>
+        </div>
+        <div className="nt-setgroup__body">
+          {/* The first control on this page that actually persists. */}
+          <ProviderKeys />
         </div>
       </section>
 

@@ -40,6 +40,7 @@
     "CI",
     "DATABASE_URL",
     "GOOGLE_GENERATIVE_AI_API_KEY",
+    "PROVIDER_KEYS_SECRET",
     "NODE_ENV",
     "VERCEL",
     "VERCEL_ENV",

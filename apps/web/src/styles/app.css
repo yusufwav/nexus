@@ -1904,12 +1904,185 @@
    .nt-menu__name on the trigger. */
 
 /* ============================================================
+   BRING YOUR OWN MODEL KEY
+   ============================================================
+   The only settings group that persists. Kept in the muted terminal
+   palette rather than given a treatment of its own, so it reads as
+   part of the console instead of as an upsell bolted onto it.
+
+   COLOUR: every foreground here is `--fg-muted` or `--fg`, never
+   `--fg-dim`. That is not a stylistic preference — at `--fs-xs`
+   (11.2px) `--fg-dim` measures 4.04:1 on the dark panel and 3.59:1 on
+   the light one, both under the 4.5:1 WCAG AA bar for normal text.
+   `--fg-muted` is 8.93:1 and 6.90:1 respectively. The ladder still
+   reads, because the emphasis is carried by size, weight and the
+   mono face rather than by dropping the contrast. Verified by
+   scripts/audit-key-colours.mjs — re-run it after touching this block.
+   ============================================================ */
+.nt-keys {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.nt-keys__lead {
+  margin: 0;
+  max-width: 46rem;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--fg-muted);
+}
+/* Emphasis inside the lead lifts to full contrast rather than to a
+   half-step: at this size a half-step is not readable. */
+.nt-keys__lead b {
+  color: var(--fg);
+  font-weight: 400;
+}
+.nt-keys__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.nt-keys__row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--glass-bg);
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+/* The provider name is fixed-width so two rows line up on the tail,
+   which is the character anyone is actually checking. */
+.nt-keys__provider {
+  min-width: 7rem;
+  color: var(--fg);
+}
+.nt-keys__tail {
+  color: var(--accent-b);
+  font-family: var(--nt-font-mono);
+}
+.nt-keys__model {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+}
+.nt-keys__del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  /* Was --fg-dim: 3.84:1 dark / 3.44:1 light. A destructive control is
+     the last thing that should be hard to see. */
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+.nt-keys__del svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+.nt-keys__del:hover:not(:disabled) {
+  color: var(--danger);
+}
+.nt-keys__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-3);
+}
+.nt-keys__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+.nt-keys__field > span {
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  text-transform: lowercase;
+  color: var(--fg-muted);
+}
+/* `i` is the shape hint next to the label (e.g. the sk-or-v1- prefix).
+   It was `color-mix(--fg-dim 70%, transparent)`, which is wrong twice
+   over: it starts from an already-failing token, and mixing toward
+   `transparent` lowers alpha, so on the light theme it lands on a
+   lighter value still. Same colour as the label, set in italic so the
+   distinction is carried by shape instead of by legibility. */
+.nt-keys__field i {
+  color: var(--fg-muted);
+  font-style: italic;
+}
+.nt-keys__field input,
+.nt-keys__field select {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-0);
+  color: var(--fg);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-xs);
+}
+/* The key field must never offer to be remembered, so it opts out of
+   the browser's credential manager explicitly. */
+.nt-keys__field input {
+  -webkit-text-security: disc;
+}
+.nt-keys__field input:focus-visible,
+.nt-keys__field select:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+.nt-keys__note {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+.nt-keys__note--bad {
+  color: var(--danger);
+}
+
+/* ============================================================
    MOTION
    The dashboard is a console, so its blocks resolve line by line
    rather than fading in as one slab. The keyframes themselves are
    defined in landing.css and shared.
+
+   THE HIDE IS GATED ON .js-reveal, and that gate is the whole point.
+   It used to be an unconditional `.nt-dash [data-reveal] { opacity: 0 }`,
+   so the dashboard had a hide with no guaranteed reveal:
+
+     · while .js-reveal was set, landing.css's
+       `.js-reveal .nt-root [data-reveal] { opacity: 0.01 }` won on
+       specificity and the content was merely very faint;
+     · three seconds later layout.tsx's hydration-failure timer
+       removed .js-reveal — which it always does here, because
+       ScrollReveal is what reports revealReady, and it used to mount
+       only on the landing page — and this rule then took over at a
+       hard zero.
+
+   So every dashboard route rendered its heading and then nothing, for
+   good. Two changes fix it: ScrollReveal is mounted in
+   dashboard-shell.tsx so the reveal actually runs, and this hide now
+   shares landing's .js-reveal gate, so a genuine hydration failure
+   degrades to "content visible but un-animated" rather than "page
+   blank". .nt-root.nt-dash is a single element, so the compound
+   selector also outranks landing.css's rule at equal class count.
    ============================================================ */
-.nt-dash [data-reveal] {
+.js-reveal .nt-root.nt-dash [data-reveal] {
   opacity: 0;
 }
 .nt-dash .nt-rv-rise,
@@ -2130,6 +2303,73 @@
   align-items: center;
   gap: var(--sp-2);
   flex-shrink: 0;
+}
+
+/* ============================================================
+   THE MODEL PICKER
+   ============================================================
+   Lives in the header next to the icon tools. The select is a real
+   native control rather than a custom listbox: it gets keyboard
+   behaviour, type-ahead and the platform's own picker on mobile for
+   free, and those are exactly the things a hand-rolled one gets wrong.
+
+   Colours are --fg / --fg-muted rather than --fg-dim, for the same
+   reason as the BYOK block: at --fs-xs that token measures under 4.5:1
+   and this control has to stay legible while it is being read under
+   pressure.
+   ============================================================ */
+.nt-ai__model {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding-right: var(--sp-2);
+  margin-right: var(--sp-1);
+  border-right: 1px solid var(--line);
+  min-width: 0;
+}
+.nt-ai__model-lbl {
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  text-transform: lowercase;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+.nt-ai__model-sel {
+  /* Capped so a long model slug cannot push the icon buttons off the
+     header on a narrow screen. */
+  max-width: 15rem;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-0);
+  color: var(--fg);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-xs);
+  text-overflow: ellipsis;
+}
+.nt-ai__model-sel:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+.nt-ai__model-sel:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+/* Shown only when an OpenRouter model is picked with no key saved. The
+   reader can still send — the server refuses the pick and explains —
+   but they should not have to discover it from the refusal. */
+.nt-ai__model-warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: var(--fs-xs);
+  color: var(--warn);
+  white-space: nowrap;
+}
+.nt-ai__model-warn svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  flex: 0 0 auto;
 }
 /* The header tools. DOUBLED selector, and it is load-bearing.
    `.nt-btn` lives in landing.css, which lands AFTER this file, and at
