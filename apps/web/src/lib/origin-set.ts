@@ -1,5 +1,6 @@
 import "server-only";
 
+import { normalizeOrigin } from "@Main/auth";
 import { ENV } from "@/env.server";
 import { buildAllowedOrigins } from "@/lib/origin-guard";
 
@@ -46,5 +47,16 @@ import { buildAllowedOrigins } from "@/lib/origin-guard";
  * two definitions stop agreeing.
  */
 export function allowedOrigins(): ReadonlySet<string> {
-  return buildAllowedOrigins(ENV.BETTER_AUTH_URL, process.env.BETTER_AUTH_EXTRA_ORIGINS);
+  /*
+   * Normalised here for the same reason packages/auth normalises it: on
+   * Vercel BETTER_AUTH_URL is a bare hostname, and an Origin header always
+   * carries a scheme. Left raw, this set contained an entry no request could
+   * ever match, so the CSRF guard on /api/keys, /api/ai and /api/chat would
+   * have refused the app's own requests - a guard that blocks everyone is not
+   * a guard, it is an outage with good manners.
+   */
+  return buildAllowedOrigins(
+    normalizeOrigin(ENV.BETTER_AUTH_URL),
+    process.env.BETTER_AUTH_EXTRA_ORIGINS,
+  );
 }

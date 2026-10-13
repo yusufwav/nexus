@@ -128,10 +128,19 @@ const guardSrc = readFileSync(
   path.join(import.meta.dirname, "..", "src", "lib", "origin-guard.ts"),
   "utf8",
 );
-const authSrc = readFileSync(
-  path.join(import.meta.dirname, "..", "..", "..", "packages", "auth", "src", "index.ts"),
-  "utf8",
-);
+const authPkgSrc = path.join(import.meta.dirname, "..", "..", "..", "packages", "auth", "src");
+/*
+ * Both files, concatenated. The parsing of BETTER_AUTH_EXTRA_ORIGINS moved out
+ * of index.ts and into origin.ts when origins started being normalised, so
+ * reading index.ts alone made these assertions fail while the behaviour they
+ * describe was still present and separately tested in
+ * test-origin-normalize.mjs. Asserting over the package rather than one file
+ * keeps the intent - "the auth package does this" - without pinning it to a
+ * file layout that is free to change.
+ */
+const authSrc = ["index.ts", "origin.ts"]
+  .map((f) => readFileSync(path.join(authPkgSrc, f), "utf8"))
+  .join("\n");
 
 for (const [name, src] of [
   ["origin-guard", guardSrc],

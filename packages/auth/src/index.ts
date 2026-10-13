@@ -4,6 +4,16 @@ import * as schema from "@Main/db/schema/auth";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 
+import { normalizeOrigin, normalizeOriginList } from "./origin";
+
+/*
+ * Re-exported so the app's own origin guard normalises with the same function
+ * this package uses. Two copies of this logic would be two chances to
+ * disagree, and the failure is silent: an allowlist that never matches still
+ * looks like a valid set of strings.
+ */
+export { normalizeOrigin, normalizeOriginList } from "./origin";
+
 export type AuthConfig = {
   BETTER_AUTH_URL: string;
   BETTER_AUTH_SECRET: string;
@@ -57,15 +67,17 @@ const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7; // 7 days
 const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24; // 1 day
 
 function trustedOrigins(env: AuthConfig): string[] {
-  const raw = process.env["BETTER_AUTH_EXTRA_ORIGINS"];
-  const extra =
-    raw === undefined
-      ? []
-      : raw
-          .split(",")
-          .map((o) => o.trim())
-          .filter((o) => o.length > 0);
-  return [...new Set([env.BETTER_AUTH_URL, ...extra])];
+  /*
+   * Both sources are normalised. BETTER_AUTH_URL arrives on Vercel as a bare
+   * hostname - see the note in origin.ts - and an Origin header always
+   * carries a scheme, so the un-normalised value made the deployed app
+   * refuse its own traffic with 403 "Invalid origin". EXTRA_ORIGINS is
+   * typed by hand, so it is normalised for the trailing comma and the stray
+   * space rather than because it needs the scheme.
+   */
+  const own = normalizeOrigin(env.BETTER_AUTH_URL);
+  const extra = normalizeOriginList(process.env["BETTER_AUTH_EXTRA_ORIGINS"]);
+  return [...new Set([own, ...extra].filter((o) => o.length > 0))];
 }
 
 /*
@@ -172,7 +184,15 @@ export function createAuth(env: AuthConfig, database: Database) {
       sameSite: "lax",
     },
     secret: env.BETTER_AUTH_SECRET,
-    baseURL: env.BETTER_AUTH_URL,
+    /*
+     * Normalised for the same reason as trustedOrigins: Better Auth builds
+     * absolute URLs from this, and `${baseURL}/api/auth/...` on a bare
+     * hostname is not a URL. Correcting it in one place means the allowlist
+     * and the base cannot disagree - which is exactly the failure mode here,
+     * where a base that looked right produced an allowlist that refused
+     * everything.
+     */
+    baseURL: normalizeOrigin(env.BETTER_AUTH_URL),
     plugins: [nextCookies()],
   });
 }
