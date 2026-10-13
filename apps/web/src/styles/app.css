@@ -3254,6 +3254,47 @@
   flex-direction: column;
   gap: var(--sp-1);
 }
+
+  /*
+     Section heading inside the listbox - "Light mode palettes".
+
+     Not focusable and not selectable, so it is plain presentational text
+     (role="presentation" is set in centered-select.tsx). What it has to do is
+     separate the groups enough that forty options read as two lists rather
+     than one long one, without pretending to be an option itself.
+
+     The type is small, wide-tracked and dimmed: it reads as a label rather
+     than as content. --fs-xs is used rather than a smaller step because the
+     type scale stops at xs, and inventing --fs-2xs here would be a token
+     that exists for exactly one rule.
+
+     The top margin is larger than the list's own gap so there is a visible
+     break BEFORE a group as well as the heading itself - with only the gap,
+     the heading sits closer to the options above it than to the ones below,
+     which reads as belonging to the wrong section.
+
+     position: sticky keeps the current section visible while scrolling a
+     long group, which is what earns the row it costs. The background is
+     painted because a sticky element is still painted over the rows
+     scrolling beneath it.
+   */
+.nt-sel__group {
+  margin-top: var(--sp-3);
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+  background: var(--bg-1);
+  position: sticky;
+  top: calc(var(--sp-1) * -1);
+  z-index: 1;
+}
+/* The first heading sits directly under the list's own padding, so the
+   negative top margin would tuck it under the panel's edge. */
+.nt-sel__group:first-child {
+  margin-top: 0;
+}
 .nt-sel__opt {
   display: flex;
   align-items: center;

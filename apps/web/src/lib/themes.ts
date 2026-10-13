@@ -53,9 +53,65 @@
  *     light or dark.
  */
 import { GENERATED_THEMES } from "./themes.generated";
-export const THEMES = GENERATED_THEMES;
 
-export type ThemeId = (typeof THEMES)[number]["id"];
+/*
+ * The registry's shape, declared once here rather than inferred at each use.
+ *
+ * GENERATED_THEMES is emitted `as const`, so its type is a union of literal
+ * object types - and because only the generated palettes carry a `group`,
+ * that union splits: most members have no `group` property at all, so
+ * `t.group` on the union is a type error rather than `string | undefined`.
+ *
+ * That error is correct and worth keeping. Widening the union to add
+ * `group?: string` is the fix, and doing it HERE means one declaration
+ * instead of a cast at each of the call sites that needs to read a group.
+ * `ThemeId` stays derived from the literal union, so an id that is not in the
+ * generated file is still a compile error.
+ */
+export type ThemeEntry = {
+  readonly id: string;
+  readonly label: string;
+  readonly hint: string;
+  readonly glyph: string;
+  /** Section this palette belongs under, or absent if it is ungrouped. */
+  readonly group?: string;
+};
+
+export const THEMES: readonly ThemeEntry[] = GENERATED_THEMES;
+
+export type ThemeId = (typeof GENERATED_THEMES)[number]["id"];
+
+/**
+ * Every theme id, in the shape next-themes wants them.
+ *
+ * This exists because of a bug that only appears once there is more than the
+ * two themes next-themes ships expecting. On every theme change next-themes
+ * does this:
+ *
+ *   d.classList.remove(...themes)
+ *   d.classList.add(next)
+ *
+ * `themes` defaults to ["light", "dark"]. We never passed it, so it stayed
+ * at those two - and every palette id outside them was only ever ADDED,
+ * never removed. Switching gruvbox -> dracula left both on <html>:
+ *
+ *   <html class="gruvbox dracula">
+ *
+ * Both rules match `.nt-root` at the same specificity, so the winner was
+ * whichever block came later in the stylesheet rather than whichever theme
+ * the reader picked. Worse, the accumulated classes kept growing, so a
+ * session that visited a few palettes could end up rendering a theme nobody
+ * had chosen. It read as "the picker sets it wrong".
+ *
+ * Handing next-themes the full id list makes its own remove-then-add correct
+ * for our palettes, and keeps the two lists from drifting apart.
+ */
+/*
+ * Mapped from GENERATED_THEMES rather than from THEMES, so the element type
+ * stays the literal union and an id that is not in the generated registry is
+ * a compile error rather than an accepted string.
+ */
+export const THEME_IDS: string[] = GENERATED_THEMES.map((t) => t.id);
 
 /**
  * The theme a reader sees when they have expressed no preference.

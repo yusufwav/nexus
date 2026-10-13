@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 /**
@@ -59,7 +59,46 @@ export type SelectOption = {
   readonly label: string;
   /** Second line: the slug, or a short explanation. */
   readonly hint?: string;
+  /**
+   * Heading this option sits under, rendered above the first option of each
+   * group. Optional, and only the FIRST option of a group needs to carry it -
+   * the rest inherit from the run.
+   *
+   * This is a flat list with headings, not nested groups, on purpose. Every
+   * index in this component (`active`, `aria-activedescendant`, the id on each
+   * row) is an index into one array; nesting would mean a second addressing
+   * scheme and two places for the keyboard to disagree with the screen
+   * reader. A heading is just another row that is not selectable.
+   */
+  readonly group?: string;
 };
+
+/**
+ * Rows to render: options plus the headings between them.
+ *
+ * Returned as a discriminated union rather than computed inline in JSX so the
+ * keyboard navigation and the render agree by construction - both read the
+ * same list, so there is no way for a heading to become reachable by arrow
+ * key while looking unreachable on screen.
+ */
+type Row =
+  | { readonly kind: "heading"; readonly text: string }
+  | { readonly kind: "option"; readonly option: SelectOption; readonly index: number };
+
+function buildRows(options: readonly SelectOption[]): Row[] {
+  const rows: Row[] = [];
+  let currentGroup: string | undefined;
+  for (const [index, option] of options.entries()) {
+    // A heading is emitted on a CHANGE of group, so repeating the same group
+    // name across consecutive options does not print it ten times.
+    if (option.group !== undefined && option.group !== currentGroup) {
+      rows.push({ kind: "heading", text: option.group });
+      currentGroup = option.group;
+    }
+    rows.push({ kind: "option", option, index });
+  }
+  return rows;
+}
 
 export default function CenteredSelect(props: {
   label: string;
@@ -90,6 +129,19 @@ export default function CenteredSelect(props: {
   const listId = useId();
 
   const current = options.find((o) => o.value === value) ?? options[0];
+
+  /*
+   * Headings and options, in render order.
+   *
+   * Memoised because `options` is a fresh array on every parent render in at
+   * least one caller, and rebuilding rows is cheap but the identity churn
+   * would re-run the scroll-into-view effect on every unrelated re-render.
+   *
+   * Note what navigation still uses: `options`, not `rows`. The arrow keys
+   * move an index into the options array, so a heading has no index to be
+   * moved onto. Grouping cannot become keyboard-reachable by accident.
+   */
+  const rows = useMemo(() => buildRows(options), [options]);
 
   // Portals need a document. Guarded rather than assumed: this renders
   // on the server too.
@@ -235,7 +287,25 @@ export default function CenteredSelect(props: {
             >
               <p className="nt-sel__title">{listLabel ?? label}</p>
               <ul className="nt-sel__list">
-                {options.map((o, i) => {
+                {rows.map((row) => {
+                  /*
+                   * A heading is presentation only.
+                   *
+                   * role="presentation" removes it from the accessibility
+                   * tree, which is what stops a screen reader counting it as
+                   * an option and reporting "3 of 42" where 3 is a heading.
+                   * The visible text stays in the list for sighted users, so
+                   * the grouping is not sighted-only.
+                   */
+                  if (row.kind === "heading") {
+                    return (
+                      <li key={`h-${row.text}`} role="presentation" className="nt-sel__group">
+                        {row.text}
+                      </li>
+                    );
+                  }
+
+                  const { option: o, index: i } = row;
                   const selected = o.value === value;
                   return (
                     <li

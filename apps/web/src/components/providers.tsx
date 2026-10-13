@@ -2,6 +2,8 @@
 
 import { Toaster } from "@Main/ui/components/sonner";
 
+import { THEME_IDS } from "@/lib/themes";
+
 import { ThemeProvider } from "./theme-provider";
 import { ThemeSync } from "./theme-sync";
 
@@ -32,6 +34,14 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       defaultTheme="light"
       enableSystem
       disableTransitionOnChange
+      /*
+       * Without this next-themes only knows how to remove "light" and "dark",
+       * so switching between two of our own palettes left the previous one on
+       * <html> as well as the new one - and the two then fought over .nt-root
+       * at equal specificity, with source order deciding. THEME_IDS makes its
+       * own remove-then-add do the right thing. See THEME_IDS in lib/themes.
+       */
+      themes={THEME_IDS}
     >
       {children}
       {/* Applies the account's saved theme once the session resolves, and

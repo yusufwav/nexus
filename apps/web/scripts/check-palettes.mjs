@@ -36,8 +36,26 @@ const CSS = [
   readFileSync(join(HERE, "src", "styles", "palettes.generated.css"), "utf8"),
 ].join("\n");
 const REGISTRY = readFileSync(join(HERE, "src", "lib", "themes.generated.ts"), "utf8");
+const PICKER = readFileSync(join(HERE, "src", "components", "theme-picker.tsx"), "utf8");
+const SELECT = readFileSync(join(HERE, "src", "components", "centered-select.tsx"), "utf8");
 
 let failures = 0;
+
+/**
+ * WCAG relative luminance. Duplicated from build-palettes.mjs rather than
+ * imported, because that file runs top-to-bottom as a build step and exports
+ * nothing. Two copies of a five-line standard is the cheaper trade than
+ * reshaping the generator into a module; the formula is fixed by the spec, so
+ * it cannot drift in the way a palette rule can.
+ */
+function luminance([r, g, b]) {
+  const f = (v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+}
+
 const ok = (m) => console.log(`  ok   ${m}`);
 const bad = (m) => {
   failures++;
@@ -195,6 +213,202 @@ for (const id of registryIds) {
   const at = selectorAt(`.${id} .nt-root`);
   if (at === -1) bad(`${id} is selectable in the picker but has no .${id} .nt-root block`);
   else ok(`${id} has a block`);
+}
+
+/*
+ * THE "LIGHT MODE PALETTES" SECTION IS REAL
+ * ------------------------------------------------------------------------
+ * Grouping is the one part of this feature that has no stylesheet to check it
+ * against. A palette with a `group` renders identically whether or not the
+ * picker honours the group, so the only failure mode is silent: the heading
+ * says "Light mode palettes" and the list underneath it is dark themes, or the
+ * heading is missing entirely and forty options read as one undifferentiated
+ * wall.
+ *
+ * Both are checked here, by reading the two files that have to agree:
+ * theme-picker.tsx decides which palette goes in which section, and
+ * centered-select.tsx has to be able to render the heading at all.
+ */
+console.log("\nthe light/dark sections are wired up");
+{
+  const lightGrouped = [...REGISTRY.matchAll(/group:\s*"([^"]+)"/g)].map((m) => m[1]);
+  const distinct = [...new Set(lightGrouped)];
+
+  if (lightGrouped.length === 0) {
+    bad("no palette in the registry carries a group, so the picker has no sections");
+  } else {
+    ok(`${lightGrouped.length} palettes are grouped (${distinct.join(", ")})`);
+  }
+
+  /* Every grouped palette must actually be light, measured not declared. */
+  const cssLight = new Set();
+  for (const m of CSS.matchAll(/^\.([a-z0-9-]+) \.nt-root \{([\s\S]*?)\n\}/gm)) {
+    const bg = /--bg-0:\s*(#[0-9a-f]{6})/i.exec(m[2]);
+    if (!bg) continue;
+    const n = parseInt(bg[1].slice(1), 16);
+    const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+    const f = (v) => {
+      const c = v / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const lum = 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    if (lum > 0.72) cssLight.add(m[1]);
+  }
+
+  const declaredLight = [...REGISTRY.matchAll(/\bid:\s*"([^"]+)"[^\n]*group:\s*"light"/g)].map((m) => m[1]);
+  const notActuallyLight = declaredLight.filter((id) => !cssLight.has(id));
+  if (notActuallyLight.length > 0) {
+    bad(`filed under "light" but their --bg-0 is dark: ${notActuallyLight.join(", ")}`);
+  } else {
+    ok(`all ${declaredLight.length} palettes filed as light really are bright (--bg-0 luminance > 0.72)`);
+  }
+
+  /*
+   * The picker must consume the group, and must label it for the reader.
+   *
+   * Matched as `t.group === "light"` because that is how the code reads it -
+   * an earlier version of this check searched for `group: "light"`, the
+   * object-literal spelling, and reported the wiring missing while the code
+   * was correct. A check that fails on working code gets ignored, so the
+   * pattern has to match what is actually written.
+   */
+  if (!/t\.group\s*===\s*"light"/.test(PICKER)) {
+    bad('theme-picker.tsx does not filter on group === "light", so nothing would be sectioned');
+  } else if (!/Light mode palettes/.test(PICKER)) {
+    bad('theme-picker.tsx sections the light group but never labels it "Light mode palettes"');
+  } else {
+    ok('theme-picker filters on group === "light" and labels the section "Light mode palettes"');
+  }
+
+  /*
+   * The dark palettes need a section too, or they fall through.
+   *
+   * The picker's dark filter is `group === undefined`, so a palette left
+   * ungrouped after light is taken would match neither list and become
+   * unselectable. theme-picker throws on that at runtime; this catches it at
+   * build time, and reads the same condition the picker uses rather than
+   * re-deriving it.
+   */
+  if (!/t\.group\s*===\s*undefined/.test(PICKER)) {
+    bad(
+      "theme-picker.tsx does not collect group === undefined as the dark section, " +
+        "so the ungrouped palettes would land outside both lists",
+    );
+  } else {
+    ok("theme-picker collects the ungrouped palettes as the dark section");
+  }
+
+  /*
+   * The real orphan case: a palette carrying a group the picker does not
+   * handle.
+   *
+   * Note what is deliberately NOT checked here. "Ungrouped" is not an orphan
+   * - ungrouped is exactly how the dark palettes are declared, and the
+   * `group === undefined` filter above collects them. An earlier version of
+   * this check treated every ungrouped palette as unselectable and failed on
+   * all thirty dark themes, which was the check being wrong rather than the
+   * code.
+   *
+   * So the only genuinely unreachable palette is one whose group string is
+   * something other than "light": it matches neither filter and falls out of
+   * the list entirely. That is the case worth a build failure.
+   */
+  const groupsInRegistry = [...new Set([...REGISTRY.matchAll(/group:\s*"([^"]+)"/g)].map((m) => m[1]))];
+  const unknownGroup = groupsInRegistry.filter((g) => g !== "light");
+  if (unknownGroup.length > 0) {
+    bad(
+      `these group(s) are in the registry but handled by no section in the picker, ` +
+        `so those palettes would be unselectable: ${unknownGroup.join(", ")}`,
+    );
+  } else {
+    ok("every group in the registry is handled by a section in the picker");
+  }
+
+  /* CenteredSelect has to render a heading, or the group is only data. */
+  if (!/nt-sel__group/.test(SELECT)) {
+    bad("centered-select.tsx never renders the group heading, so sections would not appear");
+  } else {
+    ok("centered-select renders a heading row for each group");
+  }
+}
+
+/*
+ * THE INPUT WELL IS VISIBLE ON ITS OWN PAGE
+ * ------------------------------------------------------------------------
+ * This one exists because a real bug shipped past every other check.
+ *
+ * --input-bg is built by mixing the background toward black, which is what
+ * makes an input sit in a depression. On any background with room below it
+ * that works. On a near-black background there is no room: #08080a mixed
+ * toward black is #060607, two levels out of 255, and the resulting well
+ * measured 1.006:1 against its own page - invisible.
+ *
+ * Nothing else caught it. The token was present, so the 72-token contract
+ * passed. It was a valid hex/rgba, so the ramp check passed. The theme
+ * rendered, so there was no error anywhere - just an input field that could
+ * not be told apart from the surface it sat on.
+ *
+ * Six of the thirty original dark themes had the same defect before this
+ * check existed (rose-pine, night-owl, iceberg, oxocarbon, vesper,
+ * jellybeans). They were all near-black backgrounds and all had it silently.
+ *
+ * So the well is composited over its own page and measured. Below 1.05:1 it
+ * is not a depression, it is a slightly different shade of the page.
+ */
+console.log("\ninput wells are visible against their own background");
+{
+  const parseRgba = (v) => {
+    const m = /rgba?\(([^)]+)\)/.exec(v);
+    if (!m) return null;
+    const p = m[1].split(",").map((s) => parseFloat(s));
+    return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1];
+  };
+  const parseHex = (v) => {
+    const m = /^#([0-9a-f]{6})$/i.exec(v);
+    if (!m) return null;
+    const n = parseInt(m[1], 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255, 1];
+  };
+  const over = (f, b) => [0, 1, 2].map((i) => f[i] * f[3] + b[i] * (1 - f[3]));
+
+  const faint = [];
+  let measured = 0;
+  for (const id of registryIds) {
+    if (id === "system" || id === "light" || id === "dark") continue;
+    const at = selectorAt(`.${id} .nt-root`);
+    if (at === -1) continue;
+    const body = CSS.slice(CSS.indexOf("{", at), CSS.indexOf("}", at));
+    const bg = parseHex((/--bg-0:\s*([^;]+);/.exec(body) ?? [])[1] ?? "");
+    const inp = parseRgba((/--input-bg:\s*([^;]+);/.exec(body) ?? [])[1] ?? "");
+    if (!bg || !inp) continue;
+    measured++;
+    const r =
+      (Math.max(luminance(over(inp, bg)), luminance(bg)) + 0.05) /
+      (Math.min(luminance(over(inp, bg)), luminance(bg)) + 0.05);
+    /*
+     * The bar is 1.06:1, not a round number I liked.
+     *
+     * It comes from the hand-written `.light` palette in tokens.css, which is
+     * the one input well in this codebase that was tuned by eye and reviewed:
+     * rgba(26,22,20,0.035) over #faf8f6 measures 1.072:1. Holding the
+     * generated palettes to that same figure means "good enough" is defined by
+     * work someone actually did, rather than by a threshold I picked and then
+     * had to defend.
+     *
+     * 1.06 still catches the real defect comfortably - the broken wells
+     * measured 1.006-1.013, an order of magnitude away - while not
+     * flagging palettes whose well is subtle but genuinely present.
+     */
+    if (r < 1.06) faint.push(`${id} ${r.toFixed(3)}:1`);
+  }
+  if (faint.length > 0) {
+    bad(
+      `input well is barely distinguishable from the page (bar is 1.06:1, ` +
+        `set from the hand-written .light reference): ${faint.join(", ")}`,
+    );
+  } else {
+    ok(`all ${measured} input wells clear 1.06:1 against their own page`);
+  }
 }
 
 console.log(

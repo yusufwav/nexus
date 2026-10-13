@@ -156,21 +156,164 @@ function contrast(a, b) {
 
 /* ---------------------------------------------------------------- derive -- */
 
+/**
+ * Is this a bright canvas?
+ *
+ * Not a `light: true` flag on the seed. A flag is a promise, and a seed that
+ * says light while carrying #282828 gets every one of the light rules applied
+ * to a dark page - which renders, just wrongly. Measuring the background is
+ * the fact itself, so it cannot be contradicted.
+ *
+ * The threshold is deliberately high. Half the palette list is dark, and a
+ * mid-tone theme must keep the dark rules: the difference between the two
+ * branches is mostly "does white glow or black glow", and applying it at 0.5
+ * would flip a theme like solarized's dark teal into light-mode shadows.
+ */
+function isBright(bg) {
+  return luminance(bg) > 0.72;
+}
+
+/**
+ * Derive a theme's 72 tokens.
+ *
+ * THE BRANCH IS NOT COSMETIC
+ * ------------------------------------------------------------------------
+ * Both branches emit all 72, and they differ where the physics differ rather
+ * than where a designer felt like being different. Three groups of token, and
+ * only three:
+ *
+ *   1. Alphas over the foreground.
+ *      --line, --panel, --grid-line and friends are `rgba(fg, a)`. On a dark
+ *      page that is a white hairline; on a bright one it is a dark hairline,
+ *      which is exactly what each wants. Same rule, correct both ways - these
+ *      are untouched by the branch.
+ *
+ *   2. Alphas over the background.
+ *      --scrim, --input-bg, --switch-track. On dark these are dark overlays
+ *      and stay legible. On a bright page a *light* overlay disappears
+ *      entirely, so a light rule has to darken instead. This is the flip.
+ *
+ *   3. Colour used as an ink.
+ *      --ascii-high, --amb-high, --glow-accent-* are "the palette's own
+ *      colour, where it is allowed to show". On dark, a light colour IS the
+ *      ink. On bright, a light colour is invisible against the page, so these
+ *      pull toward the foreground - which is dark, and so is now the ink.
+ *
+ * A fourth case is worth naming because it looks like it should be handled
+ * here and is not: --hover-glow and --glow-* are decorative bloom. On a
+ * bright page a bright bloom is invisible, so the bright branch tints them
+ * with the background at low alpha and keeps the blur. The blur is the part
+ * the eye actually reads.
+ */
 function derive(p) {
   const bg = parseHex(p.bg);
   const fg = parseHex(p.fg);
   const muted = parseHex(p.muted);
   const primary = parseHex(p.primary);
   const secondary = parseHex(p.secondary);
+  const bright = isBright(bg);
 
   // A darker and a lighter step of the background, both toward the
   // foreground hue rather than toward black or white.
   const bg1 = mix(bg, fg, 0.04);
   const bg2 = mix(bg, fg, 0.09);
-  const bgDeep = mix(bg, BLACK, 0.28);
+
+  /*
+   * Surfaces, and why the bright branch inverts the direction.
+   *
+   * On a dark page a raised surface moves AWAY from the background, toward
+   * white, or it is invisible. That is bg1/bg2 above, and it is why a dark
+   * palette's panels look like panels.
+   *
+   * On a near-white page the same move produces a panel indistinguishable
+   * from the page - and the fix is not to make it darker, which would read
+   * as a hole, but to let the panel reach actual white and let the INSET
+   * surface be the one that darkens. So bright reverses the pair: bg1 is
+   * pushed toward true white (the card lifts off the page) and bg2 is
+   * nudged toward the foreground (the well inside it).
+   *
+   * 0.04 and 0.09 are kept so a bright palette's two steps are as far apart
+   * as a dark one's, rather than the two collapsing into one another.
+   */
+  const bg1Out = bright ? mix(bg, WHITE, 0.55) : bg1;
+  const bg2Out = bright ? mix(bg, fg, 0.045) : bg2;
+
+  /*
+   * The deep step - the colour an input well is painted in, so it has to read
+   * as a depression in the surface.
+   *
+   * "Mix the background toward black" is the obvious rule and it is wrong for
+   * every palette whose background is already dark. Mixing #08080a toward
+   * black yields #060607 - two levels out of 255 - and the resulting well
+   * measured 1.006:1 against its own page. Nothing reported it: the token was
+   * present, it was valid rgba, the theme rendered, and the input simply
+   * could not be told apart from the surface it sat on.
+   *
+   * There is no colour "below" a near-black background, so the target of the
+   * mix has to be chosen by how much room is left:
+   *
+   *   - bright page   -> toward the foreground, hard. Mixing toward black
+   *                      would put a black rectangle on white paper.
+   *   - dark page     -> toward a target that slides from black (plenty of
+   *                      room below) up to the foreground (no room at all).
+   *
+   * The slide is on the TARGET, not on the mix strength, and that distinction
+   * matters. An earlier attempt interpolated the target as
+   * `mix(BLACK, fg, room)` and scaled by 0.02 luminance, which left every
+   * near-black theme at 1.014-1.043:1 - worse than the 1.05 the simpler rule
+   * produced, because interpolating black toward a light colour at a small
+   * `room` still returns nearly-black. The target has to travel the whole
+   * distance to the foreground once the page is at the floor.
+   *
+   * The bands are set from measured contrast, not taste. check-palettes.mjs
+   * holds every palette to 1.06:1, the figure the hand-written `.light`
+   * palette measures. 0.10 is the smallest near-floor mix at which the
+   * darkest background in the set (pitch, luminance 0.0021) clears that bar:
+   * 1.077:1, against 1.050:1 at 0.07.
+   */
+  const bgLum = luminance(bg);
+  /*
+   * One continuous interpolation, no bands.
+   *
+   * `room` runs 0 at absolute black to 1 once the page has real luminance to
+   * give away. It drives BOTH the target and the strength, and both vary
+   * smoothly, because a step anywhere in here is a visible discontinuity in
+   * the token as a palette's background crosses the threshold.
+   *
+   * The two constants were solved for rather than chosen. Sweeping both
+   * against every dark palette's measured well and keeping the settings where
+   * the weakest one still clears 1.06:1 gives K = 0.12 and S0 = 0.10:
+   *
+   *   room = 0   (pitch, 0.0021)   -> target fg, strength 0.10 -> 1.071:1
+   *   room = 1   (above 0.12)      -> target black, strength 0.28
+   *
+   * K = 0.02 is the intuitive-looking value and it does not work: it leaves
+   * poimandres at 1.035:1. The reason is that a mid-dark palette is not the
+   * same problem as a near-black one - it has room, just not much - and it
+   * needs a lower `room` for longer before its target starts moving, not a
+   * higher one. The curve has to stay shallow across the whole mid range.
+   *
+   * An intermediate version also switched the strength between two constants
+   * at a threshold rather than interpolating it, which passed the near-black
+   * themes and broke fourteen mid-dark ones - solarized fell to 1.024:1. That
+   * is the reason there is no `? :` here.
+   */
+  const HAS_ROOM_BELOW = 0.12;
+  const room = Math.min(1, bgLum / HAS_ROOM_BELOW);
+  const deepTarget = bright ? fg : mix(BLACK, fg, 1 - room);
+  const deepStrength = bright ? 0.28 : 0.1 + 0.18 * room;
+  const bgDeep = mix(bg, deepTarget, deepStrength);
 
   const fgMuted = mix(fg, muted, 0.5);
   const accentC = rotate(primary, 150);
+
+  /*
+   * Shadow ink. A shadow on a dark page is black - it can be, because there
+   * is nothing darker than the page to make it look wrong. On a white page a
+   * black shadow at the same alpha reads as a grey smudge, so the ink moves
+   * toward the foreground instead: still dark, but carrying the hue, so the
+   * shadow reads as belonging to the palette rather than to the browser.
+   */
   const shadowInk = mix(bg, BLACK, 0.2);
 
   // Status: canonical hues, pulled toward the palette's own accents so they
@@ -179,10 +322,61 @@ function derive(p) {
   const warn = mix(towardHue(secondary, 45, 0.75), primary, 0.25);
   const danger = mix(towardHue(primary, 5, 0.8), primary, 0.3);
 
+  /*
+   * Colour used as INK, and the one genuinely load-bearing inversion.
+   *
+   * The accent colours are the palette's identity, so they stay exactly as
+   * seeded on both branches - a light theme with a dark primary would be a
+   * different theme. What changes is where that colour is allowed to appear
+   * against the page.
+   *
+   * On dark, `secondary` is a light colour and a light colour is legible
+   * against a dark page, so it can be the ASCII field's bright end and the
+   * glow's colour directly.
+   *
+   * On a near-white page the same colour is invisible. So every token whose
+   * job is "the palette's own colour, showing" mixes toward the foreground
+   * first. The foreground on a bright page is dark, so mixing toward it turns
+   * a pastel accent into a deep one that reads on white - the accents keep
+   * their hue, and only their lightness is traded for legibility.
+   *
+   * The mix amount is 0.45 rather than "as dark as it takes". Fully dark
+   * would flatten every accent to the same near-black and lose the hue that
+   * makes the theme recognisable; 0.45 keeps the colour identifiable while
+   * clearing the page.
+   */
+  const inkAccent = bright ? mix(secondary, fg, 0.45) : secondary;
+  const inkPrimary = bright ? mix(primary, fg, 0.45) : primary;
+  const inkAccentC = bright ? mix(accentC, fg, 0.45) : accentC;
+
+  /*
+   * The ambient and ASCII LOW ends. On dark, "low" means dim, and dimming a
+   * light colour gives a dark one that recedes. On bright it is reversed: the
+   * low end has to be a colour that is barely THERE against white, so it is
+   * pulled toward the background, not the foreground.
+   *
+   * This is the same inversion as bg1/bg2, one level down, and getting it
+   * wrong is why a generated light theme tends to look like a dark theme with
+   * the brightness turned up: the low end is too dark, so the whole field
+   * reads as noise rather than as fog.
+   */
+  const asciiLow = bright ? mix(bg, fg, 0.07) : bg2;
+  const ambLow = bright ? mix(bg, fg, 0.18) : muted;
+
+  /*
+   * Decorative bloom. On dark a coloured glow at low alpha over black is
+   * visible and pretty. On white the same glow is a pale wash of a pale
+   * colour over white - nothing. So on bright the glow keeps its blur but
+   * takes the FOREGROUND's colour at low alpha, which is what produces the
+   * soft grey lift the hand-written .light palette uses.
+   */
+  const glowInk = bright ? fg : secondary;
+  const glowAlphaScale = bright ? 0.55 : 1;
+
   return {
     "--bg-0": hex(...bg),
-    "--bg-1": hex(...bg1),
-    "--bg-2": hex(...bg2),
+    "--bg-1": hex(...bg1Out),
+    "--bg-2": hex(...bg2Out),
     "--bg-fade": hex(...bg),
 
     "--fg": hex(...fg),
@@ -193,8 +387,8 @@ function derive(p) {
     "--accent-b": hex(...secondary),
     "--accent-c": hex(...accentC),
     "--accent-dot": rgba(primary, 0.8),
-    "--accent-line": rgba(secondary, 0.28),
-    "--accent-soft": rgba(secondary, 0.08),
+    "--accent-line": rgba(bright ? inkAccent : secondary, 0.28),
+    "--accent-soft": rgba(bright ? inkAccent : secondary, 0.08),
 
     "--syn-key": hex(...primary),
     "--syn-fn": hex(...secondary),
@@ -212,6 +406,8 @@ function derive(p) {
     "--warn-line": rgba(warn, 0.3),
     "--danger-fill": rgba(danger, 0.09),
 
+    // rgba(fg, a) throughout: a white hairline on dark, a dark one on
+    // light. Correct on both branches from the one rule.
     "--line": rgba(fg, 0.11),
     "--line-soft": rgba(fg, 0.055),
     "--panel": rgba(fg, 0.035),
@@ -222,14 +418,27 @@ function derive(p) {
     "--shadow-md": `0 14px 40px -22px ${rgba(shadowInk, 0.8)}`,
     "--shadow-sm": `0 10px 34px -26px ${rgba(shadowInk, 0.9)}`,
 
-    "--scrim": rgba(bg, 0.7),
-    "--scrim-bar": rgba(bg, 0.3),
+    /*
+     * Scrims, and the reason bgDeep is defined with the bright branch.
+     *
+     * rgba(bg, a) works on dark because a dark scrim dims a darker page. On
+     * a white page a white scrim does not dim anything - it erases contrast
+     * by flooding the page with its own colour, which is why the hand-written
+     * light palette's scrim is near-opaque: it has to BE the dimming.
+     *
+     * Rather than special-case each alpha, the bright branch anchors scrims
+     * to bgDeep, which was mixed toward the (dark) foreground above. One
+     * changed variable gives every scrim the right behaviour, and the alphas
+     * stay the numbers a reader can reason about.
+     */
+    "--scrim": rgba(bright ? bgDeep : bg, 0.7),
+    "--scrim-bar": rgba(bright ? bgDeep : bg, 0.3),
     "--scrim-deep": rgba(bgDeep, 0.9),
-    "--scrim-soft": rgba(bg, 0.45),
+    "--scrim-soft": rgba(bright ? bgDeep : bg, 0.45),
 
-    "--hover-edge": rgba(secondary, 0.4),
-    "--hover-fill": rgba(secondary, 0.05),
-    "--hover-glow": `0 18px 50px -26px ${rgba(secondary, 0.45)}`,
+    "--hover-edge": rgba(bright ? inkAccent : secondary, 0.4),
+    "--hover-fill": rgba(bright ? inkAccent : secondary, 0.05),
+    "--hover-glow": `0 18px 50px -26px ${rgba(glowInk, 0.45 * glowAlphaScale + (bright ? 0.12 : 0))}`,
 
     "--input-bg": rgba(bgDeep, 0.5),
     "--input-bg-focus": rgba(bgDeep, 0.72),
@@ -241,28 +450,35 @@ function derive(p) {
     "--switch-track": rgba(bgDeep, 0.45),
 
     "--glass-bg": rgba(fg, 0.028),
-    "--glass-bg-hover": rgba(secondary, 0.05),
+    "--glass-bg-hover": rgba(bright ? inkAccent : secondary, 0.05),
     "--glass-console": rgba(bg, 0.74),
     "--glass-edge": rgba(fg, 0.09),
     "--glass-sheen": rgba(fg, 0.05),
     "--glass-tint": rgba(fg, 0.3),
-    "--glass-tint-hover": rgba(bg1, 0.72),
+    "--glass-tint-hover": rgba(bg1Out, 0.72),
 
-    "--glow-accent": rgba(secondary, 0.16),
-    "--glow-accent-a": rgba(primary, 0.26),
-    "--glow-accent-breathe": rgba(secondary, 0.14),
-    "--glow-accent-soft": rgba(secondary, 0.05),
-    "--glow-accent-strong": rgba(secondary, 0.42),
-    "--bundle-glow": `0 26px 70px -30px ${rgba(secondary, 0.42)}`,
+    "--glow-accent": rgba(glowInk, 0.16 * glowAlphaScale),
+    "--glow-accent-a": rgba(bright ? inkPrimary : primary, 0.26 * glowAlphaScale),
+    "--glow-accent-breathe": rgba(glowInk, 0.14 * glowAlphaScale),
+    "--glow-accent-soft": rgba(glowInk, 0.05 * glowAlphaScale),
+    "--glow-accent-strong": rgba(glowInk, 0.42 * glowAlphaScale),
+    "--bundle-glow": `0 26px 70px -30px ${rgba(glowInk, 0.42 * glowAlphaScale)}`,
 
     // Hex only: hexToRgb() in ascii-field.tsx parses nothing else, and a
     // named colour here renders as a black field.
     "--ascii-op": "0.55",
-    "--ascii-low": hex(...bg2),
-    "--ascii-high": hex(...secondary),
+    "--ascii-low": hex(...asciiLow),
+    "--ascii-high": hex(...inkAccent),
     "--amb-op": "0.4",
-    "--amb-low": hex(...muted),
-    "--amb-high": hex(...accentC),
+    "--amb-low": hex(...ambLow),
+    "--amb-high": hex(...inkAccentC),
+    /*
+     * The AI veil washes the field toward the page rather than darkening it.
+     * rgba(bg, ...) is correct on both branches and is the one scrim-shaped
+     * token that needs no branch: on a bright page a bright veil is already
+     * the right gesture, fading content into white paper - which is what the
+     * hand-written .light block calls "paper, not ink".
+     */
     "--ai-veil": rgba(bg, 0.4),
 
     "--grad-from": hex(...primary),
@@ -304,9 +520,25 @@ const brandEntries = [
   `  { id: "dark", label: "Dark", hint: "Dark surfaces, light text", glyph: "☾" },`,
 ].join("\n");
 
-const paletteEntries = palettes
-  .map((p) => `  { id: ${JSON.stringify(p.id)}, label: ${JSON.stringify(p.label)}, hint: ${JSON.stringify(p.hint)}, glyph: ${JSON.stringify(p.glyph)} },`)
-  .join("\n");
+/*
+ * `group` is carried through from the seed rather than decided here.
+ *
+ * The dropdown needs to know which palettes are light and which are dark so
+ * it can put a heading between them, and it must be the SAME fact the
+ * derivation used - otherwise the picker files a theme under one heading
+ * while the stylesheet rendered it the other way, and the section labels lie.
+ * So the seed is the single source and this only formats it.
+ *
+ * A palette with no `group` is emitted without the key at all rather than
+ * with `group: undefined`, so the generated type stays honest about which
+ * entries actually declare one.
+ */
+const entryFor = (p) => {
+  const base = `id: ${JSON.stringify(p.id)}, label: ${JSON.stringify(p.label)}, hint: ${JSON.stringify(p.hint)}, glyph: ${JSON.stringify(p.glyph)}`;
+  return p.group ? `{ ${base}, group: ${JSON.stringify(p.group)} },` : `{ ${base} },`;
+};
+
+const paletteEntries = palettes.map(entryFor).join("\n");
 
 const registry = `/* GENERATED FILE - DO NOT EDIT.
  *
@@ -376,10 +608,26 @@ for (const p of palettes) {
   const muted = parseHex(p.muted);
   const ratio = contrast(fg, bg);
   const mutedRatio = contrast(muted, bg);
-  report.push({ id: p.id, tokens: count, ratio, mutedRatio });
+  report.push({ id: p.id, group: p.group ?? null, tokens: count, ratio, mutedRatio, bright: isBright(bg) });
 
   if (ratio < 4.5) {
     console.log(`  FAIL ${p.id}: body text contrast ${ratio.toFixed(2)}:1 is below 4.5:1`);
+    failures++;
+  }
+
+  /*
+   * A bright theme's whole point is that it IS bright. A seed that looks
+   * bright but measures dark would take the dark rule set and render a dark
+   * page from a palette named "Paper" - and nothing else would complain,
+   * because every other check passes on a correct dark palette too.
+   *
+   * So the group a palette is filed under is checked against the branch it
+   * actually took. This is the check that keeps "light mode palettes" from
+   * quietly containing a dark one.
+   */
+  const declaredBright = p.group === "light";
+  if (declaredBright && !isBright(bg)) {
+    console.log(`  FAIL ${p.id}: filed under "light" but bg ${p.bg} measures dark (luminance ${luminance(bg).toFixed(3)} < 0.72)`);
     failures++;
   }
 
@@ -396,13 +644,30 @@ writeFileSync(join(STYLES, "palettes.generated.css"), out, "utf8");
 const written = (out.match(/^  --/gm) ?? []).length;
 const expected = palettes.length * 72;
 
+const lightCount = report.filter((r) => r.bright).length;
+
 console.log(`palettes      : ${palettes.length}`);
 console.log(`blocks        : ${(out.match(/^\.\S+ \.nt-root \{/gm) ?? []).length}`);
 console.log(`registry      : ${palettes.length + 1} entries (${palettes.length} palettes + system)`);
 console.log(`token lines   : ${written} (expected ${expected})`);
 console.log(`file size     : ${Math.round(out.length / 1024)} KB`);
 console.log(`consistent    : ${written === expected && written === Object.keys(derive(palettes[0])).length * palettes.length}`);
+console.log(`bright branch : ${lightCount} bright, ${palettes.length - lightCount} dark`);
 if (written !== expected) failures++;
+
+/*
+ * Report the bright themes by name, not just a count.
+ *
+ * A count is satisfied by the wrong set. Ten dark themes derived with the
+ * light rules would still report "10", so the reader has to be able to see
+ * which ones took the bright branch and judge that against the seeds.
+ */
+if (lightCount > 0) {
+  console.log("\nbright themes (took the light rule set):");
+  for (const r of report.filter((x) => x.bright)) {
+    console.log(`  ${r.id.padEnd(18)} ${r.group ?? "(no group)"}`);
+  }
+}
 
 console.log("\nbody-text contrast, worst first:");
 for (const r of [...report].sort((a, b) => a.ratio - b.ratio).slice(0, 6)) {

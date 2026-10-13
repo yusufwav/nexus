@@ -1,11 +1,12 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import CenteredSelect from "@/components/centered-select";
 import { authClient } from "@/lib/auth-client";
 import { DEFAULT_THEME, THEMES, isTheme, resolveTheme } from "@/lib/themes";
+import type { ThemeEntry } from "@/lib/themes";
 
 /**
  * APPEARANCE - THEME PICKER
@@ -63,7 +64,72 @@ export function ThemePicker(): React.JSX.Element {
   useEffect(() => setMounted(true), []);
 
   const current = mounted && isTheme(theme) ? theme : DEFAULT_THEME;
-  const options = THEMES.map((t) => ({ value: t.id, label: t.label, hint: t.hint }));
+
+  /*
+   * The list, ordered and grouped.
+   *
+   * The registry already carries a `group` on each generated palette, so this
+   * does not invent a classification - it only decides the ORDER of the
+   * sections and names them.
+   *
+   * Order is set here rather than read from the registry because the seeds
+   * file is a build input, not a UI decision: reordering it to suit the
+   * dropdown would make the generated CSS order follow the UI, which is the
+   * wrong way round. One place decides what the reader sees first.
+   *
+   * "Light mode palettes" leads because these are the themes people reach for
+   * when they want brightness, and a list of forty that starts with thirty
+   * dark ones buries them.
+   *
+   * light and dark are deliberately NOT grouped. They are the brand pair, not
+   * a family, and the reader who wants "the bright one" wants the actual
+   * Light rather than a heading that has to be read to find it.
+   *
+   * `system` stays last and ungrouped: it is an instruction, not a palette,
+   * and giving it a heading would imply it belongs to a family.
+   */
+  const options = useMemo(() => {
+    const entry = (t: ThemeEntry, group?: string) => ({
+      value: t.id,
+      label: t.label,
+      hint: t.hint,
+      ...(group ? { group } : {}),
+    });
+
+    const isBrand = (t: ThemeEntry) => t.id === "light" || t.id === "dark";
+
+    const light = THEMES.filter((t) => t.group === "light").map((t) => entry(t, "Light mode palettes"));
+
+    const dark = THEMES.filter((t) => t.group === undefined && !isBrand(t) && t.id !== "system").map((t) =>
+      entry(t, "Dark mode palettes"),
+    );
+
+    const brand = THEMES.filter(isBrand).map((t) => entry(t));
+
+    const system = THEMES.filter((t) => t.id === "system").map((t) => entry(t));
+
+    /*
+     * Every generated palette must land in exactly one section.
+     *
+     * The dark filter above is `group === undefined`, so a palette given a
+     * group this file does not handle would match neither it nor `light` and
+     * would vanish from the picker: a theme that exists, has a full CSS
+     * block, and cannot be selected. Nothing else would report that, because
+     * check-palettes only compares the registry against the stylesheet.
+     * Throwing is the point.
+     */
+    const grouped = new Set([...light, ...dark].map((o) => o.value));
+    const orphans = THEMES.filter((t) => !isBrand(t) && t.id !== "system" && !grouped.has(t.id));
+    if (orphans.length > 0) {
+      throw new Error(
+        `theme-picker: ${orphans.length} palette(s) are in no section and would be unselectable: ${orphans
+          .map((t) => t.id)
+          .join(", ")}. Add a group to them in palette-seeds.json and a section here.`,
+      );
+    }
+
+    return [...brand, ...light, ...dark, ...system];
+  }, []);
 
   function choose(id: string): void {
     const chosen = resolveTheme(id);
