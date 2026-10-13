@@ -65,11 +65,13 @@ console.log("\nan unrecognised value falls back rather than being applied");
  * migrated, a hand-edited row, a value from a newer build rolling back to
  * an older one. None of them may reach next-themes.
  *
- * "gruvbox" was one of these until it was added. It is deliberately NOT in
- * this list any more - asserting it was unknown would now be a test that
- * fails the moment someone implements it, which is the wrong way round.
+ * Note what is NOT here: "gruvbox" and "dracula" were both used as unknown
+ * values while they were still to be implemented. A test that asserts a real
+ * theme is unknown fails the moment someone adds it, which teaches the
+ * reader to distrust the suite. These are all ids no palette will plausibly
+ * claim.
  */
-for (const value of ["dracula", "midnight", "GRUVBOX", "gruvbox-dark", " light", "light ", "solarized-lagoon"]) {
+for (const value of ["no-such-theme", "midnight", "DRACULA", "gruvbox-dark", " light", "light ", "solarized-lagoon"]) {
   eq(`${JSON.stringify(value)} resolves to the default`, resolveTheme(value), DEFAULT_THEME);
   eq(`${JSON.stringify(value)} is not a theme`, isTheme(value), false);
 }
@@ -101,7 +103,7 @@ for (const key of ["toString", "constructor", "hasOwnProperty", "__proto__"]) {
 console.log("\nlabels are for display and degrade readably");
 eq("light", themeLabel("light"), "Light");
 eq("gruvbox", themeLabel("gruvbox"), "Gruvbox");
-eq("unknown value", themeLabel("dracula"), "Unknown");
+eq("unknown value", themeLabel("no-such-theme"), "Unknown");
 eq("null", themeLabel(null), "Unknown");
 
 console.log("\nadding a theme later is one entry, and the invariants still hold");
@@ -117,8 +119,8 @@ if (future.some((t) => t.id === "gruvbox")) ok("a new entry would be in the regi
 else bad("adding an entry did not register");
 eq("and still resolves", future.some((t) => t.id === "gruvbox"), true);
 console.log("\n  label and glyph degrade readably for a value that is gone");
-eq("a theme that was removed", themeLabel("dracula"), "Unknown");
-eq("glyph for a removed theme", typeof themeGlyph("dracula"), "string");
+eq("a theme that was removed", themeLabel("no-such-theme"), "Unknown");
+eq("glyph for a removed theme", typeof themeGlyph("no-such-theme"), "string");
 
 console.log("\nthe save rule, which was wrong the first time");
 /*
@@ -165,10 +167,26 @@ eq("not signed in", save(false, "light", "dark"), false);
 eq("not signed in, first choice", save(false, undefined, "dark"), false);
 
 console.log("\n  a value we cannot render is never written");
-eq("a theme that does not exist", save(true, "light", "dracula"), false);
+eq("a theme that does not exist", save(true, "light", "no-such-theme"), false);
 eq("null", save(true, "light", null), false);
 eq("undefined", save(true, "light", undefined), false);
 eq("not a string", save(true, "light", 7), false);
+
+console.log("\nevery generated palette is selectable and every seed reached the build");
+/*
+ * Thirty palettes, generated from one seeds file into both the CSS and the
+ * registry. The failure this guards against is a seed that produces a block
+ * but no registry entry, or the reverse - either way a theme is offered that
+ * does not render, or renders but cannot be picked, and neither throws.
+ */
+eq("registry size", THEMES.length, 33);
+eq("palettes plus light, dark and system", THEMES.length - 3, 30);
+const labels = new Set(THEMES.map((t) => t.label));
+eq("no duplicate labels", labels.size, THEMES.length);
+for (const expected of ["light", "dark", "system", "gruvbox", "dracula", "nord", "solarized", "catppuccin", "tokyo-night", "monokai", "one-dark", "everforest", "rose-pine", "night-owl", "kanagawa", "ayu", "zenburn", "iceberg", "oxocarbon", "edge", "sonokai", "nightfox", "oceanic-next", "material", "horizon", "poimandres", "cobalt2", "vesper", "shades-of-purple", "synthwave", "github", "jellybeans", "base16"]) {
+  if (isTheme(expected)) ok(`selectable: ${expected}`);
+  else bad(`MISSING from the registry: ${expected}`);
+}
 
 console.log("\nthe header toggle reaches every palette, including the new ones");
 /*

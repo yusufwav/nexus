@@ -31,7 +31,11 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = join(dirname(fileURLToPath(import.meta.url)), "..");
-const CSS = readFileSync(join(HERE, "src", "styles", "tokens.css"), "utf8");
+const CSS = [
+  readFileSync(join(HERE, "src", "styles", "tokens.css"), "utf8"),
+  readFileSync(join(HERE, "src", "styles", "palettes.generated.css"), "utf8"),
+].join("\n");
+const REGISTRY = readFileSync(join(HERE, "src", "lib", "themes.generated.ts"), "utf8");
 
 let failures = 0;
 const ok = (m) => console.log(`  ok   ${m}`);
@@ -87,10 +91,8 @@ console.log("\nevery palette block defines all of them");
  * "dark" is listed here even though it has no `.dark .nt-root` block, and
  * that is correct rather than an omission: dark IS the base palette, held in
  * a plain `.nt-root` block, so when next-themes puts class="dark" on <html>
- * neither the .light nor the .gruvbox rule matches and `.nt-root` answers.
- * Duplicating 72 values into a .dark block would mean two copies of one
- * palette to keep in step, and .dark .nt-root at specificity (0,2,0) would
- * also have to win against itself.
+ * no other rule matches and `.nt-root` answers. Duplicating 72 values into a
+ * .dark block would mean two copies of one palette to keep in step.
  *
  * The selector match is anchored to the start of a line so ".nt-root" cannot
  * match the tail of ".light .nt-root" - which is exactly the mistake an
@@ -102,8 +104,21 @@ console.log("\nevery palette block defines all of them");
 const paletteSelectors = [
   [".nt-root", "dark (base)"],
   [".light .nt-root", "light"],
-  [".gruvbox .nt-root", "gruvbox"],
 ];
+
+/* Every generated palette, found by scanning rather than by a hardcoded list,
+ * so a new seed cannot be added without being checked.
+ *
+ * "light" is excluded because it lives in tokens.css and is already listed
+ * above. Leaving it in scanned it twice and made the count wrong, which is
+ * the kind of wrong that makes a number stop being worth reading. */
+const generatedIds = [...CSS.matchAll(/^\.([a-z0-9-]+) \.nt-root \{/gm)]
+  .map((m) => m[1])
+  .filter((id) => id !== "light");
+for (const id of generatedIds) paletteSelectors.push([`.${id} .nt-root`, id]);
+
+console.log(`  ${generatedIds.length} generated palettes + light + the dark base`);
+if (generatedIds.length === 0) bad("no generated palette blocks found - is palettes.generated.css committed?");
 
 for (const [selector, name] of paletteSelectors) {
   const at = selectorAt(selector);
@@ -114,16 +129,16 @@ for (const [selector, name] of paletteSelectors) {
   const tokens = blockTokens(at);
 
   const missing = [...contract].filter((t) => !tokens.has(t));
-  // :root legitimately also defines the theme-invariant tokens, so "extra"
+  // The base legitimately also defines the theme-invariant tokens, so "extra"
   // is only a problem for the override blocks.
   const isBase = selector === ".nt-root";
   const extra = isBase ? [] : [...tokens].filter((t) => !contract.has(t));
 
   if (missing.length > 0) {
-    bad(`${name}: missing ${missing.length} token(s) - they will inherit from :root, which is tuned for #000:`);
+    bad(`${name}: missing ${missing.length} token(s) - they will inherit from the dark base, tuned for #000:`);
     for (const t of missing) console.log(`          ${t}`);
   } else {
-    ok(`${name.padEnd(12)} defines all ${contract.size}${isBase ? " (plus theme-invariant tokens)" : ""}`);
+    ok(`${name.padEnd(18)} defines all ${contract.size}${isBase ? " (plus theme-invariant tokens)" : ""}`);
   }
   if (extra.length > 0) {
     bad(`${name}: defines ${extra.length} token(s) the contract does not list: ${extra.join(", ")}`);
@@ -136,25 +151,32 @@ console.log("\nhex-only where the ASCII engine requires it");
  * an rgb() there renders as black - which reads as "the field is broken"
  * rather than "a token was written in the wrong notation".
  */
-for (const selector of [".gruvbox .nt-root"]) {
-  const at = selectorAt(selector);
+const HEX_TOKENS = ["--ascii-low", "--ascii-high", "--amb-low", "--amb-high"];
+let hexChecked = 0;
+for (const id of generatedIds) {
+  const at = selectorAt(`.${id} .nt-root`);
   if (at === -1) continue;
   const open = CSS.indexOf("{", at);
   const close = CSS.indexOf("}", open);
   const body = CSS.slice(open, close);
-  for (const token of ["--ascii-low", "--ascii-high", "--amb-low", "--amb-high"]) {
+  for (const token of HEX_TOKENS) {
     const m = new RegExp(`${token}\\s*:\\s*([^;]+);`).exec(body);
     if (!m) continue;
+    hexChecked++;
     const value = m[1].trim();
-    if (/^#[0-9a-f]{6}$/i.test(value)) ok(`${selector.split(" ")[0].slice(1)} ${token} is hex`);
-    else bad(`${selector.split(" ")[0].slice(1)} ${token} = ${value}, which the hex reader cannot parse`);
+    if (!/^#[0-9a-f]{6}$/i.test(value)) {
+      bad(`${id} ${token} = ${value}, which the hex reader cannot parse`);
+    }
   }
 }
+if (hexChecked > 0) ok(`${hexChecked} ramp tokens across ${generatedIds.length} palettes are hex`);
 
 console.log("\nevery theme in the registry has a stylesheet block");
-const themesSrc = readFileSync(join(HERE, "src", "lib", "themes.ts"), "utf8");
-const registryIds = [...themesSrc.matchAll(/\bid:\s*"([^"]+)"/g)].map((m) => m[1]);
-console.log(`  registry: ${registryIds.join(", ")}`);
+const registryIds = [...REGISTRY.matchAll(/\bid:\s*"([^"]+)"/g)].map((m) => m[1]);
+console.log(`  registry has ${registryIds.length} entries`);
+if (new Set(registryIds).size !== registryIds.length) {
+  bad("the registry contains duplicate ids");
+}
 for (const id of registryIds) {
   /*
    * "system" is an instruction, not a palette - it has no tokens of its own

@@ -71,8 +71,32 @@ export default function CenteredSelect(props: {
   warning?: string;
   /** Accessible name for the listbox when `label` is visual-only. */
   listLabel?: string;
+  /**
+   * Called with the highlighted option as the pointer or keyboard moves over
+   * it, and with null when the panel closes. Optional: without it the control
+   * behaves exactly as before, which is why the model picker and the feedback
+   * form are unaffected.
+   *
+   * Fires for KEYBOARD navigation too, not just hover. A preview that only
+   * worked with a mouse would be unusable for anyone driving the listbox with
+   * arrows - and it would be the only preview in the app that was.
+   *
+   * The caller is responsible for treating this as provisional: a preview must
+   * not be committed, because the reader may move on to the next option, or
+   * press Escape, or close the panel by clicking the scrim. See theme-preview.
+   */
+  onPreview?: (value: string | null) => void;
 }): React.JSX.Element {
-  const { label, value, onChange, options, disabled = false, warning, listLabel } = props;
+  const {
+    label,
+    value,
+    onChange,
+    options,
+    disabled = false,
+    warning,
+    listLabel,
+    onPreview,
+  } = props;
 
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -92,11 +116,16 @@ export default function CenteredSelect(props: {
   const close = useCallback(
     (returnFocus = true) => {
       setOpen(false);
+      // Drop any preview on the way out. Without this a cancelled selection
+      // would leave the page wearing the theme the reader merely looked at -
+      // and because the preview is never committed, reloading would be the
+      // only way back to what they actually chose.
+      onPreview?.(null);
       if (returnFocus) {
         triggerRef.current?.focus();
       }
     },
-    [],
+    [onPreview],
   );
 
   const choose = useCallback(
@@ -129,6 +158,21 @@ export default function CenteredSelect(props: {
     const el = panelRef.current?.querySelector<HTMLElement>(`#${CSS.escape(`${listId}-${active}`)}`);
     el?.scrollIntoView({ block: "nearest" });
   }, [open, active, listId]);
+
+  /*
+   * Preview follows the highlight, whether it moved by pointer or by key.
+   *
+   * Driven off `active` rather than off onMouseEnter so both routes are
+   * covered by one effect - the mouse handler below only sets `active`, so
+   * there is a single place where "what is being looked at" turns into a
+   * side effect.
+   */
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    onPreview?.(options[active]?.value ?? null);
+  }, [open, active, options, onPreview]);
 
   function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
     switch (e.key) {

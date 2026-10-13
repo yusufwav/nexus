@@ -28,41 +28,32 @@
  * HOW A THEME IS APPLIED
  *
  * `attribute="class"` on the ThemeProvider means next-themes writes the
- * theme name onto <html> as a class, and the palettes are defined in
- * styles/tokens.css against those class names. So adding a theme is two
- * things: an entry here, and a `.gruvbox { ... }` block of tokens there.
+ * theme name onto <html> as a class, and the palettes are defined against
+ * those class names. So adding a theme means adding a class.
+ *
+ * THE LIST IS GENERATED, NOT WRITTEN HERE
+ *
+ * THEMES comes from themes.generated.ts, which build-palettes.mjs emits from
+ * the same palette-seeds.json that produces palettes.generated.css.
+ *
+ * This file used to carry a hand-written array beside a hand-written
+ * stylesheet, which is two lists of one fact, and they did disagree: a theme
+ * present in one and absent from the other renders as a class nothing styles,
+ * or as a picker option that quietly does nothing. Neither is an error -
+ * check-palettes.mjs is what noticed, and only because it compares the two.
+ *
+ * Generating both makes that state unreachable. There is now one place to add
+ * a palette, and it cannot be half-done.
  *
  *   light / dark / system
- *     The two palettes that exist today. "system" is not a palette - it is
- *     an instruction to follow the OS, and it has no tokens of its own.
+ *     light is hand-written in tokens.css. dark is the base palette, held in
+ *     .nt-root, so it has no block of its own - duplicating 72 values would
+ *     mean two copies to keep in step. "system" is not a palette at all: it
+ *     is an instruction to follow the OS, and next-themes resolves it to
+ *     light or dark.
  */
-export const THEMES = [
-  {
-    id: "light",
-    label: "Light",
-    /** Shown in the dashboard. A word, not a swatch: both palettes are legible as text. */
-    hint: "Bright surfaces, dark text",
-    glyph: "☀",
-  },
-  {
-    id: "dark",
-    label: "Dark",
-    hint: "Dark surfaces, light text",
-    glyph: "☾",
-  },
-  {
-    id: "gruvbox",
-    label: "Gruvbox",
-    hint: "Warm, faded dark — the retro terminal palette",
-    glyph: "◍",
-  },
-  {
-    id: "system",
-    label: "Match system",
-    hint: "Follow your operating system's setting",
-    glyph: "⌘",
-  },
-] as const;
+import { GENERATED_THEMES } from "./themes.generated";
+export const THEMES = GENERATED_THEMES;
 
 export type ThemeId = (typeof THEMES)[number]["id"];
 

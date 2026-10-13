@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono, Playfair_Display } from "next/font/google";
 import "../index.css";
 // The design tokens come first so landing.css and app.css both read
 // the same variables off .nt-root regardless of bundle order.
+import "../styles/palettes.generated.css";
 import "../styles/tokens.css";
 import "../styles/app.css";
 import Providers from "@/components/providers";
