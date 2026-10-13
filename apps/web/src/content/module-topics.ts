@@ -63,7 +63,24 @@ export const MODULE_TOPICS: Readonly<Record<string, ReadonlyArray<ModuleTopic>>>
       title: "Limits and continuity",
       description:
         "Approach rather than substitution, one-sided limits, and why a limit can exist at a point the function is not defined at.",
-      pdf: null,
+      /*
+       * Set, where every other entry in this file still has pdf: null.
+       *
+       * These two topics are the only ones with a written PDF, so the rest
+       * genuinely have nothing to serve and null is the honest value - the
+       * route turns null into a 404 rather than offering a download button
+       * for a file that does not exist.
+       *
+       * The path is developer-set here on purpose, and NOT read from
+       * note_topics.source_path. That column is classified internal by
+       * test-no-internal-leak.mjs: a filename handed to a model can be asked
+       * for back and will answer, so it must never be selected into
+       * application code. Keeping the mapping in this file means the path
+       * that reaches the filesystem is a literal in the repository, which is
+       * reviewable, and the storage layer still refuses anything that is
+       * not under topics/.
+       */
+      pdf: "/topics/matt101-sample.pdf",
       pages: 14,
     },
     {
