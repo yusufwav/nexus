@@ -67,6 +67,10 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
       "--ascii-cursor-radius", "--ascii-cursor-power",
       "--amb-ramp", "--amb-font", "--amb-fps", "--amb-op", "--amb-scale",
       "--amb-low", "--amb-high", "--amb-speed",
+      // Read for the landing boost below: the ramp endpoints are pulled toward
+      // the page's own background and foreground, which is what widens the
+      // contrast, and neither is derivable from the ramp alone.
+      "--bg-0", "--fg",
     ]);
 
     const P = interactive ? "ascii" : "amb";
@@ -74,7 +78,7 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
     const cell = Number.parseFloat(t[`${P}-font`]) || 13;
     const fps = Number.parseFloat(t[`${P}-fps`]) || 24;
     const speed = Number.parseFloat(t[`${P}-speed`]) || 1;
-    const op = Number.parseFloat(t[`${P}-op`]);
+    let op = Number.parseFloat(t[`${P}-op`]);
     const cursorRadius = Number.parseFloat(t["ascii-cursor-radius"]) || 10;
     const cursorPower = Number.parseFloat(t["ascii-cursor-power"]) || 1;
 
@@ -86,8 +90,54 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
       scale = 1;
     }
 
-    const low = hexToRgb(t[`${P}-low`]);
-    const high = hexToRgb(t[`${P}-high`]);
+    let low = hexToRgb(t[`${P}-low`]);
+    let high = hexToRgb(t[`${P}-high`]);
+
+    /*
+     * THE HOMEPAGE FIELD, MADE STRIKING
+     * ------------------------------------------------------------
+     * The field was tuned to be atmosphere: --ascii-op is 0.55 in every
+     * palette and the ramp runs from a barely-there low to a muted high.
+     * Behind the landing copy that reads as texture. On its own, filling the
+     * hero, it reads as a nearly blank rectangle - hard to see on the dark
+     * base and almost invisible on light, where a dark-on-dark ramp at 0.55
+     * loses most of what little contrast it had.
+     *
+     * Three changes, all relative to the palette's own tokens so this stays
+     * correct across all thirty-three of them and does not hard-code a colour
+     * that only works on the base:
+     *
+     *   opacity  raised
+     *     The cheapest win, and the one the eye notices first.
+     *
+     *   low  pulled toward the page background
+     *     Darkens the dim end of the ramp, so the glyphs separate from the
+     *     page instead of sitting inside it. On light this is what stops the
+     *     field reading as grey mud.
+     *
+     *   high  pulled toward the page foreground
+     *     Brightens the lit end, which widens the ramp rather than just
+     *     making the whole thing uniformly stronger. A field with more range
+     *     has shape; the same field turned up looks like a filter.
+     *
+     * SCOPED TO variant="landing"
+     * ------------------------------------------------------------
+     * Only the homepage. The ambient layer behind the tutor and the dashboard
+     * is meant to be unobtrusive - it sits behind a whole working interface -
+     * and boosting it would compete with the content rather than frame it.
+     *
+     * Not done in CSS, deliberately: this engine reads its tokens off
+     * .nt-root through getComputedStyle, so a class on the homepage wrapper
+     * would never reach it. The component already knows which variant it is,
+     * so that is where the decision belongs.
+     */
+    if (variant === "landing") {
+      const bg = hexToRgb(t["bg-0"]);
+      const fg = hexToRgb(t["fg"]);
+      low = mixRgb(low, bg, 0.4);
+      high = mixRgb(high, fg, 0.32);
+      op = Math.min(1, (Number.isNaN(op) ? 0.55 : op) * 1.5);
+    }
 
     canvas.style.opacity = String(Number.isNaN(op) ? 1 : op);
 
@@ -413,6 +463,19 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
       className={variant === "landing" ? "nt-landing__ascii" : "nt-ambient-bg"}
     />
   );
+}
+
+/** Linear blend between two RGB triples: t=0 returns a, t=1 returns b. */
+function mixRgb(
+  a: [number, number, number],
+  b: [number, number, number],
+  t: number,
+): [number, number, number] {
+  return [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+  ];
 }
 
 function hexToRgb(hex: string | undefined): [number, number, number] {

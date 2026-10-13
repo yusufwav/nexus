@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
 import { isTheme, shouldSaveTheme } from "@/lib/themes";
-import { isPreviewing } from "@/lib/theme-preview";
 
 /**
  * THEME FOLLOWS THE ACCOUNT
@@ -97,14 +96,6 @@ export function ThemeSync(): null {
   /* -- save: only on a change the reader made ----------------------------- */
   useEffect(() => {
     if (!ready || !restored.current) return;
-
-    /*
-     * A preview repaints the page but is not a choice. Without this, sweeping
-     * the pointer down the palette list would save every theme it passed
-     * over - thirty writes, and whichever was hovered last would become the
-     * reader's saved theme. See lib/theme-preview.ts.
-     */
-    if (isPreviewing()) return;
 
     const chosen = isTheme(theme) ? theme : null;
 

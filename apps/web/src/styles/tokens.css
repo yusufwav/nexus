@@ -99,6 +99,13 @@
      toggle, not an icon button, and making it square would misrepresent
      what it does. Icon buttons only. */
   --nt-icon-btn: 2.25rem;
+  /* Height of a control in a toolbar that mixes square icon buttons with
+     wider text buttons. A separate token from --nt-icon-btn because the two
+     answers are different questions: that one is "how big is an icon-only
+     button", this one is "how tall is every control in this row". The
+     dashboard toolbar needs both to agree or its buttons have different top
+     edges - see the note on .nt-dash__id-row in app.css. */
+  --nt-ctl-h: 2.75rem;
 
   --r-sm: 6px;
   --r-md: 10px;

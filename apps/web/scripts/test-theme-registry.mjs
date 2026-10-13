@@ -25,6 +25,7 @@
 import {
   DEFAULT_THEME,
   THEMES,
+  headerThemes,
   isTheme,
   nextTheme,
   resolveTheme,
@@ -188,38 +189,54 @@ for (const expected of ["light", "dark", "system", "gruvbox", "dracula", "nord",
   else bad(`MISSING from the registry: ${expected}`);
 }
 
-console.log("\nthe header toggle reaches every palette, including the new ones");
+console.log("\nthe header toggle offers three states, not thirty-three");
 /*
- * The cycle was a hardcoded three-entry map (system -> light -> dark ->
- * system). Adding a fourth theme would not have thrown - the button would
- * simply have cyclled those three forever, so a palette added to the picker
- * would have been unreachable from the header. That reads as "the toggle is
- * broken", not "the toggle was hardcoded", which is why the cycle is now
- * derived from THEMES and asserted against THEMES.
+ * It used to cycle every palette in the registry. With thirty-three themes
+ * that put thirty-one clicks between light and dark - the journey almost
+ * everyone actually takes - and the button is on every page, so it has to be
+ * usable by feel without looking at it.
+ *
+ * So the cycle is light, dark, and the reader's own theme, collapsing to two
+ * when that theme is already one of the pair.
+ */
+eq("never chose anything", headerThemes(undefined).join(","), "light,dark");
+eq("never chose, null", headerThemes(null).join(","), "light,dark");
+eq("chose light (already in the pair)", headerThemes("light").join(","), "light,dark");
+eq("chose dark (already in the pair)", headerThemes("dark").join(","), "light,dark");
+eq("chose a palette", headerThemes("night-owl").join(","), "light,dark,night-owl");
+eq("chose gruvbox", headerThemes("gruvbox").join(","), "light,dark,gruvbox");
+eq("a value naming no theme", headerThemes("no-such-theme").join(","), "light,dark");
+
+console.log("\n  and the cycle walks that set and wraps");
+eq("light -> dark", nextTheme("light", undefined), "dark");
+eq("dark -> light (nothing chosen)", nextTheme("dark", undefined), "light");
+eq("dark -> reader theme", nextTheme("dark", "night-owl"), "night-owl");
+eq("reader theme -> light", nextTheme("night-owl", "night-owl"), "light");
+eq("light -> dark", nextTheme("light", "night-owl"), "dark");
+eq("a reader theme reached from dark, three states", headerThemes("night-owl").length, 3);
+
+console.log("\n  an unknown current value still lands somewhere real");
+/*
+ * An unrecognised current is treated as "not in the list", which indexes to 0
+ * - light, the site default. Deliberately the same as an undefined current:
+ * a stored theme naming nothing real should not leave the button cycling from
+ * somewhere arbitrary.
+ */
+eq("unknown current", nextTheme("no-such-theme", undefined), "light");
+eq("undefined current", nextTheme(undefined, undefined), "light");
+eq("null current", nextTheme(null, undefined), "light");
+
+console.log("\n  every registered palette is still REACHABLE - just not from the header");
+/*
+ * The header being narrowed must not mean the picker is. All thirty-three
+ * have to remain selectable somewhere, or the whole feature is decoration.
  */
 const ids = THEMES.map((t) => t.id);
-console.log(`  order: ${ids.join(" -> ")}`);
-
-// Walk the whole cycle and prove it visits every theme exactly once before
-// returning to where it started.
-const walked = [];
-let at = ids[0];
-for (let i = 0; i < ids.length; i++) {
-  walked.push(at);
-  at = nextTheme(at);
-}
-eq("visits every theme", walked.length, ids.length);
-eq("and returns to the start", at, ids[0]);
+eq("registry is intact", ids.length, 33);
 for (const id of ids) {
-  if (walked.includes(id)) ok(`reachable from the toggle: ${id}`);
-  else bad(`unreachable from the toggle: ${id}`);
+  if (isTheme(id)) ok(`selectable in the picker: ${id}`);
+  else bad(`NOT selectable: ${id}`);
 }
-eq("no theme visited twice", new Set(walked).size, ids.length);
-
-console.log("\n  cycling from an unknown value still lands somewhere real");
-eq("unknown", nextTheme("gruvbox-dark"), DEFAULT_THEME);
-eq("undefined", nextTheme(undefined), DEFAULT_THEME);
-eq("null", nextTheme(null), DEFAULT_THEME);
 
 console.log("\n  every theme carries a glyph, so the toggle always has one");
 for (const t of THEMES) {

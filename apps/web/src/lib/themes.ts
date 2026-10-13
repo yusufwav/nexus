@@ -100,19 +100,42 @@ export function themeGlyph(value: unknown): string {
 }
 
 /**
- * The next theme after this one, wrapping at the end.
+ * What the small header button should offer.
  *
- * Derived from THEMES rather than written out, because the previous version
- * was a hardcoded three-entry map (system -> light -> dark -> system) and it
- * silently became wrong the moment a fourth palette existed: the header
- * button would have cycled light, dark, system forever and Gruvbox would
- * have been reachable only from the dashboard. That is the kind of bug that
- * looks like "the picker doesn't work" rather than "the toggle was
- * hardcoded", so the cycle is now generated from the same list the picker
- * renders.
+ * Not every theme. The header button is a three-state convenience: light,
+ * dark, and whatever the reader chose for themselves. It is on every page, so
+ * it has to stay a thing you can cycle through by feel without looking.
+ *
+ * With thirty-three palettes in the registry, cycling all of them would make
+ * the button nearly unusable - and worse, it would make the common case
+ * (going from light to dark for a quick look) take thirty clicks. The full
+ * list lives in Settings, where it is a deliberate act.
+ *
+ * So the header offers exactly three, and collapses to two when the reader's
+ * own theme is already one of them:
+ *
+ *   reader has never chosen      light, dark
+ *   reader chose "light"         light, dark            (nothing to add)
+ *   reader chose "night-owl"     light, dark, night-owl
+ *
+ * Returns the pair plus the reader's theme when that theme is a real palette
+ * and not already one of the two. The order is fixed so the button behaves
+ * the same on every page and for every reader.
  */
-export function nextTheme(current: unknown): ThemeId {
-  const ids = THEMES.map((t) => t.id);
+export function headerThemes(saved: unknown): ThemeId[] {
+  const base: ThemeId[] = ["light", "dark"];
+  if (isTheme(saved) && !base.includes(saved)) return [...base, saved];
+  return base;
+}
+
+/**
+ * The next theme in the header cycle.
+ *
+ * Takes the reader's saved theme rather than the whole registry, so the cycle
+ * is the three (or two) options above. Wraps at the end.
+ */
+export function nextTheme(current: unknown, saved?: unknown): ThemeId {
+  const ids = headerThemes(saved);
   const at = isTheme(current) ? ids.indexOf(current) : -1;
   return ids[(at + 1) % ids.length];
 }

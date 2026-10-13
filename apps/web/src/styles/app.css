@@ -2190,23 +2190,33 @@
   height: var(--nt-icon-btn);
   flex: 0 0 auto;
   padding: 0;
-  border: 1px solid var(--line);
+  /* The same surface as .nt-btn, so this control is not the odd one out in a
+     toolbar of its siblings. It was `background: transparent` behind a plain
+     border, which let the ASCII field show straight through it and read as a
+     dashed box rather than a button — you could see it had been built
+     separately from the five controls beside it. */
+  border: 1px solid var(--glass-edge);
   border-radius: var(--r-sm);
-  background: transparent;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  box-shadow: inset 0 1px 0 0 var(--glass-sheen);
   color: var(--fg-muted);
   font-family: var(--nt-font-mono);
   font-size: 0.95rem;
   line-height: 1;
   cursor: pointer;
   transition:
-    color var(--dur-fast) var(--ease-out),
-    border-color var(--dur-fast) var(--ease-out),
-    background-color var(--dur-fast) var(--ease-out);
+    color var(--dur-hover) var(--ease-out),
+    border-color var(--dur-hover) var(--ease-out),
+    background-color var(--dur-hover) var(--ease-out),
+    -webkit-backdrop-filter var(--dur-hover) var(--ease-out),
+    backdrop-filter var(--dur-hover) var(--ease-out);
 }
 .nt-theme-btn:hover {
   color: var(--accent-b);
   border-color: var(--accent-line);
-  background: var(--hover-fill);
+  background: var(--glass-bg-hover);
 }
 .nt-theme-btn:focus-visible {
   outline: 2px solid var(--accent-b);
@@ -3038,8 +3048,64 @@
   }
 }
 @media (min-width: 641px) {
+  /*
+   * THE DESKTOP TOOLBAR, AND WHY IT WAS RAGGED
+   * ------------------------------------------------------------
+   * Below 640px this row is hidden in favour of a floating menu, because
+   * five controls in one line is ragged on a phone. Above 640px it comes
+   * back - and it was still ragged, for a different reason nobody had looked
+   * at.
+   *
+   * The row is six controls of two different kinds:
+   *
+   *   three square icon links, the theme toggle
+   *     sized with width AND height: var(--nt-icon-btn) - 2.25rem, fixed
+   *
+   *   browse modules, sign out
+   *     plain .nt-btn, with no height at all; their height falls out of
+   *     padding (--sp-3) plus the line box, which is nearer 3rem
+   *
+   * A flex row defaults to align-items: stretch, so the two text buttons
+   * stretched to the tallest item in the row while the squares could not -
+   * they have a height. The result was 36px boxes sitting beside 55px ones
+   * with their centres aligned, so every control had a different top edge.
+   *
+   * On a page whose whole design language is a terminal, a toolbar that does
+   * not line up on its own baseline reads as a mistake rather than a choice.
+   *
+   * THE FIX
+   * ------------------------------------------------------------
+   * One height for the row, from one token, and centre alignment rather than
+   * stretch. --nt-ctl-h is a little taller than --nt-icon-btn so the squares
+   * gain breathing room and the text buttons keep their padding without
+   * overflowing it.
+   *
+   * Scoped to .nt-dash__id-row rather than to .nt-btn, because .nt-btn is the
+   * landing page's button too and there it is deliberately sized by its
+   * content. Changing it globally would restyle the hero.
+   */
   .nt-dash__id-row {
     display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+  .nt-dash__id-row .nt-btn--icon,
+  .nt-dash__id-row .nt-theme-btn {
+    width: var(--nt-ctl-h);
+    height: var(--nt-ctl-h);
+    flex: 0 0 auto;
+  }
+  /*
+   * A floor rather than a fixed height, so a longer label wraps instead of
+   * being clipped, with padding-block reduced from --sp-3 to --sp-2 to keep
+   * the natural height under the floor.
+   */
+  .nt-dash__id-row .nt-btn:not(.nt-btn--icon) {
+    min-height: var(--nt-ctl-h);
+    padding-top: var(--sp-2);
+    padding-bottom: var(--sp-2);
+    display: inline-flex;
+    align-items: center;
   }
 }
 
@@ -3409,92 +3475,3 @@
   }
 }
 
-/* ---- Appearance: theme picker ------------------------------------------------
- *
- * A radio group, not a switch. The placeholder it replaced was an on/off
- * "Light theme" toggle, which cannot express "follow my OS" and would have
- * needed a second toggle per palette. More themes are coming, so the shape
- * that survives them is the one that grows by adding an option.
- *
- * Sized with the same tokens as everything else here rather than fixed
- * rems - see the note in settings-controls.tsx about inline styles being
- * unreachable by a media query, and about a fixed-width input leaving the
- * label column one word wide on a phone.
- * ---------------------------------------------------------------------------- */
-.nt-root .nt-theme-picker {
-  border: 0;
-  padding: 0;
-  margin: 0;
-}
-.nt-root .nt-theme-picker__legend {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: var(--sp-3);
-  padding: 0 0 var(--sp-3);
-  font-weight: 600;
-  color: var(--fg);
-}
-.nt-root .nt-theme-picker__note {
-  font-weight: 400;
-  color: var(--fg-dim);
-}
-.nt-root .nt-theme-picker__options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
-  gap: var(--sp-3);
-}
-.nt-root .nt-theme-picker__opt {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  min-width: 0;
-  text-align: left;
-  padding: var(--sp-4);
-  background: var(--surface-raised);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md, 10px);
-  color: var(--fg-muted);
-  cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
-}
-.nt-root .nt-theme-picker__opt:hover {
-  border-color: var(--accent-line);
-  color: var(--fg);
-}
-/* The selected state is carried by border AND background, not colour alone,
- * so it is still distinguishable without colour perception. */
-.nt-root .nt-theme-picker__opt[data-active] {
-  border-color: var(--accent-a);
-  background: var(--accent-soft);
-  color: var(--fg);
-}
-.nt-root .nt-theme-picker__opt:focus-visible {
-  outline: 2px solid var(--accent-b);
-  outline-offset: 2px;
-}
-.nt-root .nt-theme-picker__label {
-  font-weight: 600;
-  color: inherit;
-}
-.nt-root .nt-theme-picker__hint {
-  font-size: 0.82em;
-  color: var(--fg-dim);
-  overflow-wrap: anywhere;
-}
-.nt-root .nt-theme-picker__status {
-  margin: var(--sp-3) 0 0;
-  font-size: 0.82em;
-  color: var(--fg-dim);
-  min-height: 1.2em;
-}
-/* A polite live region: this text changes after a round trip to save, and a
- * screen reader should hear it without being interrupted mid-sentence. */
-.nt-root .nt-theme-picker__status:empty {
-  margin: 0;
-}
-@media (prefers-reduced-motion: reduce) {
-  .nt-root .nt-theme-picker__opt {
-    transition: none;
-  }
-}
