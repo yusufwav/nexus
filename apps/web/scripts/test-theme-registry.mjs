@@ -26,8 +26,10 @@ import {
   DEFAULT_THEME,
   THEMES,
   isTheme,
+  nextTheme,
   resolveTheme,
   shouldSaveTheme,
+  themeGlyph,
   themeLabel,
 } from "../src/lib/themes.ts";
 
@@ -50,11 +52,11 @@ if (!THEMES.some((t) => t.id === DEFAULT_THEME)) {
   ok("the default is also a selectable option");
 }
 
-console.log("\nlight, dark and system are all real, selectable choices");
-eq("option count", THEMES.length, 3);
-for (const id of ["light", "dark", "system"]) {
-  eq(`${id} is a theme`, isTheme(id), true);
-  eq(`${id} resolves to itself`, resolveTheme(id), id);
+console.log("\nevery registered theme is a real, selectable choice");
+for (const t of THEMES) {
+  eq(`${t.id} is a theme`, isTheme(t.id), true);
+  eq(`${t.id} resolves to itself`, resolveTheme(t.id), t.id);
+  eq(`${t.id} has a label`, typeof t.label === "string" && t.label.length > 0, true);
 }
 
 console.log("\nan unrecognised value falls back rather than being applied");
@@ -62,8 +64,12 @@ console.log("\nan unrecognised value falls back rather than being applied");
  * These are the values that actually turn up: a theme renamed and not
  * migrated, a hand-edited row, a value from a newer build rolling back to
  * an older one. None of them may reach next-themes.
+ *
+ * "gruvbox" was one of these until it was added. It is deliberately NOT in
+ * this list any more - asserting it was unknown would now be a test that
+ * fails the moment someone implements it, which is the wrong way round.
  */
-for (const value of ["gruvbox", "dracula", "midnight", "GRUVBOX", " light", "light ", "solarized-lagoon"]) {
+for (const value of ["dracula", "midnight", "GRUVBOX", "gruvbox-dark", " light", "light ", "solarized-lagoon"]) {
   eq(`${JSON.stringify(value)} resolves to the default`, resolveTheme(value), DEFAULT_THEME);
   eq(`${JSON.stringify(value)} is not a theme`, isTheme(value), false);
 }
@@ -94,7 +100,8 @@ for (const key of ["toString", "constructor", "hasOwnProperty", "__proto__"]) {
 
 console.log("\nlabels are for display and degrade readably");
 eq("light", themeLabel("light"), "Light");
-eq("unknown value", themeLabel("gruvbox"), "Unknown");
+eq("gruvbox", themeLabel("gruvbox"), "Gruvbox");
+eq("unknown value", themeLabel("dracula"), "Unknown");
 eq("null", themeLabel(null), "Unknown");
 
 console.log("\nadding a theme later is one entry, and the invariants still hold");
@@ -109,7 +116,9 @@ const future = [...THEMES, { id: "gruvbox", label: "Gruvbox", hint: "Warm retro"
 if (future.some((t) => t.id === "gruvbox")) ok("a new entry would be in the registry");
 else bad("adding an entry did not register");
 eq("and still resolves", future.some((t) => t.id === "gruvbox"), true);
-console.log("  (a real theme would also need a matching token block in styles/tokens.css)");
+console.log("\n  label and glyph degrade readably for a value that is gone");
+eq("a theme that was removed", themeLabel("dracula"), "Unknown");
+eq("glyph for a removed theme", typeof themeGlyph("dracula"), "string");
 
 console.log("\nthe save rule, which was wrong the first time");
 /*
@@ -156,10 +165,49 @@ eq("not signed in", save(false, "light", "dark"), false);
 eq("not signed in, first choice", save(false, undefined, "dark"), false);
 
 console.log("\n  a value we cannot render is never written");
-eq("unknown theme", save(true, "light", "gruvbox"), false);
+eq("a theme that does not exist", save(true, "light", "dracula"), false);
 eq("null", save(true, "light", null), false);
 eq("undefined", save(true, "light", undefined), false);
 eq("not a string", save(true, "light", 7), false);
+
+console.log("\nthe header toggle reaches every palette, including the new ones");
+/*
+ * The cycle was a hardcoded three-entry map (system -> light -> dark ->
+ * system). Adding a fourth theme would not have thrown - the button would
+ * simply have cyclled those three forever, so a palette added to the picker
+ * would have been unreachable from the header. That reads as "the toggle is
+ * broken", not "the toggle was hardcoded", which is why the cycle is now
+ * derived from THEMES and asserted against THEMES.
+ */
+const ids = THEMES.map((t) => t.id);
+console.log(`  order: ${ids.join(" -> ")}`);
+
+// Walk the whole cycle and prove it visits every theme exactly once before
+// returning to where it started.
+const walked = [];
+let at = ids[0];
+for (let i = 0; i < ids.length; i++) {
+  walked.push(at);
+  at = nextTheme(at);
+}
+eq("visits every theme", walked.length, ids.length);
+eq("and returns to the start", at, ids[0]);
+for (const id of ids) {
+  if (walked.includes(id)) ok(`reachable from the toggle: ${id}`);
+  else bad(`unreachable from the toggle: ${id}`);
+}
+eq("no theme visited twice", new Set(walked).size, ids.length);
+
+console.log("\n  cycling from an unknown value still lands somewhere real");
+eq("unknown", nextTheme("gruvbox-dark"), DEFAULT_THEME);
+eq("undefined", nextTheme(undefined), DEFAULT_THEME);
+eq("null", nextTheme(null), DEFAULT_THEME);
+
+console.log("\n  every theme carries a glyph, so the toggle always has one");
+for (const t of THEMES) {
+  eq(`${t.id} has a glyph`, typeof t.glyph === "string" && t.glyph.length > 0, true);
+}
+eq("unknown value falls back to a glyph", typeof themeGlyph("nope"), "string");
 
 console.log(
   failures === 0

@@ -42,16 +42,25 @@ export const THEMES = [
     label: "Light",
     /** Shown in the dashboard. A word, not a swatch: both palettes are legible as text. */
     hint: "Bright surfaces, dark text",
+    glyph: "☀",
   },
   {
     id: "dark",
     label: "Dark",
     hint: "Dark surfaces, light text",
+    glyph: "☾",
+  },
+  {
+    id: "gruvbox",
+    label: "Gruvbox",
+    hint: "Warm, faded dark — the retro terminal palette",
+    glyph: "◍",
   },
   {
     id: "system",
     label: "Match system",
     hint: "Follow your operating system's setting",
+    glyph: "⌘",
   },
 ] as const;
 
@@ -91,6 +100,30 @@ export function resolveTheme(value: unknown): ThemeId {
 export function themeLabel(value: unknown): string {
   if (!isTheme(value)) return "Unknown";
   return THEMES.find((t) => t.id === value)?.label ?? "Unknown";
+}
+
+/** Glyph for a value, for the header toggle. Unknown values get the default's. */
+export function themeGlyph(value: unknown): string {
+  if (!isTheme(value)) return THEMES.find((t) => t.id === DEFAULT_THEME)?.glyph ?? "☀";
+  return THEMES.find((t) => t.id === value)?.glyph ?? "☀";
+}
+
+/**
+ * The next theme after this one, wrapping at the end.
+ *
+ * Derived from THEMES rather than written out, because the previous version
+ * was a hardcoded three-entry map (system -> light -> dark -> system) and it
+ * silently became wrong the moment a fourth palette existed: the header
+ * button would have cycled light, dark, system forever and Gruvbox would
+ * have been reachable only from the dashboard. That is the kind of bug that
+ * looks like "the picker doesn't work" rather than "the toggle was
+ * hardcoded", so the cycle is now generated from the same list the picker
+ * renders.
+ */
+export function nextTheme(current: unknown): ThemeId {
+  const ids = THEMES.map((t) => t.id);
+  const at = isTheme(current) ? ids.indexOf(current) : -1;
+  return ids[(at + 1) % ids.length];
 }
 
 /**
