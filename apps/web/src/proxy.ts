@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
- * AUTH MIDDLEWARE
+ * AUTH PROXY
  * ------------------------------------------------------------
- * There was no middleware at all, so every protected page opted in
+ * There was no proxy at all, so every protected page opted in
  * individually by calling requireSession(). That is a convention, not
  * a boundary: the /ai page forgot, and shipped a whole chat UI to
  * anonymous visitors. The next page would forget too.
@@ -13,13 +13,21 @@ import { NextResponse, type NextRequest } from "next/server";
  * covered the moment it exists, without anyone remembering to opt in.
  *
  * WHAT THIS IS NOT: an authorisation check. It does not validate the
- * session token — it only looks for a cookie's presence, because
- * verifying one properly means hitting the database, which the edge
- * runtime cannot do. So a forged cookie gets past here and is then
- * correctly rejected by requireSession()/getSession() further in. The
- * page-level gates are still what enforce access; this only ensures a
- * request carrying no session never reaches them, and never renders a
- * protected shell on the way to being redirected.
+ * session token - it only looks for a cookie's presence, because
+ * verifying one properly means hitting the database, and doing that on
+ * every request would make this the slowest thing in the request path.
+ * So a forged cookie gets past here and is then correctly rejected by
+ * requireSession()/getSession() further in. The page-level gates are
+ * still what enforce access; this only ensures a request carrying no
+ * session never reaches them, and never renders a protected shell on the
+ * way to being redirected.
+ *
+ * WHY PROXY AND NOT MIDDLEWARE: Next 16 renamed the convention, and proxy
+ * defaults to the Node.js runtime. Middleware defaulted to edge, which
+ * Vercel's `services` layout cannot deploy ("Edge Runtime is not
+ * supported in services"). Node is the better runtime here regardless -
+ * this only reads cookies and redirects, so there is nothing edge buys it,
+ * and there is no edge cold start to pay for.
  */
 
 const PREFIXES = ["/dashboard", "/ai"] as const;
@@ -28,7 +36,7 @@ function isProtected(pathname: string): boolean {
   return PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-export function middleware(req: NextRequest): NextResponse {
+export function proxy(req: NextRequest): NextResponse {
   const { pathname, search } = req.nextUrl;
 
   // Never intercept the auth endpoints themselves — the sign-in flow
