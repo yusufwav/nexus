@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { createAuth } from "@Main/auth";
+import { createAuth, normalizeOrigin } from "@Main/auth";
 import { createDb } from "@Main/db";
 
 import { ENV } from "./env.server";
@@ -104,8 +104,32 @@ const secretStatus = providerKeysConfigured();
  * the same from the outside. It means the platform variables this computes
  * from were absent, and every origin is rejected rather than the right one.
  */
+/*
+ * The value itself is deliberately NOT printed. varlock marks BETTER_AUTH_URL
+ * sensitive, so the platform redacts it in logs and the line reads
+ * "ht<redacted>" - which told nobody anything. The comparison below is not
+ * marked sensitive, is the actionable half, and is what actually located this:
+ * the trusted origin, the production domain and the deployment URL were three
+ * different-looking things and only one of them was right.
+ */
+const trusted = normalizeOrigin(ENV.BETTER_AUTH_URL);
+const productionDomain = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+const matchesProduction =
+  trusted.length > 0 &&
+  productionDomain !== undefined &&
+  trusted === normalizeOrigin(productionDomain);
+
 console.log(
-  `[boot] base URL: ${JSON.stringify(ENV.BETTER_AUTH_URL || "<empty>")}  (production domain: ${JSON.stringify(process.env.VERCEL_PROJECT_PRODUCTION_URL || "<unset>")}, deployment: ${JSON.stringify(process.env.VERCEL_URL || "<unset>")}, VERCEL_ENV: ${JSON.stringify(process.env.VERCEL_ENV || "<unset>")})`,
+  [
+    `[boot] trusted origin matches the production domain: ${matchesProduction}`,
+    `       deployment URL: ${process.env.VERCEL_URL ?? "<unset>"}`,
+    `       VERCEL_ENV:     ${process.env.VERCEL_ENV ?? "<unset>"}`,
+    matchesProduction
+      ? ""
+      : "       -> sign-in will be refused with 403 INVALID_ORIGIN on every request.",
+  ]
+    .filter((l) => l !== "")
+    .join("\n"),
 );
 
 if (!secretStatus.ok) {
