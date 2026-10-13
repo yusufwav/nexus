@@ -29,6 +29,18 @@ export const auth = createAuth(ENV, db);
  *
  * Not attempted in production, where there is no .env to read and the only
  * real answer is a redeploy.
+ *
+ * THE ACTUAL FAILURE, so this is not guesswork. varlock injects its
+ * resolved values into process.env at startup, and on hot-reload it first
+ * DELETES every key it injected and restores its pre-injection snapshot.
+ * Its reload fails on this machine on every dev start (a libuv assertion
+ * in async.c), so a process that started before the secret was added ends
+ * up with a process.env missing every schema-backed variable — while
+ * still serving pages, answering requests, and looking entirely healthy.
+ *
+ * That is the case this distinguishes: the secret is in .env, the process
+ * cannot see it, and the fix is a restart. Reading .env is the only way
+ * to tell that apart from "nobody has configured this yet".
  */
 function secretIsInDotEnv(): boolean {
   if (process.env.NODE_ENV === "production") return false;
@@ -48,6 +60,7 @@ function secretIsInDotEnv(): boolean {
   for (const file of candidates) {
     try {
       const contents = readFileSync(file, "utf8");
+      // Matched only when commented out? Then it is not configured.
       if (/^PROVIDER_KEYS_SECRET=.+$/m.test(contents)) return true;
     } catch {
       /* not here; try the next candidate */
@@ -71,23 +84,23 @@ function secretIsInDotEnv(): boolean {
  */
 const secretStatus = providerKeysConfigured();
 if (!secretStatus.ok) {
-  const stale = secretIsInDotEnv();
+  const inDotEnv = secretIsInDotEnv();
   console.warn(
     [
       "",
       "  BYOK is OFF: reader-supplied model keys cannot be stored.",
       `  ${secretStatus.detail}`,
-      ...(stale
+      ...(inDotEnv
         ? [
             "",
-            "  -> PROVIDER_KEYS_SECRET IS in apps/web/.env but this process",
-            "     cannot see it, which means the server started before it was",
-            "     added. Restart the dev server.",
+            "  -> The secret IS in .env but this process cannot see it, so the",
+            "     server started before it was added. RESTART THE DEV SERVER —",
+            "     nothing else will fix it.",
           ]
         : []),
       "  The tutor still works and answers with the server's model.",
-      "  Until this is set, /api/keys returns an error and every reader is",
-      "  served by GOOGLE_GENERATIVE_AI_API_KEY rather than their own.",
+      "  Until this is set, /api/keys returns 503 and every reader is served",
+      "  by GOOGLE_GENERATIVE_AI_API_KEY rather than their own.",
       "",
     ].join("\n"),
   );

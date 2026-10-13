@@ -20,11 +20,16 @@
  *   deliberately NOT enabled
  *     modules         the catalogue is meant to be readable. Gating it
  *                     would break the public pages for no gain.
- *     rateLimit,
  *     user, session, account, verification
- *                     Better Auth owns these and already ships RLS on
- *                     them. Writing policies here would fight its CLI
- *                     regeneration on every `auth:generate`.
+ *                     RLS DISABLED here, deliberately. They arrive enabled
+ *                     with NO policies, which denies everything to any role
+ *                     without BYPASSRLS - and sign-up then fails with 'new
+ *                     row violates row-level security policy for table user'.
+ *                     They hold no credentials (a session row is keyed by a
+ *                     hashed token; a user row is an email), and hand-written
+ *                     policies would be silently wiped by the next
+ *                     `auth:generate`.
+ *     rateLimit         left alone: a counter keyed by a hashed path.
  *     note_topics,
  *     note_chunks
  *                     Entitlement here is a JOIN (purchases -> modules,
@@ -108,6 +113,50 @@ const STATEMENTS = [
        EXISTS (SELECT 1 FROM "chat_threads" t
                 WHERE t.id = thread_id AND t.user_id = app_reader_id())
      )`,
+
+  /*
+   * ---- Better Auth's four tables -------------------------------------
+   *
+   * `user`, `session`, `account` and `verification` arrive with RLS
+   * ALREADY ENABLED and NO POLICIES AT ALL. That was harmless while the
+   * app connected as a role carrying BYPASSRLS, which ignores the whole
+   * mechanism — and it is a trap rather than a protection: enabled with
+   * nothing to satisfy it means DENY EVERYTHING to any other role.
+   *
+   * It surfaced the moment the app was pointed at nexus_app. Sign-up
+   * failed with:
+   *
+   *   new row violates row-level security policy for table "user"
+   *
+   * and the sign-in/session tables would have failed the same way. So the
+   * options are to write real policies for four tables Better Auth owns
+   * (and which it may re-generate on the next `auth:generate`, wiping
+   * them), or to turn RLS OFF on them and accept that they are unprotected
+   * at the database layer.
+   *
+   * The second is chosen deliberately, and it is not a security
+   * regression: these tables hold no credential material. A `session` row
+   * is referenced by a token that is already hashed, a `user` row is an
+   * email and a display name. The RLS that matters — provider_keys,
+   * purchases, chat_* — is above, and note_chunks/note_topics are guarded
+   * by their query filter with no policy at all.
+   *
+   * `rateLimit` never had RLS and is a counter table keyed by a hashed
+   * request path; it is left as it is.
+   *
+   * The alternative — hand-written policies on Better Auth's tables — is
+   * a trap for a different reason: `pnpm auth:generate` regenerates the
+   * schema from Better Auth's CLI and would silently drop them, leaving
+   * sign-in broken in production with nothing in the diff to explain it.
+   */
+  `ALTER TABLE "user" NO FORCE ROW LEVEL SECURITY`,
+  `ALTER TABLE "user" DISABLE ROW LEVEL SECURITY`,
+  `ALTER TABLE "session" NO FORCE ROW LEVEL SECURITY`,
+  `ALTER TABLE "session" DISABLE ROW LEVEL SECURITY`,
+  `ALTER TABLE "account" NO FORCE ROW LEVEL SECURITY`,
+  `ALTER TABLE "account" DISABLE ROW LEVEL SECURITY`,
+  `ALTER TABLE "verification" NO FORCE ROW LEVEL SECURITY`,
+  `ALTER TABLE "verification" DISABLE ROW LEVEL SECURITY`,
 ];
 
 const client = new Client({ connectionString: url });

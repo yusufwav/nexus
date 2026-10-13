@@ -60,21 +60,49 @@ const MIN_SECRET_CHARS = 32;
 const SECRET_PROBLEM =
   "PROVIDER_KEYS_SECRET is not set, or is shorter than " +
   `${MIN_SECRET_CHARS} characters. Provider credentials cannot be stored without it. ` +
-  "Generate one with `openssl rand -base64 32` and add it to apps/web/.env and Vercel.";
+  "Generate one with `openssl rand -base64 32` and add it to apps/web/.env and Vercel. " +
+  "If it IS in .env, this process started before it was added - restart the dev server.";
+
+/*
+ * WHY process.env, AND WHY THAT WAS NOT THE BUG
+ * ------------------------------------------------------------
+ * This reads `process.env.PROVIDER_KEYS_SECRET`, and it is correct to do
+ * so. The theory that it was wrong — "varlock resolves into its own
+ * object and never touches process.env" — is false, and reading
+ * varlock/env's source is what disproved it: it mirrors every resolved
+ * value into process.env at init (env-CBCRt9p-.mjs, the `setProcessEnv`
+ * path), and ENV is a module-local Proxy rather than anything on
+ * globalThis, so process.env is the only synchronously reachable source.
+ *
+ * What actually broke is subtler and worse than a wrong source. On
+ * hot-reload varlock DELETES every key it previously injected and then
+ * restores its pre-injection snapshot before re-injecting. A reload that
+ * fails partway — and varlock's reload does fail on this machine, with a
+ * libuv assertion on every single dev start — leaves process.env missing
+ * every schema-backed variable while the server keeps running, keeps
+ * answering requests, and serves pages. The app looked perfectly healthy.
+ *
+ * So the fix is not a different source. There is no other source. The
+ * fix is that this state must be visible and recoverable rather than
+ * silent, which is what `readSecret`'s explicit failure, the boot check
+ * in services.ts, and the 503 from /api/keys are for. The one thing
+ * that actually repairs it is a restart, so every message here says so.
+ */
 
 /**
  * Read and validate the sealing key, or say precisely why it cannot be read.
  *
- * This exists because of a failure that was invisible for hours. The var
- * is read straight from process.env rather than through the generated env
- * module, so nothing validated it: varlock's hot-reload of .env failed
- * once, the var never reached process.env, and the app carried on. The
- * tutor quietly answered from the server's key while the reader believed
- * their own was in use, and saving a key returned a bare 500. Every one of
- * those symptoms pointed somewhere else.
+ * CHECKED AT BOOT AND AT EVERY FAILURE POINT, because the failure this
+ * replaced was invisible: the tutor answered from the server's key while
+ * the reader believed their own was in use, saving a key returned a bare
+ * 500, and every symptom pointed somewhere other than a broken env.
  *
- * The fix is not to stop reading process.env - it is to CHECK it, at boot
- * and at every failure point, so the cause is named instead of inferred.
+ * The value is read fresh on every call rather than cached at module
+ * scope. That is deliberate. Caching would mean a process that started
+ * before the secret was configured could never recover without a
+ * restart, even if something repaired the environment underneath it —
+ * and reading a string and taking 32 bytes of it costs nothing next to
+ * the AES operation that follows.
  */
 export function readSecret(): SecretStatus {
   const secret = process.env.PROVIDER_KEYS_SECRET;
