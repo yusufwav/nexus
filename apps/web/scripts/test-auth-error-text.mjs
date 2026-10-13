@@ -92,6 +92,61 @@ for (const [label, input] of [
   else bad(`${label} produced an empty message`);
 }
 
+console.log("\nthe status can be nested too - this was the silent one");
+/*
+ * The message lookup handled nesting; the status lookup did not. So this
+ * shape found no message AND no status and fell through to the generic
+ * default - which is exactly what a plain bad password reported on the
+ * deployed site. The 401 is the case that mattered, so it is asserted here
+ * rather than left to the switch statement to happen to cover.
+ */
+eq(
+  "nested 401 reads as invalid credentials",
+  authErrorText({ error: { status: 401, statusText: "" } }),
+  "Invalid email or password.",
+);
+eq(
+  "nested 409 reads as duplicate account",
+  authErrorText({ error: { status: 409 } }),
+  "An account with that email already exists. Try signing in instead.",
+);
+eq(
+  "status under response",
+  authErrorText({ response: { status: 500 } }),
+  "The server could not complete that request. Try again in a moment.",
+);
+eq(
+  "deeply nested status",
+  authErrorText({ error: { body: { error: { status: 401 } } } }),
+  "Invalid email or password.",
+);
+console.log("\na nested status still does not override a real message");
+eq(
+  "message wins over nested status",
+  authErrorText({
+    message: "Invalid email or password",
+    error: { status: 401 },
+  }),
+  "Invalid email or password",
+);
+
+console.log("\nnon-numeric status values are ignored, not misread");
+eq(
+  "status: 'pending'",
+  authErrorText({ status: "pending" }),
+  "Something went wrong signing you in. Try again, and if it persists the server may be misconfigured.",
+);
+eq(
+  "status: 0",
+  authErrorText({ status: 0 }),
+  "Something went wrong signing you in. Try again, and if it persists the server may be misconfigured.",
+);
+eq(
+  "status: 99999",
+  authErrorText({ status: 99999 }),
+  "Something went wrong signing you in. Try again, and if it persists the server may be misconfigured.",
+);
+
 console.log("\na bare string is passed through");
 eq("string input", authErrorText("Email is required"), "Email is required");
 

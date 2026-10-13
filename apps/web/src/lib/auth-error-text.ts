@@ -60,6 +60,35 @@ function messageFrom(value: unknown, depth = 0): string | null {
 }
 
 /**
+ * Find the HTTP status, wherever it is.
+ *
+ * Same reason as `messageFrom` above: the status is not reliably at the top
+ * level. `messageFrom` handled nesting and `status` did not, which meant a
+ * shape like `{ error: { status: 401, statusText: "" }, ... }` found no
+ * message (nothing to find - it is in `body`) AND no status - and fell
+ * through to the generic default. That is the branch that produced
+ * "Something went wrong signing you in" for an ordinary bad password, which
+ * is a correct outcome for a 401 and was the whole complaint.
+ *
+ * Only a real HTTP status counts. A nested `status: "pending"` or any other
+ * non-number is ignored rather than mistaken for a response code.
+ */
+function statusFrom(value: unknown, depth = 0): number | undefined {
+  if (depth > 4 || value === null || typeof value !== "object") return undefined;
+
+  const obj = value as Record<string, unknown>;
+
+  const direct = obj.status;
+  if (typeof direct === "number" && direct >= 100 && direct <= 599) return direct;
+
+  for (const key of ["error", "body", "data", "response"] as const) {
+    const found = statusFrom(obj[key], depth + 1);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+/**
  * Turn any thrown auth error into one sentence.
  *
  * Ordered by how much the reader can act on it:
@@ -77,10 +106,7 @@ function messageFrom(value: unknown, depth = 0): string | null {
 export function authErrorText(error: unknown): string {
   if (typeof error === "string") return authErrorText({ message: error });
 
-  const status =
-    typeof error === "object" && error !== null && "status" in error
-      ? (error as { status?: unknown }).status
-      : undefined;
+  const status = statusFrom(error);
 
   /*
    * A 5xx message is NOT shown, even when there is one.
@@ -114,7 +140,23 @@ export function authErrorText(error: unknown): string {
     case 502:
     case 503:
       return "The server could not complete that request. Try again in a moment.";
-    default:
+    default: {
+      /*
+       * Nothing recognisable came back: no message at any depth and no HTTP
+       * status. That is a distinct failure from every case above and it means
+       * the response never got as far as being parsed as an API reply - a
+       * dropped connection, a proxy error page, or a handler that threw before
+       * it could serialise anything. Saying "invalid email or password" here
+       * would be a lie, so the text stays honest about being stuck.
+       *
+       * The raw shape goes to the console rather than into the message: it is
+       * the only place the real cause is still available, and the reader's
+       * own DevTools console is the right place for it. Never to the DOM.
+       */
+      if (typeof console !== "undefined" && typeof console.warn === "function") {
+        console.warn("[auth] no message and no HTTP status on this failure:", error);
+      }
       return "Something went wrong signing you in. Try again, and if it persists the server may be misconfigured.";
+    }
   }
 }
