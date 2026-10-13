@@ -288,6 +288,17 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
   const [seed, setSeed] = useState<ReadonlyArray<StoredMessage> | null>(null);
 
   /*
+   * Which thread `seed` belongs to.
+   *
+   * A ref rather than state, and read at write time, because the two are
+   * set in the same batch and a state read would be stale on the render
+   * that consumes it. It is also genuinely mutable data: it exists only to
+   * be read inside an effect keyed on `seed`, and putting it in state would
+   * add a second render to every thread open for no observable difference.
+   */
+  const seedThread = useRef<string | null>(null);
+
+  /*
    * THE MODEL PICK, AND WHY THE TRANSPORT IS A REF
    * ------------------------------------------------------------
    * The reader's choice is read at request time through a ref rather
@@ -504,6 +515,11 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
         // render. Reopening the thread already on screen changes neither,
         // and needs neither — its transcript is what is on screen.
         if (thread.id !== threadId) {
+          // Set before setSeed: both are batched into one render, and the
+          // effect that marks these rows as already-saved reads the ref
+          // during that render. Writing them the other way round would
+          // restore a transcript that the save effect then treats as new.
+          seedThread.current = thread.id;
           setSeed(rows);
           setThreadId(thread.id);
         }
@@ -526,6 +542,7 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
     // The new id builds a new chat, so clearing the seed is what keeps the
     // deleted transcript out of it.
     setSeed(null);
+    seedThread.current = null;
     setThreadId(newThreadId());
     setInput("");
     setThreads((prev) => prev?.filter((t) => t.id !== id) ?? null);
@@ -586,24 +603,59 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
    * the message they had just typed. Persistence is a property of a
    * message existing, not of a reply arriving.
    *
-   * ONE rule: the newest message is written the moment it is complete,
-   * and it is the only thing written.
+   * ONE rule, per role, because the two are complete at different
+   * moments and for different reasons.
    *
-   *   · The user's question is complete the instant it is appended, so
-   *     it lands on that render — before the model is even asked. A
-   *     turn that then fails costs the answer, never the question.
-   *   · The reply is complete when no stream is running. Mid-stream
-   *     the last message is a partial assistant bubble, and writing it
-   *     would store half a sentence as though it were the whole reply.
-   *     The question prompting it is already on disk, so an
-   *     interrupted turn keeps its half of the conversation.
+   *   · A user's question is complete the instant it is appended. It
+   *     never streams, so nothing can make it more finished later, and
+   *     a turn that then fails must still cost the answer rather than
+   *     the question.
+   *   · An assistant reply is complete only when no stream is running.
+   *     Mid-stream it is a partial bubble, and writing it would store
+   *     half a sentence as though it were the whole reply.
    *
-   * Keyed on the message id rather than the count, and only the last
-   * message is sent. That is what makes a replay a no-op: by the time
-   * this runs, `messages.at(-1)` is the very message that was saved
-   * last, whatever else has been added since. Sending the whole
-   * transcript would mean re-sending every earlier row each turn,
-   * which the upsert would absorb and the network would not.
+   * WHY THE QUESTION USED TO BE LOST, AND IT WAS NOT THE `isSending`
+   * GUARD ON ITS OWN
+   * ------------------------------------------------------------
+   * This effect gated EVERY message on `!isSending`, on the reasoning
+   * that the question lands before the model is asked. It does not, and
+   * the reason is in the SDK rather than in this file.
+   *
+   * `sendMessage` does, in one synchronous block:
+   *
+   *     ai/src/ui/chat.ts:468   state.pushMessage(userMsg)   // notifies
+   *     ai/src/ui/chat.ts:841   setStatus({ status: 'submitted' })
+   *
+   * `useChat` reads `messages` and `status` from two SEPARATE
+   * `useSyncExternalStore` subscriptions, and both notifications land
+   * in the same tick. React therefore commits ONE render in which
+   * `messages.at(-1)` is the user's question AND `status` is already
+   * 'submitted' — so `isSending` was true and the question returned
+   * early. There was never a render where the question existed on its
+   * own.
+   *
+   * By the time the stream ended, `messages.at(-1)` was the reply, so
+   * only the reply was ever written. Transcripts kept their answers
+   * and lost their questions, which is exactly what was reported.
+   *
+   * So the gate moves: it applies to assistant messages, which are the
+   * only ones that can be half-written. A user message is written on
+   * the very first render that contains it.
+   *
+   * TRACKING SAVED IDS, NOT JUST THE LAST ONE
+   * ------------------------------------------------------------
+   * A single `lastId` guard cannot express "the question is written and
+   * the reply is not", because by the time the reply arrives the guard
+   * has been overwritten by the question's id and the two are
+   * indistinguishable from the outside. The guard is a Set of the ids
+   * actually written, which makes the replay property explicit instead
+   * of emergent: a message is written when it first appears complete,
+   * and never again.
+   *
+   * Seeded rows are pre-loaded rather than written, so they are marked
+   * as already saved — otherwise reopening a thread would re-post the
+   * whole transcript on every mount. The upsert would absorb that, but
+   * it is a full transcript's worth of pointless requests.
    *
    * The ids come from the chat and it ignores any id passed to
    * sendMessage — so the id is read back off the message the chat
@@ -611,47 +663,98 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
    * the row, it would write the question a second time under a second
    * id in the reopened thread.
    *
-   * There is deliberately no `useEffect(() => { savedRef.current = null
-   * }, [threadId])` clearing the guard on a thread switch. There used
-   * to be one, declared after this effect, and effects run in
-   * declaration order — so it reset the guard a render too late, and
-   * restoring a thread re-saved it on the same pass. The upsert
-   * absorbed that, so it was harmless, but an effect that undoes its
-   * neighbour's guard on the same commit is one refactor away from a
+   * There is deliberately no effect clearing the guard on a thread
+   * switch. There used to be one, declared after this effect, and
+   * effects run in declaration order — so it reset the guard a render
+   * too late, and restoring a thread re-saved it on the same pass. The
+   * upsert absorbed that, so it was harmless, but an effect that undoes
+   * its neighbour's guard on the same commit is one refactor away from a
    * bug that is not absorbed.
    *
-   * It is unneeded rather than merely reordered because the key carries
-   * the thread id: switching threads changes the key by itself, so the
-   * guard cannot survive across a switch and nothing has to clear it.
+   * It is unneeded rather than merely reordered because every key
+   * carries the thread id: switching threads changes the key by itself,
+   * so no id can be mistaken for one already written on another thread
+   * and nothing has to clear anything.
    */
-  const savedRef = useRef<string | null>(null);
+  const savedRef = useRef<ReadonlySet<string>>(new Set<string>());
+
+  /*
+   * Mark restored rows as already written.
+   *
+   * The guard above is a Set of ids this browser has POSTed. A transcript
+   * loaded from /api/chat is already in the database by definition — it was
+   * read from there — so it must enter the Set as though it had been saved,
+   * or the effect below would treat every restored row as new and re-post
+   * the entire conversation on each mount.
+   *
+   * The upsert would absorb those duplicates, so the symptom would only be
+   * wasted requests. It is still wrong: the history pane's thread list is
+   * re-read after a save, and a duplicate storm on every reopen is how a
+   * cheap feature becomes an expensive one.
+   *
+   * Keyed the same way as the guard, so a row restored onto thread A cannot
+   * mark the identically-numbered row on thread B as written. Ids are only
+   * unique per chat in this app, not globally.
+   */
   useEffect(() => {
-    const last = messages.at(-1);
-    if (!last) {
+    if (seed === null || seedThread.current === null) {
       return;
     }
-    // Mid-stream the last message is a partial answer. Waiting for
-    // this to clear is what keeps a truncated reply out of history.
-    if (isSending) {
-      return;
+    savedRef.current = new Set([
+      ...savedRef.current,
+      ...seed.map((m) => `${seedThread.current}:${m.id}`),
+    ]);
+  }, [seed]);
+
+  useEffect(() => {
+    const pending: StoredRow[] = [];
+
+    for (const message of messages) {
+      const role = message.role === "user" ? ("user" as const) : ("assistant" as const);
+      /*
+       * The gate, and it applies to the ROLE that can be half-written.
+       *
+       * A reply is still arriving while isSending is true, so writing it
+       * would store half a sentence. A question never streams, so waiting
+       * for the stream would mean the question is only ever written as a
+       * side effect of the answer completing - which is the bug this
+       * replaced: a turn that fails or is abandoned saved neither.
+       */
+      if (role === "assistant" && isSending) {
+        continue;
+      }
+
+      const content = (message.parts ?? [])
+        .filter((part): part is { type: "text"; text: string } => part.type === "text")
+        .map((part) => part.text)
+        .join("");
+      // Nothing to store. Not marked saved, so a message that fills in
+      // later is still picked up on a subsequent render.
+      if (content.length === 0) {
+        continue;
+      }
+
+      const key = `${threadId}:${message.id}`;
+      if (savedRef.current.has(key)) {
+        continue;
+      }
+
+      savedRef.current = new Set(savedRef.current).add(key);
+      pending.push({ id: message.id, role, content });
     }
 
-    const key = `${threadId}:${last.id}`;
-    if (savedRef.current === key) {
-      return;
+    if (pending.length > 0) {
+      /*
+       * ONE request for the batch, not one per message.
+       *
+       * The route already loops and upserts, so a turn that produced a
+       * question and an answer writes both in a single POST. That matters
+       * because a browser will happily drop the second of two requests
+       * fired back to back, and the answer is the row nobody would notice
+       * missing until they reopened the thread.
+       */
+      void persist(pending, threadId, paneOpen);
     }
-    savedRef.current = key;
-
-    const role = last.role === "user" ? ("user" as const) : ("assistant" as const);
-    const content = (last.parts ?? [])
-      .filter((part): part is { type: "text"; text: string } => part.type === "text")
-      .map((part) => part.text)
-      .join("");
-    if (content.length === 0) {
-      return;
-    }
-
-    void persist([{ id: last.id, role, content }], threadId, paneOpen);
   }, [messages, isSending, threadId, paneOpen, persist]);
 
   const send = (text: string) => {
@@ -675,6 +778,7 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
     // The seed has to go with the new id. Left set, the fresh chat would
     // be built with the previous transcript already in it.
     setSeed(null);
+    seedThread.current = null;
     setThreadId(newThreadId());
     setInput("");
     // A failure belongs to the conversation it happened in; carrying it
