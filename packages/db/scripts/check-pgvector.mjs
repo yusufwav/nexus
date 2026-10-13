@@ -83,6 +83,61 @@ const results = [];
 const ok = (m) => results.push(["ok", m]);
 const bad = (m) => results.push(["BAD", m]);
 
+/**
+ * Turn a connection failure into something a person can act on.
+ *
+ * The bare `FAIL` this replaces WAS the whole diagnostic output when the
+ * database was unreachable, which is the moment someone most needs to be
+ * told what went wrong. Two shapes caused that:
+ *
+ *   · node's `AggregateError` — thrown when several addresses are tried
+ *     (IPv4 and IPv6) and all fail. Its `.message` is EMPTY; the detail
+ *     lives in `.errors`, so `err.message` printed nothing at all.
+ *   · a wrong password, which surfaces as
+ *     `SASL: SCRAM-SERVER-FIRST-MESSAGE-FAILED-METHOD: client password must be a string`
+ *
+ * So: unwrap the aggregate, and say plainly which likely cause it looks
+ * like. A connection failure is almost never a pgvector problem, and
+ * conflating the two sends people off to install an extension that is
+ * already installed.
+ */
+function describe(err) {
+  const parts = [];
+  if (err instanceof Error) {
+    if (Array.isArray(err.errors)) {
+      for (const e of err.errors) parts.push(e instanceof Error ? e.message : String(e));
+    } else if (err.message) {
+      parts.push(err.message);
+    } else {
+      parts.push(err.code ?? err.name ?? "unknown error");
+    }
+  } else {
+    parts.push(String(err));
+  }
+
+  const text = [...new Set(parts)].filter(Boolean);
+  if (text.length === 0) return "could not connect, and the driver gave no reason";
+
+  const joined = text.join("; ");
+  let advice = "";
+  if (/password must be a string|SCRAM-SERVER-FIRST|password authentication failed/i.test(joined)) {
+    advice =
+      "\n  -> the credentials are wrong. Check DATABASE_URL for a literal\n" +
+      "     <YOUR-PASSWORD> placeholder left in the connection string.";
+  } else if (/ENOTFOUND|EAI_AGAIN/i.test(joined)) {
+    advice = "\n  -> the hostname does not resolve. Check the endpoint hostname.";
+  } else if (/ETIMEDOUT|ECONNREFUSED|EHOSTUNREACH|ENETUNREACH/i.test(joined)) {
+    advice =
+      "\n  -> could not reach the port. Either this network blocks it (some campus\n" +
+      "     and corporate Wi-Fi allow only 443), or an IP allow list on the branch\n" +
+      "     is excluding this machine.";
+  } else if (/certificate|self.signed/i.test(joined)) {
+    advice = "\n  -> TLS failed. Check sslmode in DATABASE_URL.";
+  }
+
+  return `${joined}${advice}`;
+}
+
 try {
   await client.connect();
 
@@ -145,7 +200,7 @@ try {
     );
   }
 } catch (err) {
-  bad(err instanceof Error ? err.message : String(err));
+  bad(describe(err));
 } finally {
   await client.end().catch(() => {});
 }
