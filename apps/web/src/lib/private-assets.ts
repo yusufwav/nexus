@@ -1,6 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { readCourseObject } from "@/lib/object-storage";
+
 /**
  * PRIVATE ASSETS
  * ------------------------------------------------------------
@@ -19,6 +21,21 @@ import path from "node:path";
  * The path is resolved and re-checked after joining so that a name
  * from a registry can never climb out with "..", and the resolved
  * path must still sit inside the private root.
+ *
+ * ON A DEPLOYED SITE THERE IS NO DISK
+ *
+ * private-assets/ is gitignored, so the directory does not exist in a
+ * build - it held paid PDFs that were never meant to be committed, and
+ * that is still the right call. The consequence is that the deployed app
+ * had no copy of any of them and every paid download 404'd.
+ *
+ * So a local miss now falls through to Neon object storage, where the
+ * same files live in a private bucket on the production branch. Local
+ * still wins when it can: in development the file is on disk and an
+ * edit shows up without a round trip. The access control is unchanged
+ * either way, because the gate is the route handler's session and
+ * purchase check in both cases - the bucket is private too, so no
+ * anonymous request can reach the bytes without passing it.
  */
 
 /** Absolute path to the private asset root. */
@@ -61,8 +78,32 @@ export async function readPrivateAsset(rel: string): Promise<ArrayBuffer | null>
       buf.byteOffset + buf.byteLength,
     ) as ArrayBuffer;
   } catch {
-    return null;
+    return fromStorage(rel);
   }
+}
+
+/**
+ * Read a course file from Neon object storage.
+ *
+ * Called only after the local read has failed, so local wins. That is the
+ * right order for two reasons:
+ *
+ *   development
+ *     The files are on disk, so this is never reached and a developer
+ *     editing a PDF sees their edit without a round trip to storage.
+ *
+ *   production
+ *     private-assets/ is gitignored, so the local read always fails and
+ *     this is the only path that can succeed. Nothing is lost by trying
+ *     the filesystem first.
+ *
+ * The entitlement check is not repeated here and must not be. Both
+ * callers verify the session and the purchase before calling
+ * readPrivateAsset; this function only decides where the bytes come
+ * from, and adding a second gate would risk the two disagreeing.
+ */
+async function fromStorage(rel: string): Promise<ArrayBuffer | null> {
+  return readCourseObject(rel);
 }
 
 /** Just the filename, for a Content-Disposition header. */

@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "@Main/config": "workspace:*",
+    "@neon/config": "^1.8.6",
     "@types/node": "catalog:",
     "tsx": "^4.23.13",
     "turbo": "^2.10.12",
