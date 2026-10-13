@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import z from "zod";
 
 import { authClient } from "@/lib/auth-client";
+import { authErrorText } from "@/lib/auth-error-text";
 
 import ThemeToggle from "@/components/theme-toggle";
 
@@ -74,7 +75,7 @@ function AuthCardInner(): React.JSX.Element {
               router.push(target);
             },
             onError: (error) => {
-              toast.error(error.error.message || error.error.statusText);
+              toast.error(authErrorText(error));
             },
           },
         );
@@ -89,7 +90,7 @@ function AuthCardInner(): React.JSX.Element {
             router.push(target);
           },
           onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
+            toast.error(authErrorText(error));
           },
         },
       );

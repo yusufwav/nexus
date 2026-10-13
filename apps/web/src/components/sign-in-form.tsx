@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import z from "zod";
 
 import { authClient } from "@/lib/auth-client";
+import { authErrorText } from "@/lib/auth-error-text";
 
 import Loader from "./loader";
 
@@ -31,7 +32,11 @@ export default function SignInForm({ onSwitchToSignUp }: { onSwitchToSignUp: () 
             toast.success("Sign in successful");
           },
           onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
+            // Reads the message from wherever Better Auth actually put it.
+            // It used to read error.error.message, which is the
+            // Response-shaped half of the error and carries nothing useful
+            // on a 401 — so every failed sign-in showed an empty red box.
+            toast.error(authErrorText(error));
           },
         },
       );
