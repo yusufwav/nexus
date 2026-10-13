@@ -5,7 +5,7 @@ import { z } from "zod";
 import * as q from "@Main/db/queries";
 import { db } from "@/services";
 
-import { lastFour, sealKey } from "@/lib/key-crypto";
+import { lastFour, readSecret, sealKey } from "@/lib/key-crypto";
 import {
   DEFAULT_OPENROUTER_MODEL,
   getFreeModels,
@@ -43,7 +43,13 @@ export const BodySchema = z.object({
 });
 
 /** GET — this reader's keys. */
-export async function GET(): Promise<Response> {
+export async function GET(req: Request): Promise<Response> {
+  // `req` is taken but deliberately NOT used for an origin check. A GET
+  // has nothing to forge: forging matters when the victim's browser is
+  // made to perform a state change, and a read cannot be made to do that.
+  // Adding the check here would break every legitimate non-browser reader
+  // (the settings page's own fetch is fine, but scripts and monitoring
+  // are not) in exchange for closing nothing.
   const user = await requireUser();
   if (user instanceof NextResponse) {
     return user;
@@ -80,7 +86,10 @@ export async function GET(): Promise<Response> {
 
 /** POST — store or replace one credential. */
 export async function POST(req: Request): Promise<Response> {
-  const user = await requireUser();
+  // `req` passed: this route stores a credential, so where the request
+  // came from is part of the check. GET below deliberately omits it —
+  // there is nothing to forge about a read.
+  const user = await requireUser(req);
   if (user instanceof NextResponse) {
     return user;
   }
@@ -115,6 +124,19 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json(
       { error: "That does not look like an OpenRouter key (expected sk-or-v1-…)." },
       { status: 400 },
+    );
+  }
+
+  // Checked BEFORE sealing, so a missing secret is reported as what it
+  // is. It used to be discovered as a bare 500 from inside sealKey,
+  // which pointed at the database rather than at the configuration and
+  // cost an afternoon to trace.
+  const sealing = readSecret();
+  if (!sealing.ok) {
+    console.error("[keys] refusing to store a credential:", sealing.problem);
+    return NextResponse.json(
+      { error: "Model keys cannot be saved right now — the server is misconfigured." },
+      { status: 503 },
     );
   }
 

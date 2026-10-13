@@ -35,26 +35,75 @@ const TAG_BYTES = 16;
 /**
  * The server's sealing key.
  *
- * Throws rather than falling back. The tempting alternative — deriving
- * from something already present, or generating one at boot — is much
+ * Throws rather than falling back. The tempting alternative - deriving
+ * from something already present, or generating one at boot - is much
  * worse than failing: a random per-boot key makes every stored
  * credential permanently unreadable after a restart, and a derived one
  * quietly ties credentials to a secret that was never meant to protect
  * them. A loud failure at first use beats either.
  */
 function serverKey(): Buffer {
+  const secret = readSecret();
+  if (!secret.ok) {
+    throw new Error(secret.problem);
+  }
+  return secret.key;
+}
+
+/** Why the sealing key is unusable, or the 32 bytes that seal with it. */
+export type SecretStatus =
+  | { readonly ok: true; readonly key: Buffer }
+  | { readonly ok: false; readonly problem: string };
+
+const MIN_SECRET_CHARS = 32;
+
+const SECRET_PROBLEM =
+  "PROVIDER_KEYS_SECRET is not set, or is shorter than " +
+  `${MIN_SECRET_CHARS} characters. Provider credentials cannot be stored without it. ` +
+  "Generate one with `openssl rand -base64 32` and add it to apps/web/.env and Vercel.";
+
+/**
+ * Read and validate the sealing key, or say precisely why it cannot be read.
+ *
+ * This exists because of a failure that was invisible for hours. The var
+ * is read straight from process.env rather than through the generated env
+ * module, so nothing validated it: varlock's hot-reload of .env failed
+ * once, the var never reached process.env, and the app carried on. The
+ * tutor quietly answered from the server's key while the reader believed
+ * their own was in use, and saving a key returned a bare 500. Every one of
+ * those symptoms pointed somewhere else.
+ *
+ * The fix is not to stop reading process.env - it is to CHECK it, at boot
+ * and at every failure point, so the cause is named instead of inferred.
+ */
+export function readSecret(): SecretStatus {
   const secret = process.env.PROVIDER_KEYS_SECRET;
-  if (!secret || secret.length < 32) {
-    throw new Error(
-      "PROVIDER_KEYS_SECRET is not set, or is shorter than 32 characters. " +
-        "Provider credentials cannot be stored without it. Generate one with " +
-        "`openssl rand -base64 32` and add it to apps/web/.env and Vercel.",
-    );
+  if (!secret || secret.length < MIN_SECRET_CHARS) {
+    return { ok: false, problem: SECRET_PROBLEM };
   }
   // 32 bytes exactly. scrypt-style stretching is deliberately NOT used:
   // this secret is machine-generated random, not a human password, so
   // there is no low-entropy guessing to slow down.
-  return Buffer.from(secret.slice(0, 32).padEnd(32, "0"), "utf8");
+  return {
+    ok: true,
+    key: Buffer.from(secret.slice(0, 32).padEnd(32, "0"), "utf8"),
+  };
+}
+
+/**
+ * Is the app configured to store reader credentials at all?
+ *
+ * Called at boot so a missing secret is a line in the server log at
+ * startup rather than a mystery discovered when a reader tries to save
+ * their key. Returns the problem text so the caller can log something
+ * actionable instead of "config error".
+ */
+export function providerKeysConfigured(): { readonly ok: boolean; readonly detail: string } {
+  const status = readSecret();
+  return status.ok ? { ok: true, detail: "provider key sealing is configured" } : {
+    ok: false,
+    detail: status.problem,
+  };
 }
 
 /** Seal a credential. A fresh IV per call — never reused. */

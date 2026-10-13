@@ -32,6 +32,65 @@ const nextConfig: NextConfig = {
   // the compiler's automatic memoization.
   reactCompiler: false,
   transpilePackages: ["shiki"],
+
+  /*
+   * Not advertising the framework.
+   *
+   * `X-Powered-By: Next.js` tells an attacker which advisories to read
+   * before they probe anything else. It costs nothing to remove.
+   */
+  poweredByHeader: false,
+
+  /*
+   * SECURITY HEADERS
+   * ------------------------------------------------------------
+   * There were none at all: no CSP, no X-Frame-Options, no nosniff, no
+   * HSTS, no Referrer-Policy. Each is a default a browser will otherwise
+   * assume you made on its behalf.
+   *
+   * `nosniff` matters most here. Without it a browser may execute a
+   * response based on its CONTENT-TYPE rather than the request path, and
+   * this app serves user-authored text — chat transcripts, note passages —
+   * through handlers that set the type themselves.
+   *
+   * NO Content-Security-Policy, AND THAT IS A DECISION
+   * ------------------------------------------------------------
+   * CSP is the stronger control and it is worth having eventually, but a
+   * CSP that is subtly wrong breaks the app rather than hardening it, and
+   * getting one right for a Next.js app with inline styles, the AI SDK's
+   * streaming, KaTeX and a PWA is a project in its own right. X-Frame-Options
+   * DENY covers clickjacking today and cannot be subtly wrong.
+   *
+   * So this is a staged fix rather than a finished one, and the gap is
+   * named rather than left to look complete.
+   */
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "DENY" },
+          {
+            key: "Permissions-Policy",
+            // Everything this app does not use. The tutor renders markdown
+            // and LaTeX, so there is no reason to grant camera,
+            // microphone, geolocation or payment.
+            value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+          },
+          {
+            key: "Strict-Transport-Security",
+            // Two years, preload-eligible. Sent in dev too: inert over
+            // plain http, and it avoids the header existing in only one
+            // environment — the usual way a security header goes untested
+            // until the day it is needed.
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default withVarlock(withPwa(nextConfig));

@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 
 import type { Database } from ".";
+import { withReader } from "./reader";
 import { chatMessages, chatThreads } from "./schema/chat";
 import { modules, purchases } from "./schema/modules";
 import { noteChunks, noteTopics } from "./schema/notes";
@@ -27,32 +28,43 @@ export async function getModuleByCode(db: Database, code: string) {
   return rows[0] ?? null;
 }
 
-/** Course codes the user has paid for. Pending and refunded rows do not count. */
+/**
+ * Course codes the user has paid for. Pending and refunded rows do not count.
+ *
+ * Runs inside `withReader`, so the RLS identity is set for this query and
+ * `purchases` is unreadable to this connection without it. The `where` is
+ * still here and still load-bearing: it is what makes the function correct,
+ * where RLS is what makes a mistake in it fail closed instead of wide.
+ */
 export async function getOwnedCodes(db: Database, userId: string) {
-  const rows = await db
-    .select({ code: modules.code })
-    .from(purchases)
-    .innerJoin(modules, eq(purchases.moduleId, modules.id))
-    .where(and(eq(purchases.userId, userId), eq(purchases.status, "paid")));
-  return new Set(rows.map((r) => r.code));
+  return withReader(db, userId, async (tx) => {
+    const rows = await tx
+      .select({ code: modules.code })
+      .from(purchases)
+      .innerJoin(modules, eq(purchases.moduleId, modules.id))
+      .where(and(eq(purchases.userId, userId), eq(purchases.status, "paid")));
+    return new Set(rows.map((r) => r.code));
+  });
 }
 
 /** A user's purchases with the module joined in, oldest first. */
 export async function listPurchases(db: Database, userId: string) {
-  return db
-    .select({
-      id: purchases.id,
-      amountCents: purchases.amountCents,
-      status: purchases.status,
-      provider: purchases.provider,
-      createdAt: purchases.createdAt,
-      code: modules.code,
-      name: modules.name,
-    })
-    .from(purchases)
-    .innerJoin(modules, eq(purchases.moduleId, modules.id))
-    .where(eq(purchases.userId, userId))
-    .orderBy(asc(purchases.createdAt));
+  return withReader(db, userId, (tx) =>
+    tx
+      .select({
+        id: purchases.id,
+        amountCents: purchases.amountCents,
+        status: purchases.status,
+        provider: purchases.provider,
+        createdAt: purchases.createdAt,
+        code: modules.code,
+        name: modules.name,
+      })
+      .from(purchases)
+      .innerJoin(modules, eq(purchases.moduleId, modules.id))
+      .where(eq(purchases.userId, userId))
+      .orderBy(asc(purchases.createdAt)),
+  );
 }
 
 /* ============================================================
@@ -86,18 +98,20 @@ export async function listProviderKeys(
   db: Database,
   userId: string,
 ): Promise<ReadonlyArray<ProviderKeySummary>> {
-  return db
-    .select({
-      id: providerKeys.id,
-      provider: providerKeys.provider,
-      label: providerKeys.label,
-      lastFour: providerKeys.lastFour,
-      modelId: providerKeys.modelId,
-      updatedAt: providerKeys.updatedAt,
-    })
-    .from(providerKeys)
-    .where(eq(providerKeys.userId, userId))
-    .orderBy(desc(providerKeys.updatedAt));
+  return withReader(db, userId, (tx) =>
+    tx
+      .select({
+        id: providerKeys.id,
+        provider: providerKeys.provider,
+        label: providerKeys.label,
+        lastFour: providerKeys.lastFour,
+        modelId: providerKeys.modelId,
+        updatedAt: providerKeys.updatedAt,
+      })
+      .from(providerKeys)
+      .where(eq(providerKeys.userId, userId))
+      .orderBy(desc(providerKeys.updatedAt)),
+  );
 }
 
 /**
@@ -118,19 +132,24 @@ export async function upsertProviderKey(
     readonly modelId: string;
   },
 ): Promise<void> {
-  await db
-    .insert(providerKeys)
-    .values(key)
-    .onConflictDoUpdate({
-      target: [providerKeys.userId, providerKeys.provider],
-      set: {
-        label: key.label,
-        encryptedKey: key.encryptedKey,
-        lastFour: key.lastFour,
-        modelId: key.modelId,
-        updatedAt: new Date(),
-      },
-    });
+  // The WITH CHECK half of the policy is what makes this safe: even a
+  // caller that somehow passed another reader's id could not write a row
+  // for them, because the insert is rejected rather than stored.
+  await withReader(db, key.userId, (tx) =>
+    tx
+      .insert(providerKeys)
+      .values(key)
+      .onConflictDoUpdate({
+        target: [providerKeys.userId, providerKeys.provider],
+        set: {
+          label: key.label,
+          encryptedKey: key.encryptedKey,
+          lastFour: key.lastFour,
+          modelId: key.modelId,
+          updatedAt: new Date(),
+        },
+      }),
+  );
 }
 
 /**
@@ -143,15 +162,20 @@ export async function getProviderKey(
   userId: string,
   provider: string,
 ): Promise<{ readonly encryptedKey: string; readonly modelId: string } | null> {
-  const rows = await db
-    .select({
-      encryptedKey: providerKeys.encryptedKey,
-      modelId: providerKeys.modelId,
-    })
-    .from(providerKeys)
-    .where(and(eq(providerKeys.userId, userId), eq(providerKeys.provider, provider)))
-    .limit(1);
-  return rows[0] ?? null;
+  // The ONLY query in the codebase that returns ciphertext. It runs as the
+  // reader, so RLS is a second barrier in front of the one function whose
+  // result is a credential.
+  return withReader(db, userId, async (tx) => {
+    const rows = await tx
+      .select({
+        encryptedKey: providerKeys.encryptedKey,
+        modelId: providerKeys.modelId,
+      })
+      .from(providerKeys)
+      .where(and(eq(providerKeys.userId, userId), eq(providerKeys.provider, provider)))
+      .limit(1);
+    return rows[0] ?? null;
+  });
 }
 
 /** Remove one of this reader's credentials. False when there was nothing to remove. */
@@ -160,11 +184,13 @@ export async function deleteProviderKey(
   userId: string,
   provider: string,
 ): Promise<boolean> {
-  const rows = await db
-    .delete(providerKeys)
-    .where(and(eq(providerKeys.userId, userId), eq(providerKeys.provider, provider)))
-    .returning({ id: providerKeys.id });
-  return rows.length > 0;
+  return withReader(db, userId, async (tx) => {
+    const rows = await tx
+      .delete(providerKeys)
+      .where(and(eq(providerKeys.userId, userId), eq(providerKeys.provider, provider)))
+      .returning({ id: providerKeys.id });
+    return rows.length > 0;
+  });
 }
 
 /* ============================================================
@@ -439,17 +465,19 @@ export async function listChatThreads(
   db: Database,
   userId: string,
 ): Promise<Array<ChatThreadSummary>> {
-  const rows = await db
-    .select({
-      id: chatThreads.id,
-      title: chatThreads.title,
-      updatedAt: chatThreads.updatedAt,
-    })
-    .from(chatThreads)
-    .where(eq(chatThreads.userId, userId))
-    .orderBy(desc(chatThreads.updatedAt))
-    .limit(THREAD_PAGE);
-  return rows;
+  return withReader(db, userId, async (tx) => {
+    const rows = await tx
+      .select({
+        id: chatThreads.id,
+        title: chatThreads.title,
+        updatedAt: chatThreads.updatedAt,
+      })
+      .from(chatThreads)
+      .where(eq(chatThreads.userId, userId))
+      .orderBy(desc(chatThreads.updatedAt))
+      .limit(THREAD_PAGE);
+    return rows;
+  });
 }
 
 /** One stored message, as the transcript renders it back. */
@@ -471,40 +499,45 @@ export async function getChatThread(
   userId: string,
   threadId: string,
 ): Promise<{ id: string; title: string; messages: Array<StoredChatMessage> } | null> {
-  // Ownership first. Without this the messages query would happily
-  // return a transcript for a thread belonging to somebody else.
-  const thread = await db
-    .select({ id: chatThreads.id, title: chatThreads.title })
-    .from(chatThreads)
-    .where(and(eq(chatThreads.id, threadId), eq(chatThreads.userId, userId)))
-    .limit(1);
-  const found = thread[0];
-  if (!found) {
-    return null;
-  }
+  // One transaction, one identity. The two queries below have to agree on
+  // who the reader is, and they get that from the same transaction-local
+  // setting rather than from two separate reads of the session.
+  return withReader(db, userId, async (tx) => {
+    // Ownership first. Without this the messages query would happily
+    // return a transcript for a thread belonging to somebody else.
+    const thread = await tx
+      .select({ id: chatThreads.id, title: chatThreads.title })
+      .from(chatThreads)
+      .where(and(eq(chatThreads.id, threadId), eq(chatThreads.userId, userId)))
+      .limit(1);
+    const found = thread[0];
+    if (!found) {
+      return null;
+    }
 
-  const rows = await db
-    .select({
-      id: chatMessages.id,
-      role: chatMessages.role,
-      content: chatMessages.content,
-    })
-    .from(chatMessages)
-    .where(eq(chatMessages.threadId, found.id))
-    .orderBy(asc(chatMessages.createdAt));
+    const rows = await tx
+      .select({
+        id: chatMessages.id,
+        role: chatMessages.role,
+        content: chatMessages.content,
+      })
+      .from(chatMessages)
+      .where(eq(chatMessages.threadId, found.id))
+      .orderBy(asc(chatMessages.createdAt));
 
-  return {
-    id: found.id,
-    title: found.title,
-    messages: rows.map((r) => ({
-      id: r.id,
-      // Coerced rather than trusted: role is a free-text column, and a
-      // value the tutor never wrote would otherwise render as a
-      // user-authored bubble in someone else's transcript.
-      role: r.role === "assistant" ? "assistant" : "user",
-      content: r.content,
-    })),
-  };
+    return {
+      id: found.id,
+      title: found.title,
+      messages: rows.map((r) => ({
+        id: r.id,
+        // Coerced rather than trusted: role is a free-text column, and a
+        // value the tutor never wrote would otherwise render as a
+        // user-authored bubble in someone else's transcript.
+        role: r.role === "assistant" ? "assistant" : "user",
+        content: r.content,
+      })),
+    };
+  });
 }
 
 /** What the caller wants to add to a thread. */
@@ -542,69 +575,75 @@ export async function appendChatMessage(
   threadTitle: string,
   message: NewChatMessage,
 ): Promise<boolean> {
-  // Ownership first, and it has to be a real read: the insert below is
-  // an upsert on the id, so it cannot express "only if it is mine".
-  const owned = await db
-    .select({ id: chatThreads.id })
-    .from(chatThreads)
-    .where(and(eq(chatThreads.id, threadId), eq(chatThreads.userId, userId)))
-    .limit(1);
+  // One transaction, so the ownership read, the thread claim and the
+  // message insert cannot be interleaved with another reader's. The
+  // policy's WITH CHECK is the backstop here too: a message can only be
+  // written into a thread the reader's identity can already see.
+  return withReader(db, userId, async (tx) => {
+    // Ownership first, and it has to be a real read: the insert below is
+    // an upsert on the id, so it cannot express "only if it is mine".
+    const owned = await tx
+      .select({ id: chatThreads.id })
+      .from(chatThreads)
+      .where(and(eq(chatThreads.id, threadId), eq(chatThreads.userId, userId)))
+      .limit(1);
 
-  if (owned.length === 0) {
-    // Either genuinely new, or it belongs to someone else. The insert
-    // decides which: if the row is already there under another user the
-    // conflict fires, and we bail without having written the message.
-    const claimed = await db
-      .insert(chatThreads)
-      .values({ id: threadId, userId, title: threadTitle })
-      // A concurrent tab can win the race to create this thread. Its
-      // title is the same one we would have written, so taking it is
-      // harmless — and cheaper than a select-then-insert.
-      .onConflictDoNothing({ target: chatThreads.id })
-      .returning({ id: chatThreads.id });
+    if (owned.length === 0) {
+      // Either genuinely new, or it belongs to someone else. The insert
+      // decides which: if the row is already there under another user the
+      // conflict fires, and we bail without having written the message.
+      const claimed = await tx
+        .insert(chatThreads)
+        .values({ id: threadId, userId, title: threadTitle })
+        // A concurrent tab can win the race to create this thread. Its
+        // title is the same one we would have written, so taking it is
+        // harmless — and cheaper than a select-then-insert.
+        .onConflictDoNothing({ target: chatThreads.id })
+        .returning({ id: chatThreads.id });
 
-    if (claimed.length === 0) {
-      return false;
+      if (claimed.length === 0) {
+        return false;
+      }
     }
-  }
 
-  await db
-    .insert(chatMessages)
-    .values({
-      id: message.id,
-      threadId,
-      role: message.role,
-      content: message.content,
-    })
-    // Replays happen: a stream that fails midway can be retried, and
-    // the client resends the turn. Same id, so update rather than
-    // inserting a second copy of the same message.
-    //
-    // The conflict target is deliberately NOT chatMessages.id. That
-    // column is a global primary key, so a client that guessed or
-    // reused another user's message id would collide with it and this
-    // upsert would overwrite that user's message with attacker-chosen
-    // text — a cross-user write that survives every userId check
-    // above, because the collision happens below them. Scoping the
-    // target to (threadId, id) means a message id can only ever be
-    // updated within the thread that already contains it.
-    //
-    // DO NOT "simplify" this back to the bare id. It is the second
-    // half of the ownership guarantee, not a stylistic choice.
-    .onConflictDoUpdate({
-      target: [chatMessages.threadId, chatMessages.id],
-      set: { content: message.content, role: message.role },
-    });
+    await tx
+      .insert(chatMessages)
+      .values({
+        id: message.id,
+        threadId,
+        role: message.role,
+        content: message.content,
+      })
+      // Replays happen: a stream that fails midway can be retried, and
+      // the client resends the turn. Same id, so update rather than
+      // inserting a second copy of the same message.
+      //
+      // The conflict target is deliberately NOT chatMessages.id. That
+      // column is a global primary key, so a client that guessed or
+      // reused another user's message id would collide with it and this
+      // upsert would overwrite that user's message with attacker-chosen
+      // text — a cross-user write that survives every userId check
+      // above, because the collision happens below them. Scoping the
+      // target to (threadId, id) means a message id can only ever be
+      // updated within the thread that already contains it.
+      //
+      // DO NOT "simplify" this back to the bare id. It is the second
+      // half of the ownership guarantee, not a stylistic choice.
+      .onConflictDoUpdate({
+        target: [chatMessages.threadId, chatMessages.id],
+        set: { content: message.content, role: message.role },
+      });
 
-  // Touch the thread so it sorts to the top of the history pane.
-  // updateAt has a $onUpdate hook, but that only fires through drizzle's
-  // update builder — an insert does not trigger it.
-  await db
-    .update(chatThreads)
-    .set({ updatedAt: new Date() })
-    .where(and(eq(chatThreads.id, threadId), eq(chatThreads.userId, userId)));
+    // Touch the thread so it sorts to the top of the history pane.
+    // updateAt has a $onUpdate hook, but that only fires through drizzle's
+    // update builder — an insert does not trigger it.
+    await tx
+      .update(chatThreads)
+      .set({ updatedAt: new Date() })
+      .where(and(eq(chatThreads.id, threadId), eq(chatThreads.userId, userId)));
 
-  return true;
+    return true;
+  });
 }
 
 /**
@@ -617,9 +656,11 @@ export async function deleteChatThread(
   userId: string,
   threadId: string,
 ): Promise<boolean> {
-  const rows = await db
-    .delete(chatThreads)
-    .where(and(eq(chatThreads.id, threadId), eq(chatThreads.userId, userId)))
-    .returning({ id: chatThreads.id });
-  return rows.length > 0;
+  return withReader(db, userId, async (tx) => {
+    const rows = await tx
+      .delete(chatThreads)
+      .where(and(eq(chatThreads.id, threadId), eq(chatThreads.userId, userId)))
+      .returning({ id: chatThreads.id });
+    return rows.length > 0;
+  });
 }

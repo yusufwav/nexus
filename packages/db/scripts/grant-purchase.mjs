@@ -48,6 +48,49 @@ if (!confirmed) {
   process.exit(1);
 }
 
+/*
+ * LOCALHOST ONLY, AND NOT OVERRIDABLE.
+ *
+ * `--confirm` proves intent; it does not prove which database. Both
+ * DATABASE_URLs live in the same environment and the hosted one is a
+ * `postgresql://...` URL that looks identical to the local one, so the
+ * failure mode is a typo or a stray exported variable and a real
+ * purchase is written with no payment behind it.
+ *
+ * There is deliberately no flag to get past this. The one legitimate use
+ * — granting yourself access on a hosted staging database — is served by
+ * running the script with a DATABASE_URL pointed at that staging database,
+ * where the host will not match and you will see why it stopped. A flag
+ * would be a flag someone passes in a hurry, which is exactly when this
+ * matters.
+ */
+const LOCAL_HOSTS = ["localhost", "127.0.0.1", "::1", "0.0.0.0", "[::1]"];
+
+function isLocalDatabase(connectionString) {
+  let host;
+  try {
+    host = new URL(connectionString).hostname;
+  } catch {
+    console.error("DATABASE_URL is not a URL this script can parse; refusing to run.");
+    process.exit(1);
+  }
+  // A Unix socket or a directory is not a TCP host at all, and is
+  // local by definition.
+  if (!host) return true;
+  return LOCAL_HOSTS.includes(host);
+}
+
+if (!isLocalDatabase(url)) {
+  console.error(
+    `\nRefusing to run against a non-local database.\n` +
+      `  DATABASE_URL points at: ${new URL(url).hostname}\n\n` +
+      `  This script writes status='paid' with no payment behind it. Point\n` +
+      `  DATABASE_URL at a local database, or at a staging one you are\n` +
+      `  deliberately seeding.\n`,
+  );
+  process.exit(1);
+}
+
 const db = new Client({ connectionString: url });
 
 try {

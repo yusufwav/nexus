@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/services";
 
+import { CROSS_ORIGIN_REFUSAL, originAllowed } from "@/lib/origin-guard";
+import { allowedOrigins } from "@/lib/origin-set";
 import { getSession } from "@/lib/session";
 
 /**
@@ -35,13 +37,35 @@ const MAX_CONTENT = 20_000;
 const MAX_TITLE = 80;
 const MAX_BATCH = 100;
 
-/** 401 for every verb. This is a JSON API, so not a redirect. */
+/**
+ * 401 for every verb. This is a JSON API, so not a redirect.
+ *
+ * Deliberately LOCAL rather than the shared `@/lib/require-user`: this
+ * route has its own wording ("the tutor") for the anonymous case, and
+ * the two gates are not the same question. The shared one is session
+ * plus origin, which is what the mutating verbs here need — see below.
+ */
 async function requireUser(): Promise<{ id: string } | NextResponse> {
   const user = await getSession();
   if (!user) {
     return NextResponse.json({ error: "Sign in to use the tutor." }, { status: 401 });
   }
   return user;
+}
+
+/**
+ * Session AND origin, for the verbs that write.
+ *
+ * A transcript is durable and is rendered back to its owner, so "did this
+ * come from us?" is part of the check rather than something left to
+ * `SameSite=Lax`. Reads use the session-only gate above: there is nothing
+ * to forge about a GET.
+ */
+async function requireWriteAccess(req: Request): Promise<{ id: string } | NextResponse> {
+  if (!originAllowed(req, allowedOrigins())) {
+    return NextResponse.json(CROSS_ORIGIN_REFUSAL, { status: 403 });
+  }
+  return requireUser();
 }
 
 function dbUnavailable(): NextResponse {
@@ -78,7 +102,9 @@ export async function GET(req: Request): Promise<Response> {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  const user = await requireUser();
+  // Origin-checked: this writes into a transcript, which is durable and
+  // rendered back to whoever owns the thread.
+  const user = await requireWriteAccess(req);
   if (user instanceof NextResponse) {
     return user;
   }
@@ -155,7 +181,8 @@ export async function POST(req: Request): Promise<Response> {
 }
 
 export async function DELETE(req: Request): Promise<Response> {
-  const user = await requireUser();
+  // Origin-checked: this destroys a transcript.
+  const user = await requireWriteAccess(req);
   if (user instanceof NextResponse) {
     return user;
   }

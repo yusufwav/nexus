@@ -122,6 +122,12 @@ for (const scope of scopes) {
     ["delete icon hover", "danger", rowBg, 4.5],
     ["success note", "fg-muted", panel, 4.5],
     ["error note", "danger", panel, 4.5],
+    // The tutor's "that was not the model you picked" notice. `--warn` at
+    // `--fs-xs` on the chat toolbar. Added because it is a NEW colour
+    // pairing introduced by this change and an unreadable warning is
+    // worse than none — it looks like a rendering fault rather than a
+    // statement about which model answered.
+    ["model-substituted notice", "warn", panel, 4.5],
   ];
 
   console.log(`\n=== ${scope.theme.toUpperCase()} ===`);

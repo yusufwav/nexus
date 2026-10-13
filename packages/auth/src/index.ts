@@ -28,6 +28,34 @@ export type AuthConfig = {
  * codegen step that is not runnable on every machine here. Unset means
  * exactly one trusted origin: the deployed one.
  */
+/*
+ * SESSION LIFETIME
+ * ------------------------------------------------------------
+ * Seven days was Better Auth's default, which is long for a cookie that
+ * is the only thing standing between an attacker and somebody's saved
+ * transcripts. The two settings below trade a little convenience for a
+ * much smaller window, and the split is the important part:
+ *
+ *   expiresIn  7 days
+ *     How long a session is valid if the reader does nothing at all.
+ *     Long enough that someone who signs in once a week is not logged out
+ *     every time, which is the reason the default was not simply cut.
+ *
+ *   updateAge  24 hours
+ *     How long before an ACTIVE session's expiry is pushed back. This is
+ *     the setting that actually shrinks the exposure: a session that is
+ *     being used is renewed daily, so a stolen cookie is only useful for
+ *     as long as the thief keeps using it — and every renewal changes
+ *     the token, so a copy taken before the window rolls over stops
+ *     working.
+ *
+ * The combination means an unused session dies in 7 days and a used one
+ * can be kept alive indefinitely, which is the behaviour readers expect
+ * and which does not require trusting a cookie for a month.
+ */
+const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7; // 7 days
+const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24; // 1 day
+
 function trustedOrigins(env: AuthConfig): string[] {
   const raw = process.env["BETTER_AUTH_EXTRA_ORIGINS"];
   const extra =
@@ -38,6 +66,37 @@ function trustedOrigins(env: AuthConfig): string[] {
           .map((o) => o.trim())
           .filter((o) => o.length > 0);
   return [...new Set([env.BETTER_AUTH_URL, ...extra])];
+}
+
+/*
+ * BETTER_AUTH_EXTRA_ORIGINS IS FOR LOCAL DEVELOPMENT ONLY
+ * ------------------------------------------------------------
+ * Listing an origin here lets a page on it make AUTHENTICATED requests
+ * with the reader's session cookie. That is exactly what you want when
+ * testing the app from a phone on the same wifi, and it is exactly what
+ * you do not want on a deployed site, where the list should contain
+ * nothing.
+ *
+ * It is deliberately NOT in apps/web/.env.schema, so varlock does not
+ * know about it and cannot complain when it is absent; it arrives through
+ * turbo's `globalEnv`.
+ *
+ * So this is a loud warning rather than a hard failure. Throwing would
+ * break the one case it exists for — someone mid-development with the
+ * variable set locally — which is the opposite of helpful. Printing the
+ * origins on every cold start is enough that nobody can ship it without
+ * having seen it.
+ */
+if (process.env.NODE_ENV === "production" && process.env["BETTER_AUTH_EXTRA_ORIGINS"]) {
+  console.warn(
+    [
+      "[auth] BETTER_AUTH_EXTRA_ORIGINS is set in production:",
+      `  ${process.env["BETTER_AUTH_EXTRA_ORIGINS"]}`,
+      "  Any page on those origins can make authenticated requests as a",
+      "  signed-in reader. This is intended for LAN testing only — unset it",
+      "  on the deployed environment.",
+    ].join("\n"),
+  );
 }
 
 export function createAuth(env: AuthConfig, database: Database) {
@@ -72,10 +131,45 @@ export function createAuth(env: AuthConfig, database: Database) {
       // storage would hand an attacker a fresh allowance every time
       // the process cycled.
       storage: "database",
+      // Fail CLOSED, not open.
+      //
+      // The default is to fall back to an in-memory store when the
+      // database one is unavailable, which is the wrong direction here:
+      // these rules guard credential endpoints, so a limiter that can be
+      // made to fail is a password-guessing oracle, and "the limiter
+      // broke" must never quietly mean "no limit".
+      //
+      // Note the deliberate asymmetry with the tutor route, which does
+      // the opposite — see packages/db/src/ai-rate-limit.ts. There, failing
+      // closed costs an honest reader a 429; here it costs someone their
+      // account.
+      disableMemoryFallback: true,
       customRules: {
         "/sign-in/email": { window: 60, max: 5 },
         "/sign-up/email": { window: 3600, max: 5 },
       },
+    },
+    session: {
+      expiresIn: SESSION_EXPIRES_IN_SECONDS,
+      updateAge: SESSION_UPDATE_AGE_SECONDS,
+    },
+    /*
+     * The cookie carries the session token itself, so it is `httpOnly`
+     * (no script can read it) and `sameSite: "lax"` (no other site can
+     * send it on a write). Both are Better Auth's defaults and are set
+     * explicitly here so that a dependency upgrade cannot quietly change
+     * them — the origin guard in apps/web is a second layer, and a second
+     * layer is only a second layer if the first one stays put.
+     *
+     * `secure` is deliberately NOT forced. It defaults to true when
+     * baseURL is https, which is the deployed case; forcing it would
+     * break local development over http, where the cookie would then
+     * never be sent and every test would fail with an authentication
+     * error that looks nothing like a cookie problem.
+     */
+    cookies: {
+      httpOnly: true,
+      sameSite: "lax",
     },
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,

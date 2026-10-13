@@ -18,6 +18,13 @@ import { getSession } from "@/lib/session";
  *   1. session   — no account, nothing. getSession() returns null
  *                  rather than throwing, so an unreachable auth
  *                  database reads as "logged out" and denies.
+ *
+ *                  This runs BEFORE the slug is resolved, and that
+ *                  ordering is the whole fix. findTopic() walks the
+ *                  registry, so with this check third an anonymous
+ *                  caller could enumerate every topic of every paid
+ *                  module by watching for 401 versus 404 — the 401s
+ *                  were the catalogue, for free and with no account.
  *   2. purchase  — getOwnedCodes() counts only status === "paid", so
  *                  a pending or refunded row unlocks nothing. This
  *                  is the gate that swaps the buy button for a
@@ -53,19 +60,30 @@ function findTopic(slug: string): Located | null {
 export async function GET(_req: NextRequest, { params }: Params): Promise<Response> {
   const { slug } = await params;
 
-  const found = findTopic(slug);
-  if (!found || found.topic.pdf === null) {
-    return new Response("That topic does not exist.", {
-      status: 404,
-      headers: { "content-type": "text/plain; charset=utf-8" },
-    });
-  }
-
   // --- gate 1: a session ---
+  //
+  // FIRST, before the slug is resolved. It used to run last, and the
+  // reordering is the whole fix: `findTopic` walks the registry and
+  // answers 404 for anything absent, so with the session check after it,
+  // an anonymous caller could walk the entire slug list — every topic of
+  // every paid module — with no account at all, simply by watching which
+  // slugs returned 401 and which returned 404. The 401s were the
+  // catalogue.
+  //
+  // With the order reversed, an anonymous caller gets one answer for
+  // every slug and learns nothing about which exist.
   const user = await getSession();
   if (!user) {
     return new Response("Sign in to download this topic.", {
       status: 401,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
+
+  const found = findTopic(slug);
+  if (!found || found.topic.pdf === null) {
+    return new Response("That topic does not exist.", {
+      status: 404,
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
   }

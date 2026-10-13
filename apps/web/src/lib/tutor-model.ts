@@ -74,9 +74,29 @@ export async function resolveTutorModel(wanted?: ModelSelection | null): Promise
   const user = await getSession();
 
   const stored = await readKey(user?.id);
+
+  /*
+   * THE READER'S KEY IS THERE AND COULD NOT BE USED.
+   *
+   * This branch used to be reachable only as a fallthrough, and it
+   * reported `substituted: Boolean(wanted)` — so when the reader had made
+   * no per-turn choice (the ordinary case, they just open the tutor and
+   * ask something) the flag was FALSE. They were answered by the server's
+   * Gemini account while believing the tutor was on their OpenRouter
+   * credit, and the one field whose entire job is "you did not get what
+   * you asked for" said everything was fine.
+   *
+   * `substituted` is now unconditionally true whenever a stored credential
+   * exists and the answer is coming off the server's account instead. If
+   * the reader has saved a key, then answering from ours IS a substitution,
+   * regardless of whether they picked a model this particular turn.
+   */
   if (stored && "problem" in stored) {
-    // Unreadable or undecryptable credential. Surface it; do not guess.
-    return { ...serverModel(), problem: stored.problem, substituted: Boolean(wanted) };
+    return {
+      ...serverModel(),
+      problem: stored.problem,
+      substituted: true,
+    };
   }
 
   const key = stored?.value ?? null;
@@ -156,9 +176,22 @@ async function readKey(
   let row: { readonly encryptedKey: string; readonly modelId: string } | null = null;
   try {
     row = await q.getProviderKey(db, userId, "openrouter");
-  } catch {
-    // An unreachable database is not a reason to spend the server's
-    // key while the reader believes their own is in use.
+  } catch (err) {
+    /*
+     * An unreachable database is not a reason to spend the server's key
+     * while the reader believes their own is in use — so this fails
+     * toward the server model WITH a stated reason rather than pretending
+     * the reader has no key at all. `substituted` is then set by the
+     * caller, which is what stops the notice being mistaken for the
+     * server quietly picking a model.
+     *
+     * It used to swallow the error entirely, which made this path
+     * indistinguishable from "this reader never saved a key" in the
+     * server log. The name is logged and nothing else: a driver error can
+     * carry the bound parameter values, and one of those is the
+     * credential.
+     */
+    console.error("[tutor] could not read the reader's stored key:", err instanceof Error ? err.name : "unknown");
     return { problem: "Your key could not be read just now, so the tutor fell back." };
   }
 

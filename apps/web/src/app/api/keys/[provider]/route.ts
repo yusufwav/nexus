@@ -17,10 +17,14 @@ import { requireUser } from "@/lib/require-user";
  * exist.
  */
 export async function DELETE(
-  _req: Request,
+  req: Request,
   ctx: { params: Promise<{ provider: string }> },
 ): Promise<Response> {
-  const user = await requireUser();
+  // Origin-checked: this destroys a credential. Removing someone else's
+  // is the outcome that matters, and while the `user_id` scoping below
+  // already prevents that, it is the reason to be explicit about the
+  // request's origin rather than relying on one browser default.
+  const user = await requireUser(req);
   if (user instanceof NextResponse) {
     return user;
   }

@@ -12,6 +12,10 @@ import {
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { consumeAiBudget } from "@Main/db/ai-rate-limit";
+import { db } from "@/services";
+import { CROSS_ORIGIN_REFUSAL, originAllowed } from "@/lib/origin-guard";
+import { allowedOrigins } from "@/lib/origin-set";
 import { getSession } from "@/lib/session";
 import { searchOwnNotes } from "@/lib/notes-retrieval";
 import { resolveTutorModel, type ModelSelection } from "@/lib/tutor-model";
@@ -238,12 +242,62 @@ function explainProviderFailure(error: unknown, source: "user-key" | "server"): 
  * expects a stream.
  */
 export async function POST(req: Request): Promise<Response> {
-  // --- gate: a session. No account, no model call. ---
+  /*
+   * GATE 1 of 2 — the request's ORIGIN.
+   *
+   * Ahead of the session on purpose. A cross-site POST should be turned
+   * away before a session lookup is spent on it, and the session check
+   * must never be the thing that lets a forged request through.
+   *
+   * Ahead of the spending gate too, for the same reason: the budget is
+   * there to stop model calls costing money, and a refusal costs none.
+   */
+  if (!originAllowed(req, allowedOrigins())) {
+    return NextResponse.json(CROSS_ORIGIN_REFUSAL, { status: 403 });
+  }
+
+  // --- gate 2: a session. No account, no model call. ---
   const user = await getSession();
   if (!user) {
     return NextResponse.json(
       { error: "Sign in to use the tutor." },
       { status: 401 },
+    );
+  }
+
+  /*
+   * THE SPENDING GATE
+   * ------------------------------------------------------------
+   * This route spends money on every call and there was nothing standing
+   * between a free account and the server's Gemini quota. Thirty
+   * consecutive POSTs all returned 200. A refused model selection does
+   * not help the attacker either: it still falls through to
+   * serverModel(), so "ask for a paid model and get rejected" burns the
+   * same budget as an ordinary question.
+   *
+   * The limit is per READER, not per IP, because an IP limit is trivially
+   * spread and because the thing being protected is the server's account.
+   * A reader who genuinely needs more turns than this is a support
+   * question, not something to solve by making the limit invisible.
+   *
+   * The count is DB-backed (see ai-rate-limit.ts) so the budget survives a
+   * restart or a cold start. In-memory would hand every attacker a fresh
+   * allowance each time the process cycled, which on serverless is
+   * measured in seconds.
+   *
+   * Checked AFTER the session gate and BEFORE anything expensive, so an
+   * unauthenticated flood costs a session lookup and nothing more.
+   */
+  const budget = await consumeAiBudget(db, user.id);
+  if (!budget.allowed) {
+    const retryAfter = Math.max(1, Math.ceil(budget.retryAfterMs / 1000));
+    return NextResponse.json(
+      {
+        error:
+          "You've used a lot of tutor turns in a short time. Give it a minute and try again.",
+        retryAfterSeconds: retryAfter,
+      },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } },
     );
   }
 

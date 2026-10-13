@@ -4,7 +4,8 @@ import AsciiField from "@/components/landing/ascii-field";
 import { ModelPicker, useModelPicker, type ModelPick } from "@/components/model-picker";
 import { useChat } from "@ai-sdk/react";
 import { createMathPlugin } from "@streamdown/math";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
+import { z } from "zod";
 import {
   ArrowUpIcon,
   HistoryIcon,
@@ -112,6 +113,63 @@ const TUTOR_PLUGINS = { math: MATH } as const;
  * answer length, not just a failure detector.
  */
 const WATCHDOG_MS = 30_000;
+
+/**
+ * What the server says about the turn that produced this message.
+ *
+ * The server has always sent this — `messageMetadata` in api/ai/route.ts,
+ * carrying which credential paid, whether the reader's choice was
+ * honoured, and any warning. Nothing ever READ it. The reader was told
+ * their model was in use while the answer came off the server's account,
+ * and the one field whose whole job is "you did not get what you asked
+ * for" was transmitted into the void.
+ *
+ * Mirrors the server's `messageMetadata` deliberately and is passed to
+ * `useChat` as `messageMetadataSchema`, so a mismatch fails validation
+ * rather than silently rendering nothing.
+ */
+const TutorMetadataSchema = z.object({
+  notes: z
+    .object({
+      read: z
+        .array(z.object({ moduleCode: z.string(), title: z.string() }))
+        .optional()
+        .default([]),
+    })
+    .optional(),
+  model: z
+    .object({
+      source: z.enum(["user-key", "server"]),
+      provider: z.string(),
+      modelId: z.string(),
+    })
+    .optional(),
+  /** Set when the requested model could not be used. */
+  warning: z.string().optional(),
+  /** True when the reader's explicit choice was NOT honoured. */
+  substituted: z.boolean().optional(),
+});
+
+type TutorMetadata = z.infer<typeof TutorMetadataSchema>;
+
+/**
+ * The one notice the reader needs above the conversation.
+ *
+ * Precedence matters. `warning` is the server naming a specific cause, so
+ * it wins. `substituted` on its own is the weaker signal that a different
+ * model answered, which is worth saying plainly because the alternative
+ * is the reader drawing conclusions from an answer that did not come from
+ * the model they chose. Silence is the one outcome that is never correct
+ * here.
+ */
+function tutorNotice(metadata: TutorMetadata | undefined): string | null {
+  if (!metadata) return null;
+  if (metadata.warning) return metadata.warning;
+  if (metadata.substituted) {
+    return "That model could not be used, so this answer came from the tutor's own model.";
+  }
+  return null;
+}
 
 /**
  * What to tell the reader when a turn fails.
@@ -262,8 +320,29 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
     id: threadId,
     messages: seed === null ? undefined : toUiMessages(seed),
     transport: chatTransport,
+    // Declared so `message.metadata` below is typed and VALIDATED rather
+    // than cast. Without this the server's notice arrives as `unknown` and
+    // the only way to render it is an unchecked assertion, which is how a
+    // notice that says the wrong thing gets shipped.
+    messageMetadataSchema: TutorMetadataSchema,
   });
   const isSending = status === "submitted" || status === "streaming";
+
+  /**
+   * The newest message that carries a notice wins.
+   *
+   * Scanned backwards rather than taking the last message: during
+   * streaming the newest message is the one still arriving, and it may
+   * not have its metadata yet. The most recent message that actually
+   * says something is the one the reader needs.
+   */
+  const tutorNoticeText = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const notice = tutorNotice(messages[i]?.metadata);
+      if (notice) return notice;
+    }
+    return null;
+  })();
   /**
    * The watchdog guards the WAIT FOR A FIRST TOKEN, not the turn.
    *
@@ -370,11 +449,21 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
   }, [paneOpen]);
 
   /** Stored rows in the shape useChat renders them back. */
-function toUiMessages(rows: ReadonlyArray<StoredMessage>) {
+/**
+ * Rebuild messages from a stored thread.
+ *
+ * Typed as `UIMessage<TutorMetadata>` rather than left to inference,
+ * because an object literal infers to a narrow shape with no `metadata`
+ * property at all — and that narrow type then propagates into `useChat`'s
+ * `messages`, which is exactly how `message.metadata` stops type-checking
+ * and starts needing a cast. The stored rows carry no metadata (it was
+ * never persisted), so it is simply absent.
+ */
+function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetadata>[] {
   return rows.map((m) => ({
     id: m.id,
     role: m.role,
-    parts: [{ type: "text" as const, text: m.content }],
+    parts: [{ type: "text", text: m.content }],
   }));
 }
 
@@ -721,6 +810,14 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>) {
               hasKey={picker.hasKey}
               disabled={isSending}
             />
+            {tutorNoticeText ? (
+              // role="status" so a screen reader announces it when it
+              // appears. aria-live territory: the answer below it can look
+              // entirely normal while this is what actually happened.
+              <p className="nt-ai__notice" role="status">
+                {tutorNoticeText}
+              </p>
+            ) : null}
             <button
               type="button"
               className="nt-btn nt-btn--ghost nt-ai__tool"

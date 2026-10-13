@@ -2779,6 +2779,32 @@
   letter-spacing: var(--tracking);
 }
 
+/* ---- "that model was not the one you picked".
+     Sits in the tools row beside the model picker, because that is where
+     the reader is already looking when a provider starts failing. Not a
+     modal and not an error state: the answer below it is perfectly good,
+     it just did not come from where they asked. warn, not danger, because
+     a substituted model is a fact about the answer rather than a failure
+     of the request. */
+.nt-ai__notice {
+  margin: 0;
+  padding-inline-start: var(--sp-2);
+  border-inline-start: 2px solid var(--warn-line);
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--fs-xs);
+  line-height: 1.35;
+  color: var(--warn);
+  text-align: start;
+}
+
+/* The tools row is icon-sized by default; a notice beside it needs the
+   row to be allowed to grow, and to wrap on a narrow phone rather than
+   pushing the icons off the edge. */
+.nt-ai__tools:has(.nt-ai__notice) {
+  flex-wrap: wrap;
+}
+
 /* ---- "browse modules" in the dashboard strip.
      A full label above 640px. Below it the label is replaced by the
      book glyph, because five controls plus a 14-character label do not

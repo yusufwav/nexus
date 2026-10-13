@@ -29,6 +29,55 @@ const apply = process.argv.includes("--apply");
 // Never echo the password back.
 const masked = url.replace(/\/\/([^:]+):([^@]+)@/, "//$1:***@");
 
+/*
+ * `--apply` RUNS DDL AGAINST WHATEVER DATABASE_URL POINTS AT.
+ *
+ * The read-only path is safe anywhere, so only the writing path is
+ * restricted. This is a smaller deal than grant-purchase.mjs — installing
+ * pgvector is an intended production step, and refusing it on a hosted
+ * database would mean the check could never be used for the deployment it
+ * exists to verify.
+ *
+ * So the requirement is the opposite one: state the target, and require
+ * the caller to name it. A typo in DATABASE_URL now fails loudly instead
+ * of quietly creating an extension on the wrong server, and the decision
+ * is recorded in the command rather than made by a flag someone passed in
+ * a hurry.
+ *
+ *   node scripts/check-pgvector.mjs --apply --yes-host=db.example.com
+ *
+ * Reading (no --apply) needs neither.
+ */
+const applyHostArg = process.argv.find((a) => a.startsWith("--yes-host="));
+const applyHost = applyHostArg?.slice("--yes-host=".length);
+
+if (apply && !applyHost) {
+  console.error(
+    "\n--apply changes the database. Name the target you mean:\n" +
+      "  node scripts/check-pgvector.mjs --apply --yes-host=<host-from-DATABASE_URL>\n",
+  );
+  process.exit(1);
+}
+
+if (applyHost) {
+  let host;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    console.error("DATABASE_URL is not a URL this script can parse; refusing to run.");
+    process.exit(1);
+  }
+  if (host !== applyHost) {
+    console.error(
+      `\n--apply target mismatch.\n` +
+        `  DATABASE_URL points at: ${host}\n` +
+        `  --yes-host named:     ${applyHost}\n\n` +
+        `  Re-run with --yes-host=${host} if that is what you meant.\n`,
+    );
+    process.exit(1);
+  }
+}
+
 const client = new Client({ connectionString: url });
 const results = [];
 const ok = (m) => results.push(["ok", m]);
