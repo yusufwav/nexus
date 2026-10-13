@@ -83,6 +83,31 @@ function secretIsInDotEnv(): boolean {
  * deploy.
  */
 const secretStatus = providerKeysConfigured();
+
+/*
+ * WHAT ORIGIN IS THIS DEPLOYMENT TRUSTING?
+ * ------------------------------------------------------------
+ * Printed on every cold start in production, on purpose.
+ *
+ * A wrong trustedOrigins fails in the most opaque way available: every
+ * same-origin request is refused with a bare 403 "Invalid origin", on
+ * sign-in, on sign-up and on every session check, while pages, styles and
+ * every other API route behave perfectly. Nothing about that points at
+ * configuration, and the value that is wrong is not printed anywhere.
+ *
+ * The deployed origin is public information - it is the address the
+ * reader just typed - so this leaks nothing. Compare the first value
+ * against the domain in the address bar: if they differ, sign-in is
+ * being refused against itself.
+ *
+ * An empty BETTER_AUTH_URL is the other case worth catching, and it looks
+ * the same from the outside. It means the platform variables this computes
+ * from were absent, and every origin is rejected rather than the right one.
+ */
+console.log(
+  `[boot] base URL: ${JSON.stringify(ENV.BETTER_AUTH_URL || "<empty>")}  (production domain: ${JSON.stringify(process.env.VERCEL_PROJECT_PRODUCTION_URL || "<unset>")}, deployment: ${JSON.stringify(process.env.VERCEL_URL || "<unset>")}, VERCEL_ENV: ${JSON.stringify(process.env.VERCEL_ENV || "<unset>")})`,
+);
+
 if (!secretStatus.ok) {
   const inDotEnv = secretIsInDotEnv();
   console.warn(
