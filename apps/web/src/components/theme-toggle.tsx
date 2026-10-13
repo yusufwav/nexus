@@ -14,8 +14,10 @@ import { useEffect, useState } from "react";
  *
  * Nothing renders before mount: the stored theme is unknown until
  * next-themes has read localStorage, and rendering the wrong icon
- * first causes a hydration mismatch. Until then it reports dark,
- * the palette the product launched with.
+ * first causes a hydration mismatch. Until then it reports light,
+ * which is the same default ThemeProvider is given - so the pre-mount
+ * icon and the first painted palette agree. When these two
+ * disagreed the button briefly showed a moon over a light page.
  */
 type Choice = "light" | "dark" | "system";
 
@@ -48,7 +50,7 @@ export default function ThemeToggle(): React.JSX.Element {
   const current: Choice =
     mounted && (theme === "light" || theme === "dark" || theme === "system")
       ? theme
-      : "dark";
+      : "light";
 
   return (
     <button

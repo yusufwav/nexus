@@ -166,6 +166,39 @@ export function createAuth(env: AuthConfig, database: Database) {
       updateAge: SESSION_UPDATE_AGE_SECONDS,
     },
     /*
+     * THE READER'S THEME
+     * ------------------------------------------------------------
+     * Declared as an additional field so it arrives in the session payload
+     * and can be written through updateUser, with no bespoke route and no
+     * hand-rolled SQL on the app side.
+     *
+     * `input: true` is what makes it writable. Without it the field is
+     * readable but not settable, and the save would have to be a direct
+     * database write - which is the thing this is avoiding, because the
+     * session cookie is signed by the library and a hand-rolled UPDATE
+     * would sit right next to code that is trusted to be correct.
+     *
+     * `required: false` keeps it nullable, and nullable is the point: NULL
+     * means "never chose", which is what lets a reader with no preference
+     * fall through to the site default. Making it required would force
+     * every existing account to be backfilled with a theme nobody picked.
+     *
+     * There is deliberately no enum or validation list here. The allowed
+     * values live in apps/web/src/lib/themes.ts so that adding a palette
+     * costs one array entry and no migration - see the note on the column
+     * in packages/db/src/schema/auth.ts. This only declares that the field
+     * is a string.
+     */
+    user: {
+      additionalFields: {
+        theme: {
+          type: "string",
+          required: false,
+          input: true,
+        },
+      },
+    },
+    /*
      * The cookie carries the session token itself, so it is `httpOnly`
      * (no script can read it) and `sameSite: "lax"` (no other site can
      * send it on a write). Both are Better Auth's defaults and are set

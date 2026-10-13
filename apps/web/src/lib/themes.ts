@@ -1,0 +1,138 @@
+/**
+ * THE LIST OF THEMES
+ * ------------------------------------------------------------------------
+ * One array, and everything else derives from it: what the dashboard
+ * offers, what an account value is allowed to be, and what an unknown
+ * value falls back to.
+ *
+ * WHY THIS IS A REGISTRY AND NOT A DATABASE CONSTRAINT
+ *
+ * More themes are coming - gruvbox, dracula, opencode orange. They are
+ * deliberately not listed here as placeholders, because a placeholder is a
+ * promise with nothing behind it and it would show up in the dashboard as a
+ * choice that silently does nothing.
+ *
+ * But the shape has to make adding one cheap and safe, because that is the
+ * part that is easy to get wrong. The obvious alternative is a Postgres enum
+ * or a CHECK constraint on user.theme. Both would be a schema migration to
+ * add a colour, applied to production while readers are signed in, to widen
+ * an allowed value list - and a forgotten migration would reject the write
+ * and lose the reader's choice.
+ *
+ * So the column is free text and this file is the allowlist. The cost is
+ * that the database will accept a value that names no real theme; the
+ * registry is what catches that, in isTheme(), and an unrecognised value
+ * resolves to the default instead of being applied. That failure is
+ * invisible and harmless. A rejected write is neither.
+ *
+ * HOW A THEME IS APPLIED
+ *
+ * `attribute="class"` on the ThemeProvider means next-themes writes the
+ * theme name onto <html> as a class, and the palettes are defined in
+ * styles/tokens.css against those class names. So adding a theme is two
+ * things: an entry here, and a `.gruvbox { ... }` block of tokens there.
+ *
+ *   light / dark / system
+ *     The two palettes that exist today. "system" is not a palette - it is
+ *     an instruction to follow the OS, and it has no tokens of its own.
+ */
+export const THEMES = [
+  {
+    id: "light",
+    label: "Light",
+    /** Shown in the dashboard. A word, not a swatch: both palettes are legible as text. */
+    hint: "Bright surfaces, dark text",
+  },
+  {
+    id: "dark",
+    label: "Dark",
+    hint: "Dark surfaces, light text",
+  },
+  {
+    id: "system",
+    label: "Match system",
+    hint: "Follow your operating system's setting",
+  },
+] as const;
+
+export type ThemeId = (typeof THEMES)[number]["id"];
+
+/**
+ * The theme a reader sees when they have expressed no preference.
+ *
+ * Light, per product decision. Note this is NOT "system": a reader on a
+ * dark OS who has never chosen, and has no account, gets light.
+ */
+export const DEFAULT_THEME: ThemeId = "light";
+
+/**
+ * Is this a theme we know how to render?
+ *
+ * The gate every stored value passes through. Deliberately strict and
+ * deliberately small: it accepts only ids present in THEMES, so a value
+ * written by an older build, a typo, or a hand-edited row cannot reach
+ * next-themes and become a class name on <html> that no stylesheet
+ * matches - which would render as an unstyled page.
+ */
+export function isTheme(value: unknown): value is ThemeId {
+  return typeof value === "string" && THEMES.some((t) => t.id === value);
+}
+
+/**
+ * Resolve anything - a stored value, a null, junk - to a usable theme.
+ *
+ * Always returns a real theme, so no caller has to handle a null here.
+ */
+export function resolveTheme(value: unknown): ThemeId {
+  return isTheme(value) ? value : DEFAULT_THEME;
+}
+
+/** Human label for a stored value, for display next to the current choice. */
+export function themeLabel(value: unknown): string {
+  if (!isTheme(value)) return "Unknown";
+  return THEMES.find((t) => t.id === value)?.label ?? "Unknown";
+}
+
+/**
+ * Should this be written to the reader's account?
+ *
+ * Extracted from ThemeSync because the rule was wrong the first time and the
+ * wrongness was invisible. The original compared the *stored* value against
+ * the *current* theme and saved on any difference - which meant that signing
+ * in and loading any page, with no choice ever made, wrote the site default
+ * into the row. "Never chose" became "chose light".
+ *
+ * The damage is deferred. The row looks fine, the reader sees the right
+ * colours, and the bug only surfaces the day DEFAULT_THEME changes and every
+ * one of those accounts stays stubbornly on the old value, with nothing in
+ * the database to explain why.
+ *
+ * So the question is not "does stored differ from current". It is "did the
+ * theme change since this page settled" - which is the only thing a save is
+ * ever meant to record.
+ *
+ *   signedIn  false  -> no. A visitor gets next-themes' local storage and no
+ *                      account to write to; ThemePicker says so in its copy.
+ *   settled not a real theme -> no. We have not established what the page
+ *                      arrived on, so any difference is meaningless. ThemeSync
+ *                      already refuses to settle until next-themes has read
+ *                      storage; this is the same rule stated where the
+ *                      decision is made, so a future caller cannot skip it.
+ *   current not a real theme -> no. Never write a value we cannot render.
+ *   current === settled     -> no. Nothing changed, so nothing was chosen.
+ *   otherwise               -> yes.
+ */
+export function shouldSaveTheme({
+  signedIn,
+  settled,
+  current,
+}: {
+  readonly signedIn: boolean;
+  readonly settled: unknown;
+  readonly current: unknown;
+}): boolean {
+  if (!signedIn) return false;
+  if (!isTheme(settled)) return false;
+  if (!isTheme(current)) return false;
+  return current !== settled;
+}

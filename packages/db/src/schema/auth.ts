@@ -7,6 +7,27 @@ export const user = pgTable("user", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
+  /**
+   * The reader's chosen palette, stored on the account rather than only in
+   * the browser.
+   *
+   * Nullable on purpose: NULL means "never chose", which is different from
+   * "chose light". That distinction is what lets a new reader fall through
+   * to the site default instead of being pinned to whatever the last
+   * device they used happened to be set to.
+   *
+   * Free text, NOT a database enum and NOT a CHECK constraint. More themes
+   * are coming - gruvbox, dracula, and others - and an enum or a CHECK
+   * would make every one of them a table migration, applied to production
+   * while readers are signed in, purely to widen an allowed value list.
+   *
+   * The trade is that the database will happily store a value that is not a
+   * real theme, which is what the registry in
+   * apps/web/src/lib/themes.ts exists to catch: an unrecognised id is not
+   * applied and falls back to the default. Adding a theme then costs one
+   * entry in one array, and no migration at all.
+   */
+  theme: text("theme"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

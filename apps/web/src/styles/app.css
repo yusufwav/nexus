@@ -3408,3 +3408,93 @@
     transition: none;
   }
 }
+
+/* ---- Appearance: theme picker ------------------------------------------------
+ *
+ * A radio group, not a switch. The placeholder it replaced was an on/off
+ * "Light theme" toggle, which cannot express "follow my OS" and would have
+ * needed a second toggle per palette. More themes are coming, so the shape
+ * that survives them is the one that grows by adding an option.
+ *
+ * Sized with the same tokens as everything else here rather than fixed
+ * rems - see the note in settings-controls.tsx about inline styles being
+ * unreachable by a media query, and about a fixed-width input leaving the
+ * label column one word wide on a phone.
+ * ---------------------------------------------------------------------------- */
+.nt-root .nt-theme-picker {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.nt-root .nt-theme-picker__legend {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  padding: 0 0 var(--sp-3);
+  font-weight: 600;
+  color: var(--fg);
+}
+.nt-root .nt-theme-picker__note {
+  font-weight: 400;
+  color: var(--fg-dim);
+}
+.nt-root .nt-theme-picker__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--sp-3);
+}
+.nt-root .nt-theme-picker__opt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+  text-align: left;
+  padding: var(--sp-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 10px);
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+.nt-root .nt-theme-picker__opt:hover {
+  border-color: var(--accent-line);
+  color: var(--fg);
+}
+/* The selected state is carried by border AND background, not colour alone,
+ * so it is still distinguishable without colour perception. */
+.nt-root .nt-theme-picker__opt[data-active] {
+  border-color: var(--accent-a);
+  background: var(--accent-soft);
+  color: var(--fg);
+}
+.nt-root .nt-theme-picker__opt:focus-visible {
+  outline: 2px solid var(--accent-b);
+  outline-offset: 2px;
+}
+.nt-root .nt-theme-picker__label {
+  font-weight: 600;
+  color: inherit;
+}
+.nt-root .nt-theme-picker__hint {
+  font-size: 0.82em;
+  color: var(--fg-dim);
+  overflow-wrap: anywhere;
+}
+.nt-root .nt-theme-picker__status {
+  margin: var(--sp-3) 0 0;
+  font-size: 0.82em;
+  color: var(--fg-dim);
+  min-height: 1.2em;
+}
+/* A polite live region: this text changes after a round trip to save, and a
+ * screen reader should hear it without being interrupted mid-sentence. */
+.nt-root .nt-theme-picker__status:empty {
+  margin: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nt-root .nt-theme-picker__opt {
+    transition: none;
+  }
+}

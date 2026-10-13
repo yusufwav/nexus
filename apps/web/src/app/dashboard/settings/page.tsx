@@ -7,6 +7,7 @@ import {
   PlaceholderField,
   PlaceholderSwitch,
 } from "@/components/settings-controls";
+import { ThemePicker } from "@/components/theme-picker";
 import { requireSession } from "@/lib/session";
 
 import "@/styles/landing.css";
@@ -204,10 +205,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
             description="Stops the ASCII field and the reveal animations. The OS-level setting already does this."
             defaultOn
           />
-          <PlaceholderSwitch
-            label="Light theme"
-            description="Dark only for now. The palette was designed for black and has no light counterpart."
-          />
+          <ThemePicker />
           <PlaceholderAction
             label="Export your data"
             description="Every purchase, note, and annotation as JSON."

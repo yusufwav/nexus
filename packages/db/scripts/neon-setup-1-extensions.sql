@@ -50,6 +50,17 @@ CREATE TABLE IF NOT EXISTS "user" (
   "email"          text NOT NULL,
   "email_verified" boolean DEFAULT false NOT NULL,
   "image"          text,
+  -- The reader's chosen palette. Nullable so that NULL can mean "never
+  -- chose", which is what lets a new reader fall through to the site
+  -- default instead of being pinned to a value nobody picked.
+  --
+  -- Free text, deliberately NOT an enum or a CHECK constraint. More
+  -- palettes are coming and either would make adding one a table
+  -- migration applied to production while readers are signed in, purely
+  -- to widen an allowed value list. The allowlist lives in
+  -- apps/web/src/lib/themes.ts, and a value naming no real theme falls
+  -- back to the default rather than being applied.
+  "theme"          text,
   "created_at"     timestamp DEFAULT now() NOT NULL,
   "updated_at"     timestamp DEFAULT now() NOT NULL
 );
