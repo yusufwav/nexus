@@ -183,3 +183,54 @@ export function shouldSaveTheme({
   if (!isTheme(current)) return false;
   return current !== settled;
 }
+
+/**
+ * Should the account's saved theme be applied to the page right now?
+ *
+ * Extracted from ThemeSync because the version inside the component was wrong
+ * in a way nobody could see: it decided "there is no saved theme to apply"
+ * the first time the session query settled, and never looked again.
+ *
+ * Better Auth's session atom starts as { data: null, isPending: true } and
+ * sets isPending false both when the fetch SUCCEEDS and when it FAILS. So the
+ * first settle does not mean "this reader is anonymous" - it may mean "we did
+ * not find out". The old code sealed itself there, and whenever the session
+ * arrived a moment later - a slow fetch, a transient failure, a cold start -
+ * the account's theme was silently never applied. The reader landed on
+ * whatever their device had, and the only way back to their own theme was a
+ * refresh, which retried the query and usually worked. That reads as a
+ * rendering bug, and it is not one.
+ *
+ * Three answers, not two:
+ *
+ *   still fetching       -> do nothing, keep waiting
+ *   the fetch failed     -> do nothing, keep waiting. We do not know yet,
+ *                           and because nothing is sealed, the next
+ *                           successful settle is handled normally.
+ *   settled with a session carrying a real theme -> apply it, once
+ *
+ * `applied` is what stops a local change being reverted. Once the account's
+ * theme has been applied, a reader who then picks a different one must keep
+ * it: the condition stops matching, so the account value does not drag them
+ * back on the next render. That is what makes it safe to run on every render
+ * rather than sealing after a single use.
+ */
+export function shouldRestoreTheme({
+  isPending,
+  error,
+  storedTheme,
+  currentTheme,
+  applied,
+}: {
+  readonly isPending: boolean;
+  readonly error: unknown;
+  readonly storedTheme: unknown;
+  readonly currentTheme: unknown;
+  readonly applied: string | null;
+}): boolean {
+  if (isPending) return false;
+  if (error) return false;
+  if (!isTheme(storedTheme)) return false;
+  if (applied === storedTheme) return false;
+  return storedTheme !== currentTheme;
+}

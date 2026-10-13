@@ -29,6 +29,7 @@ import {
   isTheme,
   nextTheme,
   resolveTheme,
+  shouldRestoreTheme,
   shouldSaveTheme,
   themeGlyph,
   themeLabel,
@@ -243,6 +244,56 @@ for (const t of THEMES) {
   eq(`${t.id} has a glyph`, typeof t.glyph === "string" && t.glyph.length > 0, true);
 }
 eq("unknown value falls back to a glyph", typeof themeGlyph("nope"), "string");
+
+console.log("\nthe restore rule, and the race that made the theme need a refresh");
+/*
+ * This is the bug behind "changing the theme does nothing until I reload".
+ *
+ * Better Auth's session atom starts { data: null, isPending: true } and clears
+ * isPending both on success and on FAILURE. ThemeSync used to seal itself the
+ * first time that settled, so a session that arrived afterwards - slow fetch,
+ * transient failure, cold start - was never read. The reader landed on their
+ * device's theme and had to reload.
+ *
+ * The rule below has to keep waiting while the answer is unknown, and must not
+ * seal, so a late session is handled by the ordinary render path.
+ */
+const restore = (o) => shouldRestoreTheme(o);
+const late = { storedTheme: "dracula", currentTheme: "dark", applied: null };
+
+console.log("\n  while the answer is not yet known");
+eq("still fetching", restore({ ...late, isPending: true, error: null }), false);
+eq("fetch failed", restore({ ...late, isPending: false, error: new Error("network") }), false);
+eq("fetch failed with no message", restore({ ...late, isPending: false, error: true }), false);
+
+console.log("\n  a late session IS applied - the case that used to be lost");
+eq("session arrives after a failure", restore({ ...late, isPending: false, error: null }), true);
+eq(
+  "and is not lost when the device theme differs",
+  restore({ storedTheme: "nord", currentTheme: "light", applied: null, isPending: false, error: null }),
+  true,
+);
+
+console.log("\n  it is applied exactly once, and then left alone");
+eq("already applied", restore({ ...late, applied: "dracula", isPending: false, error: null }), false);
+eq(
+  "reader changed it locally after it was applied",
+  restore({ storedTheme: "dracula", currentTheme: "nord", applied: "dracula", isPending: false, error: null }),
+  false,
+);
+eq("already showing it", restore({ ...late, currentTheme: "dracula", isPending: false, error: null }), false);
+
+console.log("\n  a genuinely anonymous reader applies nothing, harmlessly");
+eq(
+  "no stored theme at all",
+  restore({ storedTheme: null, currentTheme: "dark", applied: null, isPending: false, error: null }),
+  false,
+);
+eq(
+  "stored theme names nothing real",
+  restore({ storedTheme: "no-such-theme", currentTheme: "dark", applied: null, isPending: false, error: null }),
+  false,
+);
 
 console.log(
   failures === 0
