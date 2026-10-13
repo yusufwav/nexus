@@ -1,5 +1,6 @@
 "use client";
 
+import CenteredSelect, { type SelectOption } from "@/components/centered-select";
 import { useState } from "react";
 
 /**
@@ -15,12 +16,23 @@ import { useState } from "react";
  */
 
 const KINDS = [
-  { value: "wrong", label: "something is wrong" },
-  { value: "unclear", label: "something is unclear" },
-  { value: "missing", label: "something is missing" },
-  { value: "typo", label: "typo or formatting" },
-  { value: "other", label: "other" },
+  { value: "wrong", label: "something is wrong", hint: "a calculation or fact that does not hold up" },
+  { value: "unclear", label: "something is unclear", hint: "correct, but hard to follow" },
+  { value: "missing", label: "something is missing", hint: "a step or a definition that should be there" },
+  { value: "typo", label: "typo or formatting", hint: "spelling, symbols, layout" },
+  { value: "other", label: "other", hint: "anything the four above do not cover" },
 ] as const;
+
+/**
+ * Flattened for CenteredSelect. Kept as a separate constant rather than
+ * mapping at render so the option list is a stable module-level value
+ * and does not rebuild on every keystroke elsewhere in the form.
+ */
+const KIND_OPTIONS: readonly SelectOption[] = KINDS.map((k) => ({
+  value: k.value,
+  label: k.label,
+  hint: k.hint,
+}));
 
 export default function ImprovementForm(): React.JSX.Element {
   const [sent, setSent] = useState(false);
@@ -91,18 +103,23 @@ export default function ImprovementForm(): React.JSX.Element {
         <label className="nt-label" htmlFor="imp-kind">
           what kind of feedback
         </label>
-        <select
-          id="imp-kind"
-          className="nt-input"
+        {/*
+          Was a native <select>, which rendered as the platform's own
+          grey control in the middle of a themed form, and could not show
+          a second line explaining what each kind means. It also sat
+          directly under the email field, which is why it read as part of
+          the email row rather than as its own control.
+
+          CenteredSelect is the same component the model picker uses, so
+          both behave identically and neither is a one-off.
+        */}
+        <CenteredSelect
+          label="feedback type"
+          listLabel="What kind of feedback"
           value={kind}
-          onChange={(e) => setKind(e.target.value)}
-        >
-          {KINDS.map((k) => (
-            <option key={k.value} value={k.value}>
-              {k.label}
-            </option>
-          ))}
-        </select>
+          onChange={setKind}
+          options={KIND_OPTIONS}
+        />
       </div>
 
       <div className="nt-field">

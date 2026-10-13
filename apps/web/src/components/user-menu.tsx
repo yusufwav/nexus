@@ -11,10 +11,13 @@ import Link from "next/link";
 import {
   BookOpenIcon,
   CompassIcon,
+  HomeIcon,
   LayoutDashboardIcon,
   LogOutIcon,
   ReceiptIcon,
   SettingsIcon,
+  SparklesIcon,
+  UserRoundIcon,
 } from "lucide-react";
 import { useMemo } from "react";
 
@@ -80,7 +83,24 @@ function topEdgeAnchor() {
  * only header there is: without this, being signed in on `/` meant there
  * was nowhere to sign out from.
  */
-export default function UserMenu(): React.JSX.Element {
+export default function UserMenu(props: {
+  /**
+   * Drop the panel from the trigger instead of from the top edge of the
+   * viewport.
+   *
+   * The top-edge anchor is right where this menu normally lives: a thin
+   * header that the panel then covers, so descending from y=0 continues
+   * a line rather than interrupting one. It is wrong on the dashboard,
+   * whose floating control is also at the top — a panel from y=0 there
+   * lands straight across the large avatar in the identity strip, so
+   * the two read as two menus fighting for the same corner.
+   *
+   * Anchoring to the trigger also puts the panel where the finger
+   * already is, which is the point of having the control float.
+   */
+  anchorToTrigger?: boolean;
+} = {}): React.JSX.Element {
+  const { anchorToTrigger = false } = props;
   const { data: session, isPending } = authClient.useSession();
 
   // Above the early returns below: a hook after a conditional return is
@@ -103,14 +123,25 @@ export default function UserMenu(): React.JSX.Element {
 
   return (
     <DropdownMenu>
+      {/*
+        AN ICON, NOT THE AVATAR.
+
+        The trigger was the account's profile photo with a caret beside
+        it. Two problems with that: a photo is a different shape from
+        every other control in the header, so the row read as "identity
+        block plus toolbar" rather than as one set of buttons; and it is
+        the only control on any page whose appearance changes per user,
+        which makes the header's rhythm impossible to keep consistent.
+
+        A person glyph is the same square as everything else in the row
+        and carries the same accessible name, so nothing is lost —
+        `aria-label` still says whose menu it is.
+      */}
       <DropdownMenuTrigger
-        className="nt-menu__btn nt-menu__btn--icon"
+        className="nt-btn nt-btn--ghost nt-btn--icon nt-menu__btn"
         aria-label={`Account menu for ${session.user.name ?? "you"}`}
       >
-        <Avatar name={session.user.name} image={session.user.image} size="sm" />
-        <span className="nt-menu__caret" aria-hidden="true">
-          ▼
-        </span>
+        <UserRoundIcon aria-hidden="true" />
       </DropdownMenuTrigger>
 
       {/* Descends from the top of the viewport rather than from the
@@ -121,8 +152,8 @@ export default function UserMenu(): React.JSX.Element {
           stays a slim, fixed-height strip on any screen instead of
           stretching to fill the viewport like the column did. */}
       <DropdownMenuContent
-        align="center"
-        anchor={anchor}
+        align={anchorToTrigger ? "end" : "center"}
+        anchor={anchorToTrigger ? undefined : anchor}
         collisionAvoidance={{ side: "shift", align: "shift", fallbackAxisSide: "none" }}
         positionMethod="fixed"
         side="bottom"
@@ -139,6 +170,21 @@ export default function UserMenu(): React.JSX.Element {
             by accident at best. The group is laid out as a row by
             .nt-menu__rail. */}
         <DropdownMenuGroup className="nt-menu__rail">
+          {/*
+            Home first. The dashboard is the only signed-in surface with
+            no site header, and its tab bar links only to other dashboard
+            pages — so without this there is no way back to the landing
+            page from inside it except the browser's back button, which
+            on a deep link is a dead end rather than a parent.
+          */}
+          <DropdownMenuItem
+            render={<Link href="/" />}
+            className="nt-menu__ico"
+            aria-label="Home"
+            data-label="Home"
+          >
+            <HomeIcon aria-hidden="true" />
+          </DropdownMenuItem>
           <DropdownMenuItem
             render={<Link href="/dashboard" />}
             className="nt-menu__ico"
@@ -178,6 +224,14 @@ export default function UserMenu(): React.JSX.Element {
             data-label="Browse catalogue"
           >
             <CompassIcon aria-hidden="true" />
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            render={<Link href="/ai" />}
+            className="nt-menu__ico"
+            aria-label="AI tutor"
+            data-label="AI tutor"
+          >
+            <SparklesIcon aria-hidden="true" />
           </DropdownMenuItem>
         </DropdownMenuGroup>
 

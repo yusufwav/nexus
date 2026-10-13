@@ -1,8 +1,5 @@
 "use client";
 
-import { AlertTriangleIcon } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-
 /**
  * THE MODEL PICKER
  * ------------------------------------------------------------
@@ -27,7 +24,27 @@ import { useCallback, useEffect, useState } from "react";
  * `substituted`, and this shows the reason. Silence there would be the
  * worst possible outcome — the reader believes they are evaluating a
  * model and is actually evaluating ours.
+ *
+ * WHY A HAND-BUILT LISTBOX AND NOT <select>
+ * ------------------------------------------------------------
+ * The native control was rendering as the platform's own dropdown: a
+ * grey rounded box that ignored the palette entirely, and on a phone a
+ * full-width sheet that covered the conversation. It also cannot show
+ * two lines per option, which this needs — the friendly label
+ * ("nemotron 3.5 lightning") is useless without the slug beside it
+ * ("nvidia/nemotron-3.5-lightning:free") when picking between several
+ * models from the same vendor.
+ *
+ * What a native control gives for free, and what this therefore has to
+ * earn back deliberately: keyboard navigation, Escape to dismiss, type-
+ * ahead, focus return, and the screen-reader wiring. All of that is
+ * implemented below rather than assumed, and the ARIA roles are the
+ * standard listbox pattern so it announces as a listbox rather than as
+ * a pile of buttons.
  */
+
+import CenteredSelect, { type SelectOption } from "@/components/centered-select";
+import { useCallback, useEffect, useState } from "react";
 
 export type ModelPick = {
   readonly provider: string;
@@ -48,6 +65,13 @@ const STORAGE_KEY = "nexus.tutor.model";
 
 /** "server" is a real option, not the absence of one. */
 export const SERVER_PICK: ModelPick = { provider: "server", modelId: "" };
+
+/**
+ * The option value that stands for "use the server's model". Separate
+ * from SERVER_PICK because CenteredSelect speaks in flat strings and
+ * this is the encoding of that choice inside one.
+ */
+const SERVER_PICK_VALUE = "server|";
 
 export function useModelPicker(): {
   pick: ModelPick;
@@ -142,31 +166,30 @@ export function ModelPicker(props: {
 }): React.JSX.Element {
   const { pick, onPick, models, hasKey, disabled } = props;
 
+  // "server default" is a real option rather than the absence of one,
+  // so it occupies the first slot in the same list every model follows.
+  const options: SelectOption[] = [
+    { value: SERVER_PICK_VALUE, label: "Server default (gemini)" },
+    ...models.map((m) => ({ value: `openrouter|${m.id}`, label: m.label, hint: m.id })),
+  ];
+
+  const value =
+    pick.provider === "server" && pick.modelId === ""
+      ? SERVER_PICK_VALUE
+      : `${pick.provider}|${pick.modelId}`;
+
   return (
-    <label className="nt-ai__model">
-      <span className="nt-ai__model-lbl">model</span>
-      <select
-        className="nt-ai__model-sel"
-        value={`${pick.provider}|${pick.modelId}`}
-        disabled={disabled}
-        onChange={(e) => {
-          const [provider, ...rest] = e.target.value.split("|");
-          onPick({ provider, modelId: rest.join("|") });
-        }}
-      >
-        <option value="server|">server default (gemini)</option>
-        {models.map((m) => (
-          <option key={m.id} value={`openrouter|${m.id}`}>
-            {m.label}
-          </option>
-        ))}
-      </select>
-      {pick.provider === "openrouter" && !hasKey && (
-        <span className="nt-ai__model-warn">
-          <AlertTriangleIcon aria-hidden="true" />
-          no key saved — add one in settings
-        </span>
-      )}
-    </label>
+    <CenteredSelect
+      label="model"
+      listLabel="Choose a model"
+      value={value}
+      disabled={disabled}
+      warning={pick.provider === "openrouter" && !hasKey ? "no key saved" : undefined}
+      options={options}
+      onChange={(v) => {
+        const [provider, ...rest] = v.split("|");
+        onPick({ provider, modelId: rest.join("|") });
+      }}
+    />
   );
 }

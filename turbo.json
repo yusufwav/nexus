@@ -35,6 +35,7 @@
     }
   },
   "globalEnv": [
+    "BETTER_AUTH_EXTRA_ORIGINS",
     "BETTER_AUTH_SECRET",
     "BETTER_AUTH_URL",
     "CI",

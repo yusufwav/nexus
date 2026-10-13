@@ -103,7 +103,7 @@ export default async function ModulesPage(): Promise<React.JSX.Element> {
         </div>
       </nav>
 
-      <main className="nt-app__main" style={{ paddingTop: "var(--sp-8)" }}>
+      <main className="nt-app__main nt-under-nav">
         <div className="nt-wrap" style={{ paddingBottom: "var(--sp-9)" }}>
           <div className="nt-sec-head" data-reveal="rise">
             <div className="nt-sec-head__bar">

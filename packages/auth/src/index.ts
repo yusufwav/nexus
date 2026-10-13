@@ -9,13 +9,44 @@ export type AuthConfig = {
   BETTER_AUTH_SECRET: string;
 };
 
+/**
+ * Extra origins, for testing from a phone on the same wifi.
+ * ------------------------------------------------------------
+ * `trustedOrigins` is a strict allowlist, so serving the app from
+ * `http://10.0.0.10:3001` and signing in from there fails the CSRF
+ * origin check — the request's Origin is not `BETTER_AUTH_URL`. That
+ * is correct behaviour rather than a bug, and the fix is to NAME the
+ * extra origin instead of widening the check.
+ *
+ * Deliberately NOT done: falling back to "trust whatever Origin the
+ * request carries", or to a wildcard. Either silently reduces the
+ * origin check to no check at all, and this check is what stands
+ * between a page on another site and a signed-in session.
+ *
+ * Read straight from process.env rather than through the generated env
+ * module so that adding it does not require regenerating env.ts — a
+ * codegen step that is not runnable on every machine here. Unset means
+ * exactly one trusted origin: the deployed one.
+ */
+function trustedOrigins(env: AuthConfig): string[] {
+  const raw = process.env["BETTER_AUTH_EXTRA_ORIGINS"];
+  const extra =
+    raw === undefined
+      ? []
+      : raw
+          .split(",")
+          .map((o) => o.trim())
+          .filter((o) => o.length > 0);
+  return [...new Set([env.BETTER_AUTH_URL, ...extra])];
+}
+
 export function createAuth(env: AuthConfig, database: Database) {
   return betterAuth({
     database: drizzleAdapter(database, {
       provider: "pg",
       schema,
     }),
-    trustedOrigins: [env.BETTER_AUTH_URL],
+    trustedOrigins: trustedOrigins(env),
     emailAndPassword: {
       enabled: true,
       /*

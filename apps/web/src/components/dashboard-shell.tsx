@@ -2,7 +2,11 @@ import Link from "next/link";
 
 import AsciiField from "@/components/landing/ascii-field";
 import ScrollReveal from "@/components/landing/scroll-reveal";
-import { SparklesIcon } from "lucide-react";
+import { BookOpenIcon } from "lucide-react";
+
+import { DASH_ACTIONS } from "@/lib/dash-actions";
+
+import UserMenu from "./user-menu";
 import type { Session } from "@Main/auth";
 
 import Avatar from "./avatar";
@@ -71,38 +75,52 @@ export default function DashboardShell({
             </p>
           </div>
 
-          <div className="nt-dash__id-actions">
-            {/* The tutor had no way in from anywhere in the dashboard:
-                five pages, none of them linking to it, so the only route
-                to /ai was typing the path or arriving from another nav.
-                Here rather than in the tab bar below, because the tabs
-                are this console's own sections and the tutor is a
-                destination outside the dashboard — the same distinction
-                that keeps "browse modules" up here too.
+            <div className="nt-dash__id-actions">
+              {/*
+               * THE INLINE ROW — desktop only.
+               *
+               * Hidden below 640px in favour of a floating <UserMenu />
+               * in the top-right corner. See `.nt-dash__float` in
+               * app.css for why a row of five controls does not survive
+               * a phone: it is three square icons beside two wide ones,
+               * which reads as ragged boxes rather than a toolbar.
+               *
+               * Both presentations reach the same destinations. The
+               * desktop row from DASH_ACTIONS; the floating menu through
+               * UserMenu, which offers a superset.
+               */}
+              <div className="nt-dash__id-row">
+                {DASH_ACTIONS.map(({ href, label, Icon }) => (
+                  <Link
+                    key={href}
+                    className="nt-btn nt-btn--ghost nt-btn--icon"
+                    href={href}
+                    aria-label={label}
+                    title={label}
+                  >
+                    <Icon aria-hidden="true" />
+                  </Link>
+                ))}
+                {/* Keeps its label on desktop, where there is room. */}
+                <Link className="nt-btn nt-btn--ghost nt-dash__modules" href="/modules">
+                  <BookOpenIcon className="nt-dash__modules-icon" aria-hidden="true" />
+                  <span className="nt-dash__modules-label">browse modules</span>
+                </Link>
+                <ThemeToggle />
+                <SignOutButton />
+              </div>
 
-                Icon rather than a `~/ai` label, with the name on
-                aria-label: an icon on its own announces nothing, and the
-                spark is the glyph the tutor's own heading uses.
-
-                Unconditional, unlike the public pages: this shell only
-                renders for a signed-in user, so there is no state in
-                which the link would be a dead end. */}
-            <Link
-              className="nt-btn nt-btn--ghost nt-btn--icon"
-              href="/ai"
-              aria-label="AI tutor"
-              title="AI tutor"
-            >
-              <SparklesIcon aria-hidden="true" />
-            </Link>
-            <Link className="nt-btn nt-btn--ghost" href="/modules">
-              browse modules
-            </Link>
-            <ThemeToggle />
-            <SignOutButton />
+              {/* The compact menu — mobile only, floated clear of the strip.
+                  See .nt-dash__float in app.css: it is deliberately the
+                  top-right control on the page rather than one more item
+                  in the identity row, because inside that row it sat on
+                  the console's border and read as clutter. */}
+              <div className="nt-dash__float">
+                <UserMenu anchorToTrigger />
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
       {/* ---- The console over the lower four fifths ---- */}
       <div className="nt-dash__console">

@@ -13,6 +13,15 @@ import { useState } from "react";
  * one and reloading shows it back off, which is the honest behaviour
  * for a control with nothing behind it.
  *
+ * ONE THING NOT TO REINTRODUCE: these controls used to carry their
+ * sizing as inline `style` — `width: "18rem"` on the input, a flex row
+ * on its wrapper. Inline styles cannot be reached by any stylesheet
+ * rule without `!important`, so on a 390px phone the fixed 18rem input
+ * left the label column about 20px wide and "Shown on the dashboard and
+ * on anything you publish." rendered ONE WORD PER LINE, with the input
+ * sitting on top of it. Layout that has to be overridden on small
+ * screens belongs in CSS where the override can reach it.
+ *
  * TODO: needs a user preferences table and a settings endpoint.
  * See IDEAS/TODO.md.
  */
@@ -70,13 +79,12 @@ export function PlaceholderField({
         <b>{label}</b>
         {hint !== undefined ? <span>{hint}</span> : null}
       </div>
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)" }}>
+      <div className="nt-field__control">
         <input
           id={id}
-          className="nt-input"
+          className="nt-input nt-field__input"
           type={type}
           value={value}
-          style={{ width: "18rem" }}
           onChange={(e) => setValue(e.target.value)}
         />
         {/* Only appears once the value has diverged from what it was.

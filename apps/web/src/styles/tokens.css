@@ -78,6 +78,28 @@
   --sp-8: 4rem;
   --sp-9: 6rem;
 
+  /* Height of the fixed site nav in landing.css, which page content
+     has to clear. Declared HERE rather than on `.nt-nav` itself: a
+     custom property set on an element is only readable by that element
+     and its descendants, and the content that needs to clear the nav is
+     a SIBLING of it, not a child. Declaring it on `.nt-nav` made
+     `calc(var(--nt-nav-h) + …)` invalid on the consuming element, which
+     silently dropped the padding to nothing — a worse overlap than the
+     one it was fixing. */
+  --nt-nav-h: 4.8125rem;
+
+  /* ---- Control sizes ----
+     One square for every icon-only control on every page.
+     Measured across all ten routes before this existed: 22 controls at
+     2.25rem and ten more at 30px, because `.nt-theme-btn` hard-coded a
+     smaller square and sat next to the 2.25rem ones in the same header
+     on every single page. Six-pixel mismatch, repeated everywhere.
+
+     `.nt-switch` is deliberately NOT sized from this: it is a 42x22
+     toggle, not an icon button, and making it square would misrepresent
+     what it does. Icon buttons only. */
+  --nt-icon-btn: 2.25rem;
+
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 14px;

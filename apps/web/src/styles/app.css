@@ -16,10 +16,39 @@
    canvas, the mono body type, and the fixed grid, so a new page
    only has to supply its content.
    ============================================================ */
-.nt-app {
+/*
+   * COMPOUND SELECTOR, AND IT IS NOT COSMETIC.
+   *
+   * `.nt-root` (landing.css:14) sets `min-height: 100svh` on itself, and
+   * this element carries both classes. (app)/layout.tsx imports
+   * landing.css AFTER app.css, so at equal specificity `.nt-root` wins
+   * on order — a plain `.nt-app { min-height: 0 }` is silently ignored,
+   * which is exactly what happened: the computed value stayed 704px on
+   * a 704px viewport with the site header on top, so the shell
+   * overflowed by the header's height and the composer sat below the
+   * fold with `overflow: hidden` clipping it off entirely.
+   *
+   * `.nt-root.nt-app` is (0,2,0) and cannot lose that way.
+   */
+.nt-root.nt-app {
   position: relative;
-  min-height: 100vh;
-  min-height: 100svh;
+  /*
+   * `height`, not `min-height`. The route inside this shell declared its
+   * own `min-height: 100svh` while sitting BELOW the header, so the
+   * document was always header-height taller than the viewport: a
+   * scrollbar appeared on every /ai load, and dragging it scrolled a page
+   * that had nothing below the fold. `height` plus `overflow: hidden`
+   * makes the shell exactly one viewport, so the page cannot scroll and
+   * the only thing that scrolls is the message list — which is what a
+   * chat should do.
+   *
+   * `100dvh` rather than `100svh`: dvh tracks the DYNAMIC viewport, so
+   * the composer stays put above the mobile keyboard instead of hiding
+   * behind it. `100vh` stays as the preceding fallback.
+   */
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-0);
@@ -28,7 +57,7 @@
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 .nt-app *,
 .nt-app *::before,
@@ -44,7 +73,16 @@
   outline-offset: 2px;
 }
 .nt-app__main {
+  /* `min-height: 0` is load-bearing, not tidy-up. A flex child defaults
+     to `min-height: auto`, which refuses to shrink below its content —
+     so without this the chain cannot be constrained to the viewport and
+     the overflow simply reappears one level down. `display: flex` lets
+     `.nt-ai` inside it take the height rather than needing to know what
+     the header measured. */
   flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 .nt-app__pad {
   padding-block: var(--sp-8);
@@ -1187,9 +1225,20 @@
   .nt-dash__id {
     gap: var(--sp-4);
   }
-  .nt-dash__id-actions .nt-btn {
-    display: none;
-  }
+  /*
+   * This used to contain
+   *
+   *     .nt-dash__id-actions .nt-btn { display: none; }
+   *
+   * which hid EVERY button in the strip on a phone, and was the
+   * reason there was no way to get to the module listing from the
+   * dashboard. It also removed sign-out entirely - the dashboard has
+   * no user menu, so a signed-in reader on a phone had no way to sign
+   * out at all. Hiding a control is not the same as making it fit.
+   *
+   * Each button now keeps a presentation that fits instead: 'browse
+   * modules' and 'sign out' become icons, and nothing is removed.
+   */
 }
 
 /* ---- The console: the glass container over the lower 4/5ths ---- */
@@ -1655,8 +1704,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: var(--nt-icon-btn);
+  height: var(--nt-icon-btn);
   padding: 0;
   text-decoration: none;
 }
@@ -2134,8 +2183,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  /* Was a hard-coded 30px, sitting beside the 2.25rem icon buttons in
+     the same header on all ten pages. Now the same token as everything
+     else, so the row reads as one set of controls. */
+  width: var(--nt-icon-btn);
+  height: var(--nt-icon-btn);
   flex: 0 0 auto;
   padding: 0;
   border: 1px solid var(--line);
@@ -2194,10 +2246,17 @@
   border: 0;
 }
 
-.nt-ai {
+/* Compound for the same reason as `.nt-root.nt-app` above: this element
+   also carries `.nt-root`, which sets `min-height: 100svh` from
+   landing.css and would otherwise win on import order. */
+.nt-root.nt-ai {
   position: relative;
-  min-height: 100vh;
-  min-height: 100svh;
+  /* Fills the space the shell hands it rather than claiming a viewport
+     of its own. See `.nt-root.nt-app` — this used to be
+     `min-height: 100svh`, which stacked a second full viewport
+     underneath the site header. */
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--bg-0);
@@ -2206,7 +2265,7 @@
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
 /* The canvas. Same re-anchor as the dashboard strip: .nt-ambient-bg
@@ -2258,6 +2317,9 @@
   gap: var(--sp-4);
   padding: var(--sp-4) var(--sp-5);
   border-radius: var(--r-lg);
+  /* Only while collapsing. The expanded header is not clipped, so a long
+     title or an oversized picker is never cut off. */
+  overflow: hidden;
 }
 .nt-ai__head-txt {
   min-width: 0;
@@ -2305,72 +2367,6 @@
   flex-shrink: 0;
 }
 
-/* ============================================================
-   THE MODEL PICKER
-   ============================================================
-   Lives in the header next to the icon tools. The select is a real
-   native control rather than a custom listbox: it gets keyboard
-   behaviour, type-ahead and the platform's own picker on mobile for
-   free, and those are exactly the things a hand-rolled one gets wrong.
-
-   Colours are --fg / --fg-muted rather than --fg-dim, for the same
-   reason as the BYOK block: at --fs-xs that token measures under 4.5:1
-   and this control has to stay legible while it is being read under
-   pressure.
-   ============================================================ */
-.nt-ai__model {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding-right: var(--sp-2);
-  margin-right: var(--sp-1);
-  border-right: 1px solid var(--line);
-  min-width: 0;
-}
-.nt-ai__model-lbl {
-  font-size: var(--fs-xs);
-  letter-spacing: var(--tracking);
-  text-transform: lowercase;
-  color: var(--fg-muted);
-  white-space: nowrap;
-}
-.nt-ai__model-sel {
-  /* Capped so a long model slug cannot push the icon buttons off the
-     header on a narrow screen. */
-  max-width: 15rem;
-  padding: var(--sp-1) var(--sp-2);
-  border: 1px solid var(--line);
-  border-radius: var(--r-sm);
-  background: var(--bg-0);
-  color: var(--fg);
-  font-family: var(--nt-font-mono);
-  font-size: var(--fs-xs);
-  text-overflow: ellipsis;
-}
-.nt-ai__model-sel:focus-visible {
-  outline: 2px solid var(--accent-line);
-  outline-offset: 1px;
-}
-.nt-ai__model-sel:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-/* Shown only when an OpenRouter model is picked with no key saved. The
-   reader can still send — the server refuses the pick and explains —
-   but they should not have to discover it from the refusal. */
-.nt-ai__model-warn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: var(--fs-xs);
-  color: var(--warn);
-  white-space: nowrap;
-}
-.nt-ai__model-warn svg {
-  width: 0.8rem;
-  height: 0.8rem;
-  flex: 0 0 auto;
-}
 /* The header tools. DOUBLED selector, and it is load-bearing.
    `.nt-btn` lives in landing.css, which lands AFTER this file, and at
    one class each it wins on order. Two symptoms, both measured: the
@@ -2783,7 +2779,475 @@
   letter-spacing: var(--tracking);
 }
 
+/* ---- "browse modules" in the dashboard strip.
+     A full label above 640px. Below it the label is replaced by the
+     book glyph, because five controls plus a 14-character label do not
+     fit one row at 390px — the label was simply being pushed out of the
+     strip, which is how "no way to reach the module listing on mobile"
+     happened. The link itself never moved or disappeared, so nothing
+     here changes where it points. */
+.nt-dash__modules {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.nt-dash__modules-icon {
+  display: none;
+  width: 1rem;
+  height: 1rem;
+}
+/* Sign out: label above 640px, icon below. It carries an aria-label
+   either way, so the icon-only form still announces as "Sign out". */
+.nt-signout {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.nt-signout__icon {
+  display: none;
+  width: 1rem;
+  height: 1rem;
+}
 @media (max-width: 640px) {
+  .nt-dash__modules-label {
+    display: none;
+  }
+  .nt-dash__modules-icon {
+    display: block;
+  }
+  .nt-signout__label {
+    display: none;
+  }
+  .nt-signout__icon {
+    display: block;
+  }
+  /* The identity block and its actions share the strip; at this width
+     the actions need their own line or the theme toggle and sign-out
+     get pushed out of view. */
+  .nt-dash__id {
+    flex-wrap: wrap;
+  }
+  .nt-dash__id-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  /* The inline row is five controls — three square icons and two wide
+     ones — which on a phone rendered as ragged boxes of mixed widths
+     sitting across the console's top border. The menu carries the same
+     destinations in the free space at the top right instead. */
+  .nt-dash__id-row {
+    display: none;
+  }
+}
+
+/* ============================================================
+   SETTINGS FIELDS
+   Was inline `width: 18rem`. See the note in settings-controls.tsx —
+   inline sizing could not be overridden on a phone without
+   !important, which is what left the label column one word wide.
+   ============================================================ */
+.nt-field__control {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.nt-field__input {
+  width: 18rem;
+  max-width: 100%;
+}
+
+/* ============================================================
+   CLEARING THE FIXED NAV
+   ============================================================
+   `.nt-nav` in landing.css is `position: fixed` with no height
+   variable, and these two module pages set their own top padding
+   INLINE — `paddingTop: var(--sp-8)` = 64px — to get below it. The nav
+   measures 77px, so the `~/nexus/modules` breadcrumb started 13px
+   underneath the blurred bar and the first row of the path was hidden
+   behind the glass.
+
+   An inline style cannot be overridden by a media query without
+   !important, so the value had to move here. It is expressed as
+   "the nav, plus breathing room" rather than as a literal, so a change
+   to the nav's padding does not silently re-break these pages.
+
+   Deliberately NOT on `.nt-app__main`: that element also wraps /ai,
+   which is pinned to exactly one viewport, and adding block padding to
+   it there would reintroduce the page-level scrollbar.
+   ============================================================ */
+.nt-under-nav {
+  padding-top: calc(var(--nt-nav-h) + var(--sp-4));
+}
+
+/* ============================================================
+   THE COLLAPSING HEADER
+   ============================================================
+   Once the reader has sent something, the header's job — say what
+   this page is — is done, and it is competing with the conversation for
+   a mostly-vertical viewport. It collapses to a single button and the
+   transcript takes the space.
+
+   Height is animated rather than the children, because animating
+   `height` to `auto` is not a thing CSS can do; the two fixed heights
+   here are the measured collapsed and expanded values, and the grid
+   `1fr` row underneath is what actually absorbs the difference on
+   screen.
+
+   `overflow: hidden` is what makes it read as a collapse rather than a
+   disappearance: the contents slide out of a shrinking box.
+
+   The container is NOT `display: none` when collapsed. That would make
+   it un-focusable and un-findable by a screen reader, which is a worse
+   failure than a visible sliver. */
+.nt-ai__head.is-collapsible {
+  /*
+     Collapsed means GONE, not "a shorter bar".
+
+     The first attempt kept `max-height: 3.5rem` with `opacity: 0.55`,
+     which is not a collapse — it is a rendering fault: the heading and
+     the intro paragraph showed through as a half-height row of text cut
+     off mid-line, directly above the toggle that was supposed to have
+     replaced them. The reader saw two half-controls instead of one.
+
+     `visibility: hidden` rather than `display: none` because display
+     cannot be transitioned, so the header would snap out instead of
+     animating. It is delayed by the collapse duration so the header is
+     still painted while it shrinks, and it is what removes the controls
+     from the tab order — a `max-height: 0` box is still focusable, and
+     invisible-but-tabbable controls are worse than either state.
+  */
+  max-height: 0;
+  opacity: 0;
+  padding-block: 0;
+  margin-bottom: 0;
+  visibility: hidden;
+  transition:
+    max-height var(--dur-slow, 420ms) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out),
+    padding-block var(--dur-slow, 420ms) var(--ease-out),
+    margin-bottom var(--dur-slow, 420ms) var(--ease-out),
+    visibility 0s linear var(--dur-slow, 420ms);
+}
+.nt-ai__head.is-collapsible.is-open {
+  max-height: 24rem;
+  opacity: 1;
+  /* Restated rather than inherited, because the collapsed rule above
+     zeroes padding-block and would otherwise win. */
+  padding-block: var(--sp-4);
+  margin-bottom: var(--sp-4);
+  visibility: visible;
+  /* No delay on the way out, so the controls are reachable as soon as
+     they are on screen. */
+  transition:
+    max-height var(--dur-slow, 420ms) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out),
+    padding-block var(--dur-slow, 420ms) var(--ease-out),
+    margin-bottom var(--dur-slow, 420ms) var(--ease-out),
+    visibility 0s linear 0s;
+}
+
+/* The collapsed toggle. Same width and rhythm as the bar it replaces,
+   so nothing shifts when it appears. */
+.nt-ai__reveal {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-4);
+  border-radius: var(--r-md);
+  color: var(--fg-muted);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  animation: nt-fade-in var(--dur-med, 220ms) var(--ease-out);
+}
+.nt-ai__reveal:hover {
+  color: var(--fg);
+}
+.nt-ai__reveal:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+}
+.nt-ai__reveal svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+}
+/* Pushed to the far end so it reads as "these controls live here",
+   which is where they will come back to. */
+.nt-ai__reveal-icon {
+  margin-left: auto;
+}
+
+/* ============================================================
+   THE FLOATING ACCOUNT CONTROL (dashboard, phones only)
+   ============================================================
+   `position: fixed` and taken out of the strip entirely, so it is the
+   top-right control on the page rather than one more item in a row
+   that sits on the console's border.
+
+   The z-index is the point, and it is enough because none of the strip,
+   the console or the scroll-reveal veil create a stacking context that
+   a fixed child cannot escape — `.nt-dash` is their common ancestor and
+   none of them set a z-index on it. So this is genuinely topmost
+   rather than merely last in the document.
+
+   `env(safe-area-inset-*)` rather than nothing: on a notched phone the
+   notch is in exactly this corner. */
+.nt-dash__float {
+  display: none;
+}
+@media (max-width: 640px) {
+  .nt-dash__float {
+    --nt-z-float: 60;
+    display: block;
+    position: fixed;
+    top: calc(var(--sp-3) + env(safe-area-inset-top, 0px));
+    right: calc(var(--sp-3) + env(safe-area-inset-right, 0px));
+    z-index: var(--nt-z-float);
+  }
+  /* The inline row it replaces on phones. */
+  .nt-dash__id-row {
+    display: none;
+  }
+}
+@media (min-width: 641px) {
+  .nt-dash__id-row {
+    display: flex;
+  }
+}
+
+/* ============================================================
+   CENTERED SELECT
+   ============================================================
+   Shared by the model picker and the feedback form.
+
+   THE OVERLAY NUMBERS ARE NOT ARBITRARY. Every glass surface on this
+   site carries `backdrop-filter`, and `backdrop-filter` creates a
+   stacking context — so a dropdown nested inside one can never paint
+   above it, no matter how large its z-index. That is why the model
+   dropdown rendered behind the chat header's glass. The fix is the
+   portal in centered-select.tsx, which lifts the overlay out of every
+   ancestor stacking context; these values only have to beat ordinary
+   positioned siblings on the page, so they are deliberately far above
+   anything else rather than carefully interleaved.
+
+   --nt-z-select is the single knob. If a surface ever needs to sit
+   above this overlay, raise it here and nowhere else.
+   ============================================================ */
+.nt-sel {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.nt-sel__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  max-width: 16rem;
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-0);
+  color: var(--fg);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.nt-sel__btn:hover:not(:disabled) {
+  border-color: var(--accent-line);
+}
+.nt-sel__btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.nt-sel__btn:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 1px;
+}
+.nt-sel__lbl {
+  color: var(--fg-muted);
+  letter-spacing: var(--tracking);
+  text-transform: lowercase;
+}
+.nt-sel__cur {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-sel__chev {
+  width: 0.8rem;
+  height: 0.8rem;
+  flex: 0 0 auto;
+  color: var(--fg-muted);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.nt-sel__btn[aria-expanded="true"] .nt-sel__chev {
+  transform: rotate(180deg);
+}
+.nt-sel__warn {
+  font-size: var(--fs-xs);
+  color: var(--warn);
+  white-space: nowrap;
+}
+
+.nt-sel__overlay.nt-root {
+  /*
+     DOUBLED, and load-bearing twice over.
+
+     (1) The overlay carries `.nt-root` so the design tokens resolve —
+     they are declared on `.nt-root`, and a node portalled to <body> is
+     outside that scope, which rendered the panel fully transparent.
+     But `.nt-root` also sets `position: relative` and
+     `min-height: 100vh`, and landing.css loads AFTER this file, so at
+     equal specificity `.nt-root` wins on order and silently turned a
+     viewport-fixed overlay into a body-relative one — which breaks the
+     centring the moment the page is scrolled.
+
+     (2) Two classes beat one, so the overlay's own positioning wins
+     regardless of import order. This is the same fix already applied to
+     `.nt-ai__tool.nt-ai__tool` for the same reason.
+     */
+  position: fixed;
+  inset: 0;
+  min-height: 0;
+  height: auto;
+  z-index: var(--nt-z-select, 9999);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+}
+/* `inset: 0` alone would not reliably cover the visual viewport on
+   mobile, so it is sized from the fixed layer explicitly. */
+.nt-sel__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgb(0 0 0 / 0.55);
+  animation: nt-fade-in var(--dur-fast) var(--ease-out);
+}
+.nt-sel__panel {
+  position: relative;
+  width: min(26rem, 100%);
+  max-height: min(28rem, 72vh);
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--bg-2);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.6);
+  animation: nt-pop-in var(--dur-med, 220ms) var(--ease-out);
+}
+.nt-sel__panel:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+}
+.nt-sel__title {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking);
+  text-transform: lowercase;
+  color: var(--fg-muted);
+}
+.nt-sel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.nt-sel__opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-size: var(--fs-xs);
+  color: var(--fg-muted);
+}
+.nt-sel__opt.is-active {
+  background: var(--surface-bar);
+  color: var(--fg);
+}
+.nt-sel__opt-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.nt-sel__opt-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-sel__opt-hint {
+  font-size: 0.62rem;
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-sel__tick {
+  width: 0.8rem;
+  height: 0.8rem;
+  flex: 0 0 auto;
+  color: var(--accent-b);
+}
+.nt-sel__keys {
+  margin: var(--sp-3) 0 0;
+  font-size: 0.62rem;
+  color: var(--fg-dim);
+  text-align: center;
+}
+
+@keyframes nt-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes nt-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* The overlay is decorative motion on top of a real interaction, so the
+   OS setting applies to it like anything else. */
+@media (prefers-reduced-motion: reduce) {
+  .nt-sel__scrim,
+  .nt-sel__panel {
+    animation: none;
+  }
+}
+
+/* ============================================================
+   PHONE
+   ------------------------------------------------------------
+   Every rule below was written from a 390x844 screenshot rather than
+   from the desktop layout, because the failures only exist at this
+   width and each one was invisible above it.
+
+   Shared breakpoint: 640px, matching the existing .nt-ai rules just
+   above this block rather than inventing a sixth value.
+   ============================================================ */
+@media (max-width: 640px) {
+  /* Pre-existing phone rules, kept in the same block rather than left
+     as a second 640px query two hundred lines apart. */
   .nt-ai__shell {
     padding: var(--sp-4) var(--sp-3) var(--sp-3);
   }
@@ -2795,6 +3259,115 @@
   }
   .nt-ai__note {
     display: none;
+  }
+
+  /* ---- /ai: the header was a side-by-side row that could not fit.
+     The title column and the tool column each wanted their intrinsic
+     width, the model picker took the middle, and the result was the
+     picker sitting ON TOP of the "AI tutor" heading with the history
+     button pushed off the right edge of the screen entirely.
+
+     Stacked: identity on top, controls on a full-width row beneath.
+     The picker is allowed to shrink to nothing here because it has an
+     ellipsis; the buttons around it may not. */
+  .nt-ai__head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--sp-3);
+  }
+  .nt-ai__head-txt {
+    min-width: 0;
+  }
+  .nt-ai__tools {
+    margin-left: 0;
+    width: 100%;
+    /* Wrap rather than shrink: three icon buttons and a picker do not
+       share 390px without either wrapping or the buttons losing their
+       2.25rem square. */
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+  /* The picker takes its own row so the current model is readable
+     rather than truncated to "server d…", and so the buttons keep their
+     square. The overlay itself needs nothing here — it is already
+     centred and fixed, which is the whole point of the portal. */
+  .nt-sel {
+    flex: 1 1 100%;
+    order: -1;
+  }
+  .nt-sel__btn {
+    width: 100%;
+    max-width: none;
+    justify-content: flex-start;
+  }
+  .nt-sel__warn {
+    width: 100%;
+  }
+  .nt-sel__panel {
+    width: 100%;
+    max-height: 62vh;
+  }
+
+  /* ---- Dashboard tabs.
+     `.nt-dash__tabs` is `overflow-x: auto`, so "settings" and
+     "support" were reachable by swiping — but there is no visual hint
+     that they exist, and on the settings page the active tab was the
+     one cut off screen. Wrapping shows all five at once, which beats a
+     hidden scroller at this width. */
+  .nt-dash__tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: var(--sp-1) var(--sp-2);
+  }
+  .nt-dash__tab {
+    padding-block: var(--sp-2);
+  }
+
+  /* ---- Settings rows.
+     `.nt-drow` is a two-column grid, `minmax(0, 1fr) auto`. The action
+     column takes its intrinsic width — a full-width input — and the
+     text column is allowed to shrink to zero, so the description
+     rendered ONE WORD PER LINE beside the input. Stacked to a single
+     column, with the action beneath the text. */
+  .nt-drow {
+    grid-template-columns: 1fr;
+    gap: var(--sp-3);
+  }
+  .nt-drow__actions {
+    justify-content: stretch;
+  }
+  .nt-drow__actions .nt-input,
+  .nt-drow__actions .nt-btn {
+    width: 100%;
+  }
+
+  /* `.nt-switch-row` has the same two-column problem by a different
+     mechanism — it is `justify-content: space-between`, so the fixed
+     18rem input squeezed the label column rather than overflowing it.
+     Same fix: one column, control underneath. */
+  .nt-switch-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--sp-3);
+  }
+  .nt-field__control {
+    width: 100%;
+  }
+  .nt-field__input {
+    width: 100%;
+  }
+
+  /* ---- The BYOK form.
+     Three fields side by side at 390px gave each ~11 characters. */
+  .nt-keys__form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .nt-keys__field {
+    flex: 1 1 auto;
+  }
+  .nt-keys__row {
+    flex-wrap: wrap;
   }
 }
 

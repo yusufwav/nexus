@@ -12,6 +12,7 @@ import {
   MessageSquareIcon,
   RotateCwIcon,
   SparklesIcon,
+  SlidersHorizontalIcon,
   Trash2Icon,
 } from "lucide-react";
 import {
@@ -319,16 +320,28 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
   }, [awaitingFirstToken, stop]);
 
   // Follow the stream, but only when the reader is already at the
-  // bottom — yanking the viewport on every token would fight anyone
+  // bottom - yanking the viewport on every token would fight anyone
   // scrolling back through an earlier answer.
+  //
+  // "The bottom" is measured against .nt-ai__body, NOT the window. The
+  // page no longer scrolls at all - the shell is pinned to one viewport
+  // and this list is the only scroll container - so the old
+  // `window.innerHeight + window.scrollY >= document.body.offsetHeight`
+  // test was reading a scroll position that is now permanently 0. It
+  // did not merely break; it evaluated TRUE on every token, so the list
+  // was dragged to the bottom continuously and a reader trying to read
+  // back through an answer was fought the whole way.
   useEffect(() => {
     const el = endRef.current;
     if (el === null) {
       return;
     }
-    const nearBottom =
-      window.innerHeight + window.scrollY >= document.body.offsetHeight - 160;
-    if (nearBottom) {
+    const box = el.closest(".nt-ai__body") as HTMLElement | null;
+    if (box === null) {
+      return;
+    }
+    const distanceFromBottom = box.scrollHeight - box.scrollTop - box.clientHeight;
+    if (distanceFromBottom < 160) {
       el.scrollIntoView({ behavior: "smooth", block: "end" });
     }
   }, [messages, status]);
@@ -596,6 +609,57 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>) {
 
   const hasMessages = messages.length > 0;
 
+  /*
+   * THE HEADER, ONCE THE CONVERSATION HAS STARTED
+   * ------------------------------------------------------------
+   * Before the first message the header is the page's whole subject:
+   * it says what this is and it holds the tools. Once the reader has
+   * asked something, that subject has been answered and the header is
+   * competing with the conversation for a viewport that is mostly
+   * vertical space. So it collapses into a single button and the
+   * conversation gets the screen.
+   *
+   * The collapsed form is a BUTTON rather than a bare icon so the
+   * controls come back by an explicit, labelled action instead of by
+   * scrolling or tapping near where they used to be.
+   *
+   * Clicking it expands the panel again and it stays expanded until
+   * the reader clicks outside it. It does NOT collapse on its own
+   * after a timer: something the reader opened should stay open until
+   * they dismiss it, and a panel that hides itself is a panel that
+   * hides itself mid-interaction.
+   *
+   * GATED ON hasMessages, so a fresh chat is never in this state and
+   * there is nothing to expand back into before the first send.
+   */
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const controlsRef = useRef<HTMLDivElement>(null);
+
+  // Collapse the moment the conversation starts, and re-arm the flag so
+  // "new chat" returns to the full header rather than leaving the
+  // reader with a collapsed bar and no way to tell why.
+  useEffect(() => {
+    setControlsOpen(false);
+  }, [hasMessages]);
+
+  // Click outside dismisses. Only while expanded — with the panel
+  // collapsed there is nothing to dismiss, and a listener that always
+  // ran would swallow clicks aimed at the conversation.
+  useEffect(() => {
+    if (!controlsOpen) {
+      return;
+    }
+    const onPointerDown = (e: MouseEvent) => {
+      if (controlsRef.current && !controlsRef.current.contains(e.target as Node)) {
+        setControlsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+    };
+  }, [controlsOpen]);
+
   return (
     <div className="nt-root nt-ai">
       {/* The field is ambient: it ignores the pointer, so the header,
@@ -603,7 +667,33 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>) {
       <AsciiField variant="ambient" />
 
       <div className="nt-ai__shell">
-        <header className="nt-ai__head nt-glass">
+        {/*
+          THE COLLAPSED TOGGLE.
+          Rendered only once there is a conversation. It sits where the
+          header was, so the reader's eye does not have to travel, and it
+          is the same width as the bar it replaced so the layout does not
+          jump when it appears.
+        */}
+        {hasMessages && !controlsOpen && (
+          <button
+            type="button"
+            className="nt-ai__reveal nt-glass"
+            onClick={() => setControlsOpen(true)}
+            aria-label="Show tutor settings and tools"
+            aria-expanded={false}
+          >
+            <SparklesIcon aria-hidden="true" />
+            <span>AI tutor</span>
+            <SlidersHorizontalIcon className="nt-ai__reveal-icon" aria-hidden="true" />
+          </button>
+        )}
+
+        <header
+          className={`nt-ai__head nt-glass${hasMessages ? " is-collapsible" : ""}${
+            controlsOpen ? " is-open" : ""
+          }`}
+          ref={controlsRef}
+        >
           <div className="nt-ai__head-txt">
             <h1 className="nt-ai__title">
               <SparklesIcon aria-hidden="true" />

@@ -100,6 +100,12 @@
    ============================================================ */
 .nt-nav {
   position: fixed;
+  /*
+     Height published as `--nt-nav-h` on the root scope in tokens.css so
+     page content can clear this bar — see the note there for why it
+     cannot live on this rule. It is fixed-height in practice: the
+     vertical padding plus one line of the wordmark.
+     */
   top: 0;
   left: 0;
   right: 0;
