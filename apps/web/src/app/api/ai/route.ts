@@ -12,6 +12,7 @@ import {
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { emailVerificationRequired } from "@Main/auth";
 import { consumeAiBudget } from "@Main/db/ai-rate-limit";
 import { db } from "@/services";
 import { CROSS_ORIGIN_REFUSAL, originAllowed } from "@/lib/origin-guard";
@@ -262,6 +263,46 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json(
       { error: "Sign in to use the tutor." },
       { status: 401 },
+    );
+  }
+
+  /*
+   * THE VERIFICATION GATE
+   * ------------------------------------------------------------
+   * An unverified address cannot reach the model. This sits HERE —
+   * after the session, before the spending gate — for two reasons.
+   *
+   * After the session, because it needs a reader to have a verdict about.
+   * Before the budget, because a request refused here has cost nothing: no
+   * tokens consumed, no spend recorded against the server's key. Spending
+   * budget on a request that was going to be refused anyway would let an
+   * unverified account exhaust an honest reader's allowance.
+   *
+   * Why this route and not the layout. Verification gates the tutor because
+   * the tutor is what costs money; it deliberately does NOT gate the
+   * catalogue, the dashboard or purchasing. An unverified reader can find
+   * modules and buy one, which is the behaviour that matters — refusing to
+   * sell to someone whose confirmation mail is slow costs real money and
+   * stops nobody. See the note on `emailVerification` in packages/auth.
+   *
+   * 403 rather than 401: the reader IS authenticated and the session is
+   * valid. Calling this "sign in again" would send them to a login form that
+   * works perfectly and changes nothing, which is the worst thing to tell
+   * someone who is already signed in.
+   *
+   * `emailVerified` is read off the session rather than the database on
+   * purpose: it is the same field Better Auth writes when a token is
+   * redeemed, so there is no second source that could disagree and no query
+   * on the hot path of every tutor turn.
+   */
+  if (emailVerificationRequired() && user.emailVerified !== true) {
+    return NextResponse.json(
+      {
+        error: "Confirm your email address to use the tutor.",
+        code: "EMAIL_NOT_VERIFIED",
+        email: user.email,
+      },
+      { status: 403 },
     );
   }
 

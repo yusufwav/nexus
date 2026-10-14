@@ -3381,6 +3381,70 @@
 @media (max-width: 640px) {
   /* Pre-existing phone rules, kept in the same block rather than left
      as a second 640px query two hundred lines apart. */
+  /*
+     THE VERIFICATION NOTICE
+     ------------------------------------------------------------
+     A banner, not a modal and not a locked page. It says what is
+     restricted, why, and what still works - the reader can browse, read
+     and buy with an unverified address, so this must not read as "your
+     account is broken".
+
+     Accent is --warn rather than --danger: losing the tutor is an
+     inconvenience, not a failure, and a red block above a chat box
+     would read as an error the reader caused.
+
+     The address is in a <code> so it wraps on a narrow screen instead of
+     forcing the whole banner to scroll sideways.
+   */
+  .nt-verify {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-3);
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--warn-line);
+    border-inline-start-width: 3px;
+    border-radius: var(--r-md);
+    background: var(--warn-fill, color-mix(in srgb, var(--warn) 8%, transparent));
+    color: var(--fg);
+    font-size: var(--fs-xs);
+    line-height: 1.45;
+  }
+  .nt-verify-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    flex: 1 1 18rem;
+  }
+  .nt-verify-text b {
+    font-weight: 600;
+    color: var(--fg);
+  }
+  .nt-verify-text span {
+    color: var(--fg-muted);
+  }
+  .nt-verify-text code {
+    font-family: inherit;
+    color: var(--fg);
+    background: var(--panel);
+    padding: 0 0.25rem;
+    border-radius: var(--r-xs, 3px);
+    word-break: break-all;
+  }
+  .nt-verify-actions {
+    flex: 0 0 auto;
+  }
+  .nt-verify-done {
+    color: var(--ok);
+  }
+  .nt-verify-error {
+    flex: 1 0 100%;
+    margin: 0;
+    color: var(--danger);
+  }
+
   .nt-ai__shell {
     padding: var(--sp-4) var(--sp-3) var(--sp-3);
   }

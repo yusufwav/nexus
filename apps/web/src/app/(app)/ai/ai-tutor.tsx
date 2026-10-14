@@ -1,6 +1,7 @@
 "use client";
 
 import AsciiField from "@/components/landing/ascii-field";
+import EmailVerifyNotice from "@/components/email-verify-notice";
 import { ModelPicker, useModelPicker, type ModelPick } from "@/components/model-picker";
 import { useChat } from "@ai-sdk/react";
 import { createMathPlugin } from "@streamdown/math";
@@ -190,6 +191,19 @@ function tutorNotice(metadata: TutorMetadata | undefined): string | null {
  * "An error occurred." is matched explicitly. It is the SDK's generic
  * mask, so its arrival means the error arrived without a description —
  * showing it verbatim would be strictly worse than saying something.
+ *
+ * A JSON body is unwrapped, which is not the same as re-deriving one. When
+ * the server answers a refusal with `{ error, code, email }` the sentence
+ * has already been written for the reader; it just arrives wearing the
+ * envelope. Falling through to `text` therefore rendered the literal
+ *
+ *     {"error":"Confirm your email address to use the tutor.",
+ *      "code":"EMAIL_NOT_VERIFIED","email":"..."}
+ *
+ * into the chat, which is the one failure in this file a reader cannot
+ * act on. Unwrapping preserves the server's wording verbatim; it invents
+ * nothing. If the JSON has no `error` string the original text is used
+ * unchanged, so a body that happens to parse is never silently swallowed.
  */
 function failureMessage(err: unknown): string {
   const text = err instanceof Error ? err.message : String(err ?? "");
@@ -197,8 +211,25 @@ function failureMessage(err: unknown): string {
   if (text.includes("abort") || text.includes("timed out") || text.includes("timeout")) {
     return "That took too long and was stopped. Try a smaller question.";
   }
-  if (text.trim() && text.trim() !== "An error occurred.") {
-    return text.trim();
+
+  const trimmed = text.trim();
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      const message =
+        typeof parsed === "object" && parsed !== null
+          ? (parsed as { error?: unknown }).error
+          : undefined;
+      if (typeof message === "string" && message.trim()) {
+        return message.trim();
+      }
+    } catch {
+      // Not JSON after all. Fall through and show it as it is.
+    }
+  }
+
+  if (trimmed && trimmed !== "An error occurred.") {
+    return trimmed;
   }
   return "The tutor could not answer that. Try again.";
 }
@@ -860,6 +891,13 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
       <AsciiField variant="ambient" />
 
       <div className="nt-ai__shell">
+        {/*
+          The verification notice. First child of the shell so it sits above
+          the transcript rather than between the reader and their question —
+          the restriction is stated before they try, rather than arriving as a
+          403 after they have already composed something.
+        */}
+        <EmailVerifyNotice />
         {/*
           THE COLLAPSED TOGGLE.
           Rendered only once there is a conversation. It sits where the

@@ -4,6 +4,7 @@ import * as schema from "@Main/db/schema/auth";
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 
+import { mailConfigured, sendMail } from "./mail";
 import { normalizeOrigin, normalizeOriginList } from "./origin";
 
 /*
@@ -65,6 +66,42 @@ export type AuthConfig = {
  */
 const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24 * 7; // 7 days
 const SESSION_UPDATE_AGE_SECONDS = 60 * 60 * 24; // 1 day
+
+/**
+ * HOW LONG A VERIFICATION LINK IS GOOD FOR
+ * ------------------------------------------------------------------------
+ * One hour. The token is a bearer credential delivered by email, so the
+ * window is the time a stolen link is useful to somebody other than its
+ * owner, and email delivery is measured in minutes — a link that outlives the
+ * inbox it was sent to is just an unused attack surface.
+ *
+ * Better Auth's own default is 3600s, so this matches it deliberately rather
+ * than inventing a number. The reason it is stated here is that it is a
+ * security-relevant choice and the next reader should know it was one.
+ */
+const VERIFICATION_EXPIRES_IN_SECONDS = 60 * 60; // 1 hour
+
+/**
+ * IS EMAIL VERIFICATION ACTUALLY IN FORCE
+ * ------------------------------------------------------------------------
+ * Depends on mail being configured, and that dependency is the whole point.
+ *
+ * Verification is enforced by refusing an unverified reader something. If
+ * mail cannot be sent, an unverified reader can never become verified, so
+ * enforcing it protects nothing — it just removes the tutor permanently for
+ * anyone who signs up on a deploy that is missing a token. That is a worse
+ * failure than having no verification at all: it looks like the feature
+ * working, and it locks people out.
+ *
+ * So the gate is tied to the ability to satisfy it. With MailTrap configured
+ * it is on; without it, it is off and the site behaves exactly as it did
+ * before. Every caller reads this rather than reading the token itself, so
+ * there is one answer to "is verification in force" rather than three
+ * plausible ones.
+ */
+export function emailVerificationRequired(): boolean {
+  return mailConfigured();
+}
 
 function trustedOrigins(env: AuthConfig): string[] {
   /*
@@ -164,6 +201,77 @@ export function createAuth(env: AuthConfig, database: Database) {
     session: {
       expiresIn: SESSION_EXPIRES_IN_SECONDS,
       updateAge: SESSION_UPDATE_AGE_SECONDS,
+    },
+    /*
+     * EMAIL VERIFICATION
+     * ------------------------------------------------------------
+     * There was none. `user.email_verified` was already false for every
+     * account and nothing ever read it, so an address was an unproven string
+     * that a reader typed twice into the same form.
+     *
+     * WHAT IT IS ENFORCED AGAINST, AND WHAT IT IS NOT
+     * --------------------------------------------------------
+     * Verification proves control of a mailbox. It does not prove identity,
+     * and it does not stop someone registering with an address they do not
+     * own — that is what a payment wall is for, and paywalls already exist
+     * here. So this is not asked to carry that weight.
+     *
+     * What it does buy is narrower and real: one mailbox can no longer mint
+     * an unbounded number of accounts against the tutor's AI budget, because
+     * the budget is per reader and a throwaway address previously gave a
+     * fresh budget for free. That is why the gate sits on AI messages and not
+     * on the site — see apps/web/src/app/api/ai/route.ts. Browsing, the
+     * catalogue and buying are all unaffected, because refusing those would
+     * cost a real reader their purchase over a slow mail server while
+     * stopping nothing.
+     *
+     * `sendOnSignUp` is on, so the mail is in flight before the reader has
+     * finished reading the confirmation screen. Better Auth's default is to
+     * send it on sign-in only when already unverified, which means a reader
+     * who closed the tab loses the link and has to know a resend exists.
+     *
+     * `autoSignInAfterVerification` is on because the reader has just proved
+     * they clicked a link in their own inbox moments ago; making them type
+     * their password again immediately after is a second, redundant
+     * identity check, and it trains people to expect verification links to be
+     * followed by being logged out.
+     */
+    emailVerification: {
+      sendOnSignUp: true,
+      autoSignInAfterVerification: true,
+      expiresIn: VERIFICATION_EXPIRES_IN_SECONDS,
+      /**
+       * Better Auth hands us the finished link; we deliver it.
+       *
+       * `url` is not optional here and not something to be reconstructed from
+       * the email — it carries a signed token whose expiry and single-use
+       * semantics live in this library. Building an equivalent link by hand
+       * would be a second implementation of a security-relevant token, and
+       * the two would drift.
+       *
+       * A failure to send is logged and swallowed, never thrown. This runs
+       * inside sign-up: throwing would report a failed registration for an
+       * account that in fact exists, and the reader's next attempt would
+       * collide with "user already exists". They would be told the worst
+       * possible thing — that sign-up did not work — when the only thing
+       * that failed was a mail server.
+       */
+      sendVerificationEmail: async ({ user, url }) => {
+        const result = await sendMail({
+          to: user.email,
+          subject: "Verify your Nexus account",
+          heading: "Confirm your email address",
+          body: "One click and your address is confirmed. This link is good for an hour.",
+          link: url,
+          linkLabel: "Verify my email",
+        });
+
+        if (!result.ok) {
+          console.error(
+            `[auth] verification mail for ${user.email} was not accepted: ${result.reason ?? "unknown reason"}`,
+          );
+        }
+      },
     },
     /*
      * THE READER'S THEME
