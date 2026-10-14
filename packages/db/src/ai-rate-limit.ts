@@ -59,6 +59,26 @@ export type AiBudget = {
  * when it has expired. So the window is a real window rather than a
  * lifetime cap that eventually locks a reader out permanently.
  *
+ * `id` IS A FRESH RANDOM VALUE, AND IT WAS NOT ALWAYS
+ *
+ * `ai_usage` has two unique constraints: `id` is the primary key and `user_id`
+ * is unique. This clause names only one arbiter, so when two requests arrived
+ * before any row existed, both attempted an INSERT and the loser collided on
+ * the *primary key* instead of taking the update path:
+ *
+ *   duplicate key value violates unique constraint "ai_usage_pkey"
+ *
+ * A throw here is not recoverable for this route's own contract, which is
+ * written to fail OPEN for the reader's key and refuse only the server's. An
+ * unhandled 23505 is neither — it is a 500 on the tutor. Measured at roughly
+ * 1 in 120 concurrent first-turns, so it was real and had simply never been
+ * seen because nothing had ever fired two tutor turns at the same instant for
+ * a brand-new account.
+ *
+ * Found while building the read budget in packages/db/src/read-budget.ts, which
+ * had the identical shape and the identical fault; that one is now pinned by
+ * scripts/test-read-budget.ts.
+ *
  * ONE STATEMENT, NOT TWO, AND NOT IN A TRANSACTION
  *
  * The obvious shape is an upsert followed by a SELECT for the retry
@@ -78,7 +98,7 @@ export async function consumeAiBudget(db: Database, userId: string): Promise<AiB
 
   const rows = await db.execute(sql`
     insert into ai_usage (id, user_id, window_started_at, count, updated_at)
-    values (${`ai:${userId}`}, ${userId}, now(), 1, now())
+    values (gen_random_uuid()::text, ${userId}, now(), 1, now())
     on conflict (user_id) do update set
       count = case
         when ai_usage.window_started_at <= now() - make_interval(secs => ${windowSeconds})
