@@ -147,20 +147,54 @@ only. `/api/chat` and `/api/keys` both scope on `getSession()` and take no
 userId from the request. The content path is: PDF (gated, unlimited) and tutor
 (gated, limited).
 
-### 2. Read budget on the content path
+### 2. Read budget on the content path — **done**
 
 A DB-backed limiter on the content route, copying `packages/db/src/ai-rate-limit.ts`
 rather than inventing a second shape:
 
-- Per-reader, per-window, counter in the database so a restart does not hand
-  back a fresh allowance. Same reasoning as the tutor's budget: serverless
-  instances are created constantly, so in-memory would make the limit decorative.
-- One upsert carrying the whole decision, no read-then-write race.
-- **Degrade rather than 429.** A scraper retries a 429 for free. Serving slowed
-  or throttled content costs them wall-clock and costs an honest reader nothing.
-- Never auto-ban. A false positive punishes a real reader for reading fast, and
-  the AI limiter's failure mode of refusing the server key is explicitly not to
-  be copied here.
+- `packages/db/src/read-budget.ts`, plus `scripts/neon-setup-6-read-budget.sql`
+- Free allowance **20/min**, delay **250ms per request over it**, capped at **6s**
+- 26 assertions in `apps/web/scripts/test-read-budget.mjs` (arithmetic, placement,
+  and the shape of the counter) and 12 in `packages/db/scripts/test-read-budget.ts`
+  against a real database (increment, window reset, concurrency, agreement between
+  the pure curve and the persisted one)
+
+**A full 79-topic pull now costs ~285s of added delay; an honest reader's 7-topic
+module burst costs exactly 0ms.** Both numbers are asserted, not asserted-about.
+
+#### Two bugs this found
+
+**1. A primary-key collision under concurrency, in the new code and in shipped code.**
+`read_usage` has a PRIMARY KEY (`id`) and a UNIQUE (`user_id`), and the upsert names
+only `user_id` as its arbiter. Two requests arriving before any row exists both
+attempt an INSERT, and the loser collides on the *primary key* — a constraint the
+clause does not cover — raising `23505`. The fix is to let the database generate `id`.
+
+**`ai_usage` has the identical shape and the identical fault.** `consumeAiBudget`
+inserted `ai:${userId}` as the primary key while arbiting on `user_id`. Measured at
+roughly **1 in 120 concurrent calls**, which on `/api/ai` is an unhandled `23505` —
+a 500 on the tutor, and not the documented behaviour, which is to fail *open* for
+the reader's key and refuse only the server's. It had never fired because nothing
+had ever hit a brand-new account with two tutor turns at the same instant.
+
+Both are fixed, and `scripts/test-ai-budget.mjs` now pins it. That file also had two
+defects of its own, worth recording because both would have made it a test that
+passes while proving nothing:
+
+- It re-implemented the SQL and called itself *"verbatim"*, so when the fix landed
+  the test went on exercising a **copy of the bug**. It now reads the `id` expression
+  out of the real source and rejects one derived from `userId`.
+- Its new concurrency case used a single `pg.Client`, which **serialises** — it warns
+  "Calling client.query() when the client is already executing a query" and queues
+  the rest. 120 "concurrent" calls were a sequential loop that passed against the
+  unfixed code. It now uses a `Pool`.
+
+#### What this does not buy, stated plainly
+
+It does not stop anyone. Someone willing to wait four minutes gets the corpus, and
+nothing in this file changes that. What it does is make the naive loop take minutes
+instead of seconds, and make it leave a row behind. Attribution — section 3 — is
+what actually answers this problem.
 
 ### 3. Watermark
 
@@ -203,7 +237,7 @@ revenue plan.
 
 - [x] Grounded in the code (surfaces, gates, and what exists)
 - [x] 1. Baseline measurement — loop is 79 requests, honest burst is 7, gap is 11x
-- [ ] 2. Read budget on the content path
+- [x] 2. Read budget on the content path — found and fixed a live 500 in `consumeAiBudget`
 - [ ] 3. Watermark
 - [ ] 4. Read ledger
 - [ ] 5. Terms

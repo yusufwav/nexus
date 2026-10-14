@@ -13,6 +13,7 @@
     "db:test:rls": "node scripts/test-rls.mjs",
     "db:ai-usage": "node scripts/create-ai-usage-table.mjs",
     "db:test:ai-budget": "node scripts/test-ai-budget.mjs",
+    "db:test:read-budget": "tsx scripts/test-read-budget.ts",
     "db:migrate:deploy": "drizzle-kit migrate",
     "db:seed": "tsx src/seed.ts",
     "db:studio": "drizzle-kit studio",

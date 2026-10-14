@@ -4,6 +4,8 @@ import { MODULE_TOPICS, type ModuleTopic } from "@/content/module-topics";
 import { getOwnedCodes } from "@/lib/modules";
 import { assetFilename, readPrivateAsset } from "@/lib/private-assets";
 import { getSession } from "@/lib/session";
+import { consumeReadBudget } from "@Main/db/read-budget";
+import { db } from "@/services";
 
 /**
  * TOPIC PDF — pay gated
@@ -109,6 +111,34 @@ export async function GET(_req: NextRequest, { params }: Params): Promise<Respon
       status: 404,
       headers: { "content-type": "text/plain; charset=utf-8" },
     });
+  }
+
+  // --- gate 4: the pace ---
+  //
+  // Everything above answers "may this reader have this file". Nothing above
+  // answers "how many times may they ask", and one paying reader requesting all
+  // 79 topics in a session is a perfectly authorised sequence of requests. This
+  // is that missing half, and it delays rather than refuses: see the long
+  // note in packages/db/src/read-budget.ts for why a 429 here would be worse
+  // than useless.
+  //
+  // PLACEMENT IS THE POINT, and it is deliberate:
+  //
+  //   AFTER the purchase gate, so only someone who has actually paid can make
+  //   the server hold a connection open. Delaying before entitlement is a free
+  //   amplification for anyone with a throwaway account — the cheapest possible
+  //   way to tie up a serverless instance's execution time.
+  //
+  //   AFTER the file was found, so a 404 costs nothing. Counting requests that
+  //   served no content would let a reader be penalised for a mistyped slug,
+  //   and would hand an attacker a way to burn a budget without extracting
+  //   anything.
+  //
+  // The only requests paced are therefore exactly the ones that returned real
+  // bytes to someone entitled to them.
+  const budget = await consumeReadBudget(db, user.id);
+  if (budget.delayMs > 0) {
+    await new Promise((resolve) => setTimeout(resolve, budget.delayMs));
   }
 
   return new Response(file, {
