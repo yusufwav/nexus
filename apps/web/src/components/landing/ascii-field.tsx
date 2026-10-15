@@ -23,6 +23,65 @@ export interface AsciiFieldProps {
  * speed, cursor influence — is read from the CSS custom properties on
  * .nt-root, so the whole look is adjustable in one place.
  */
+/**
+ * How tightly the grid is packed, as a fraction of the glyph's own cell.
+ *
+ * One number controls the character count, and it is the whole knob:
+ *
+ *   1.00  one character per glyph cell — the field before this existed
+ *   0.89  ~26% more characters overall (1/0.89²), because density goes
+ *         as the square: both axes tighten together
+ *
+ * This is deliberately SEPARATE from `scale`. They used to be the same
+ * number doing two jobs — grid pitch AND glyph rasterisation size — so
+ * the only way to get more characters was to shrink the characters, which
+ * is why density and sharpness were locked together until now.
+ *
+ * Below about 0.8 the widest glyphs in the ramp (`#`, `%`, `@`) start
+ * crowding their neighbour. Overlapping is fine and is what happens; what
+ * is not fine is the last glyph in a row losing its shape, so this does
+ * not go much lower without the ramp being shortened too.
+ *
+ * Exported for the test, which asserts the density arithmetic rather than
+ * trusting it.
+ */
+export const ASCII_TIGHTEN = 0.89;
+
+/**
+ * The family the glyphs are rasterised in.
+ *
+ * Was `getComputedStyle(document.body).fontFamily`, which is
+ * `@apply font-sans` from packages/ui/src/styles/globals.css — a
+ * PROPORTIONAL stack. Every glyph in the ramp therefore had its own
+ * advance width, so `.` and `-` sat at a visibly different spacing from
+ * `#` and `@`, which is not what a character grid is supposed to look
+ * like. It also meant the horizontal slack between characters was
+ * whatever the widest glyph happened to leave, rather than a known
+ * fraction.
+ *
+ * Resolved through a probe element rather than by reading the token
+ * directly: `--nt-font-mono` is `var(--font-jetbrains-mono), ui-monospace,
+ * ...`, and the canvas font shorthand does not resolve nested `var()`. A
+ * throwaway span lets the cascade do it. Falls back to the previous
+ * behaviour if anything goes wrong, so this can never be the reason the
+ * field is blank.
+ */
+function resolveMonoFont(): string {
+  if (typeof document === "undefined") {
+    return "monospace";
+  }
+  const probe = document.createElement("span");
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  probe.style.width = "0";
+  probe.style.height = "0";
+  probe.style.fontFamily = "var(--nt-font-mono)";
+  document.body.appendChild(probe);
+  const resolved = getComputedStyle(probe).fontFamily;
+  probe.remove();
+  return resolved && resolved.length > 0 ? resolved : getComputedStyle(document.body).fontFamily;
+}
+
 export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -145,7 +204,7 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
     // Each ramp glyph is rasterised ONCE into its own small canvas at
     // the scaled cell size. Per frame we only alpha-blend these into
     // the buffer, so no text rasterisation happens during the loop.
-    const fontFamily = getComputedStyle(document.body).fontFamily;
+    const fontFamily = resolveMonoFont();
     const atlasCell = Math.max(2, Math.round(cell * scale));
     const atlas = ramp.map((ch) => {
       const c = document.createElement("canvas");
@@ -226,6 +285,14 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
     let cols = 0;
     let rows = 0;
     let cellPx = atlasCell;
+    /*
+     * Grid pitch, in buffer pixels. Separate from `cellPx` (the glyph's
+     * own rasterisation size) so that density can be changed without
+     * touching sharpness. `cellPx` still answers "how big is a character";
+     * these answer "how far apart are they".
+     */
+    let stepX = atlasCell;
+    let stepY = atlasCell;
 
     // The buffer is rendered at `scale` of the element's CSS size, then
     // the canvas is stretched back up by CSS. Keeping the backing store
@@ -248,8 +315,10 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
       // The noise grid still divides the screen evenly; only the pixels
       // each glyph is rasterised into are scaled down.
       cellPx = Math.max(2, Math.round(cell * scale));
-      cols = Math.max(1, Math.ceil(renderW / cellPx));
-      rows = Math.max(1, Math.ceil(renderH / cellPx));
+      stepX = Math.max(1, Math.round(cellPx * ASCII_TIGHTEN));
+      stepY = Math.max(1, Math.round(cellPx * ASCII_TIGHTEN));
+      cols = Math.max(1, Math.ceil(renderW / stepX));
+      rows = Math.max(1, Math.ceil(renderH / stepY));
       bufW = renderW;
       bufH = renderH;
       img = context.createImageData(bufW, bufH);
@@ -268,20 +337,40 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
 
       const time = now * 0.001 * speed;
 
+      /*
+       * Noise frequency is per CELL INDEX, not per pixel. Tightening the
+       * grid raises the indices, so an unchanged frequency would shrink
+       * every feature by the same factor the characters did - the field
+       * would read as much finer-grained, which is a different visual
+       * change from the one asked for. Dividing by ASCII_TIGHTEN keeps a
+       * given number of cells spanning the same physical distance, so the
+       * only thing that changes is how many characters sit in it.
+       */
+      const nf = 1 / ASCII_TIGHTEN;
+
       // Clear the whole buffer in one typed-array operation.
       buf.fill(0);
 
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
-          const n1 = valueNoise(x * 0.055 + time * 0.22, y * 0.055 - time * 0.14, 1);
-          const n2 = valueNoise(x * 0.021 - time * 0.11, y * 0.021 + time * 0.09, 7);
+          const n1 = valueNoise(x * 0.055 * nf + time * 0.22, y * 0.055 * nf - time * 0.14, 1);
+          const n2 = valueNoise(x * 0.021 * nf - time * 0.11, y * 0.021 * nf + time * 0.09, 7);
           let v = n1 * 0.62 + n2 * 0.38;
 
           // Cursor influence: a soft radial well that lifts the field
           // toward the pointer. Landing layer only.
           if (interactive && pointer.active) {
-            const cxp = pointer.x / cell;
-            const cyp = pointer.y / cell;
+            /*
+             * The pointer arrives in CSS pixels and `cell` is CSS pixels,
+             * so this converts to cell units. It has to divide by the
+             * new pitch rather than by `cell`: at a tighter pitch the same
+             * pixel distance covers more cells, and using `cell` would
+             * leave the well too small by exactly the factor the grid was
+             * tightened by. `stepX` is buffer pixels, hence the / scale.
+             */
+            const pitchCss = stepX / scale;
+            const cxp = pointer.x / pitchCss;
+            const cyp = pointer.y / pitchCss;
             const dx = x - cxp;
             const dy = y - cyp;
             const dist = Math.sqrt(dx * dx + dy * dy);
@@ -317,8 +406,14 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
           const mask = gl.a;
 
           // Blend this cell's glyph into the buffer.
-          const px0 = x * cellPx;
-          const py0 = y * cellPx;
+          // The glyph is written at its FULL width even though the pitch is
+          // tighter than that, so neighbours genuinely overlap rather than
+          // being clipped to a cell. A wider glyph drawn later simply
+          // paints over the tail of the one to its left, which is what
+          // "some characters overlap" looks like. Clamping to stepX instead
+          // would shave the right-hand side off every wide glyph.
+          const px0 = x * stepX;
+          const py0 = y * stepY;
           const bw = bufW - px0;
           const bh = bufH - py0;
           if (bw <= 0 || bh <= 0) {
