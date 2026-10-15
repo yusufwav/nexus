@@ -139,27 +139,39 @@
 
   /* Ambient layer — fixed, slow, non-interactive */
   --amb-ramp: " .·:+=xX#";
-  /* Was 10px. One pixel up, which is the whole answer to "the characters
-     are still a bit soft" without paying for supersampling: a larger glyph
-     has a longer stroke and more antialiased edge to read, so it is
-     clearer at 1:1 than a smaller one. The cost is density - the cell is
-     the grid pitch, so 10px -> 11px is about 10% fewer characters
-     across. That is the trade, and it is the cheap direction: 1px of
-     type is worth more than 4x the pixel work. */
-  --amb-font: 11px;
+  --amb-font: 10px;
   --amb-fps: 20;
-  /* Resolution is 1:1 with the CSS box and that is deliberate.
-     The history, so it is not retried:
-       0.6  buffer below CSS size, the browser scaled it UP, and the
-            glyph was only 6px - blurry in two ways at once
-       2    supersampled: the glyph rasterises at 22px and the browser
-            scales back down. Measurably crisper, and unbearably
-            laggy - 4x the pixels per frame on a layer that animates
-            continuously. Reverted.
-     1 is the point where nothing is being invented in between, and the
-     way to get more clarity out of that is a bigger glyph (--amb-font),
-     not a bigger buffer. */
-  --amb-scale: 1;
+  /*
+   * BACK TO WHERE IT WAS, on purpose, and the reason is not "0.6 looked
+   * nice".
+   *
+   * This layer is the dashboard header and the tutor transcript, and
+   * every attempt to make its characters "crisper" made it worse:
+   *
+   *   0.6  blurred, because the buffer was under CSS size and the
+   *        browser scaled it up
+   *   1    honest 1:1, and the characters read cleanly - the state
+   *        that was liked
+   *   2    supersampled. Crisper edges, and unbearably laggy
+   *   1 + a bigger glyph (11px)
+   *        the opposite of the theory. A 1px bump is 10% fewer
+   *        characters across, because the cell IS the grid pitch, and
+   *        what actually got worse is legibility: `x`, `+`, `:` and
+   *        `.` are thin-stroke glyphs, and at 11px on a dim layer
+   *        they antialias toward nothing. They read as soft dots.
+   *
+   * So the honest conclusion is that this layer was never suffering
+   * from resolution. It is a 20vh strip of low-ink characters drawn
+   * faintly (--amb-op) over a moving field, and it reads as texture
+   * because that is what it is. The improvements that DID help - the
+   * mono stack, the decoupled pitch - are in the shared component and
+   * stayed; what has been undone here is the two token changes that
+   * made it worse.
+   *
+   * The landing hero and the login screen, which are large and
+   * foreground rather than background, keep --ascii-font 11px at 1:1.
+   */
+  --amb-scale: 0.6;
   --amb-op: 0.6;
   --amb-low: #8b0000;
   --amb-high: #fdd3ae;
