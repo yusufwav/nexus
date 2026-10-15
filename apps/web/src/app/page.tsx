@@ -29,9 +29,24 @@ const HERO_CTA = { label: "open modules", href: "#modules" } as const;
 
 /* ---- Terminal README ---- */
 const README_TAGLINE: ReadonlyArray<string> = [
-  "Nexus Tutoring is an AI-powered study platform leveraging RAG to improve student learning.",
-  "Powered by an intelligent chatbot and shared study notes,",
-  "it helps students master coursework with contextual AI support.",
+  /*
+   * Rewritten down from 90/57/63 characters to 47/41/42.
+   *
+   * Not decoration. .nt-term__out now wraps, but the box is 760px of
+   * monospace and roughly 78 columns fit across it, so a line over that
+   * wraps and leaves a ragged two-row block in the middle of what is
+   * meant to read as a single breath. Keeping each line inside the
+   * measure makes wrapping the safety net rather than the norm.
+   *
+   * The wordcuts are the other half. "AI-powered study platform
+   * leveraging RAG" and "an intelligent chatbot" and "contextual AI
+   * support" were three ways of saying the tutor is smart, and none of
+   * them told a first-year what happens when they open it. "reads the
+   * same notes you do" says the thing itself.
+   */
+  "Nexus Tutoring is a study platform built on RAG.",
+  "A chatbot reads the same notes you do,",
+  "so it can explain the part you are stuck on.",
 ];
 
 /* ---- Mission ---- */

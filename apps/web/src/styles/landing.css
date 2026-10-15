@@ -508,6 +508,24 @@
 }
 .nt-term__out {
   color: var(--fg-muted);
+  /*
+   * The one opt-out that is about width rather than JSX indentation.
+   *
+   * .nt-term__line sets white-space: pre so the shell lines keep their
+   * spacing. These are prose, not shell output: at 1180px each tagline
+   * line fitted on one row, and when this section moved onto the same
+   * 760px wrap as pricing and reviews they no longer did. Under `pre` a
+   * long line cannot break, so it ran off the right edge and the reader
+   * lost the end of the sentence with nothing to signal it — and since
+   * .nt-term__body scrolls horizontally, it read as though there were
+   * simply no more text.
+   *
+   * Wrapping is the right fix for prose. The MATLAB snippet is a
+   * separate element under a separate rule, so the code stays `pre` and
+   * keeps its indentation exactly as written. Nothing here trades code
+   * layout for text layout.
+   */
+  white-space: normal;
 }
 .nt-term__h1 {
   display: block;
