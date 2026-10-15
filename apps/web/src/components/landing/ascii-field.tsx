@@ -204,9 +204,33 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
      *
      * Capped at 2: a 3x phone would otherwise ask for 9x the pixels of a
      * 1x one, on the layer that animates continuously.
+     *
+     * THE HERO GETS 1.5, AND IT IS THE ONLY DIFFERENCE ON THIS PAGE
+     * ------------------------------------------------------------
+     * Every other surface took DPR 2 without complaint; the landing hero
+     * did not, and the reason is four costs that only land there and
+     * multiply:
+     *
+     *   1. AREA. .nt-landing is min-height 100svh - the whole viewport.
+     *      The dashboard strip is 20vh. Same 4x, but on ~5x the pixels.
+     *   2. IT IS THE ONLY INTERACTIVE VARIANT. The cursor well runs a
+     *      Math.sqrt PER CELL PER FRAME inside the double loop, so this
+     *      is the only surface paying arithmetic on top of the blit.
+     *   3. FASTEST LOOP. --ascii-fps is 26 against the ambient layer's
+     *      20, so it also asks for the most frames per second.
+     *   4. THE PAGE MOUNTS TWO FIELDS. page.tsx renders an ambient layer
+     *      AND the hero, so the 4x is paid twice over on one screen.
+     *
+     * A 1.5 cap on the fullscreen variant is 2.25x rather than 4x - it
+     * keeps most of the crispness for 44% of the pixels, and it is
+     * scoped to the hero so the dashboard strip and the tutor keep the
+     * full treatment. On a 1x display this is a no-op (dpr is already 1),
+     * which is worth saying plainly: the cap cannot be verified here,
+     * because the lag it addresses only exists where dpr is 2.
      */
-    const dpr = Math.min(2, Math.max(1, globalThis.devicePixelRatio || 1));
-    scale = Math.min(2, scale * dpr);
+    const dprCap = interactive ? 1.5 : 2;
+    const dpr = Math.min(dprCap, Math.max(1, globalThis.devicePixelRatio || 1));
+    scale = Math.min(dprCap, scale * dpr);
 
     let low = hexToRgb(t[`${P}-low`]);
     let high = hexToRgb(t[`${P}-high`]);
