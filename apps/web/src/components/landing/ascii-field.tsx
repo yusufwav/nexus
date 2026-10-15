@@ -160,22 +160,20 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
      *               soft when you look at one character closely.
      *
      *   scale > 1   SUPERSAMPLING. The glyph is rasterised at
-     *               `cell * scale` — 20px for a 10px character — and the
-     *               browser scales the buffer back down. The character
-     *               ends up the same physical size with a far better
-     *               raster behind it, and the downscale averages several
-     *               samples per output pixel.
+     *               `cell * scale` and the browser scales the buffer
+     *               back down. Measurably crisper edges, and it was
+     *               tried at 2 and reverted: 4x the pixels per frame
+     *               on a continuously animating layer was unbearably
+     *               laggy. Kept because the cap is what stops someone
+     *               retrying it, not because it is a good idea here.
      *
-     * Worth being precise about what this does and does not buy: it adds
-     * no detail beyond the `cell`-px design size, it makes the edges of
-     * that design cleaner. For a field made of 10px characters that is
-     * the difference between soft and crisp, but it will not make a 6px
-     * character legible.
+     * The lesson from that revert, and the reason --amb-font went from
+     * 10px to 11px instead: clarity at 1:1 comes from a LARGER glyph,
+     * not a larger buffer. One extra pixel of type has a longer stroke
+     * and more edge to read; four times the pixel work buys a softness
+     * the eye stops noticing long before the frame rate recovers.
      *
-     * Capped at 2 rather than left open: the cost is quadratic in scale
-     * (4x the pixels at 2), and past 2 the returns are invisible while the
-     * frame cost is not. Only the ambient layer uses more than 1 — the
-     * landing field is fullscreen at 26fps and 4x that is not affordable.
+     * Capped at 2 rather than left open: the cost is quadratic in scale.
      */
     let scale = Number.parseFloat(t[`${P}-scale`]);
     if (!(scale > 0 && scale <= 2)) {

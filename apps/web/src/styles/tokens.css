@@ -139,19 +139,27 @@
 
   /* Ambient layer — fixed, slow, non-interactive */
   --amb-ramp: " .·:+=xX#";
-  --amb-font: 10px;
+  /* Was 10px. One pixel up, which is the whole answer to "the characters
+     are still a bit soft" without paying for supersampling: a larger glyph
+     has a longer stroke and more antialiased edge to read, so it is
+     clearer at 1:1 than a smaller one. The cost is density - the cell is
+     the grid pitch, so 10px -> 11px is about 10% fewer characters
+     across. That is the trade, and it is the cheap direction: 1px of
+     type is worth more than 4x the pixel work. */
+  --amb-font: 11px;
   --amb-fps: 20;
-  /* Supersampled. The history of this value is the whole blur story:
-       0.6  buffer below CSS size, browser scaled it UP -> blurry, and
-            the atlas glyph was only 6px
-       1    buffer matched CSS size, no upscale, but a 10px glyph drawn
-            into a 10px cell is still soft on its own edges
-       2    the glyph rasterises at 20px and the browser scales back
-            down. Same physical character size, much cleaner edges.
-     2 and not more: the cost is quadratic, and this is why the landing
-     field is still at 1 — it is fullscreen at 26fps, where 4x the pixels
-     is not affordable. */
-  --amb-scale: 2;
+  /* Resolution is 1:1 with the CSS box and that is deliberate.
+     The history, so it is not retried:
+       0.6  buffer below CSS size, the browser scaled it UP, and the
+            glyph was only 6px - blurry in two ways at once
+       2    supersampled: the glyph rasterises at 22px and the browser
+            scales back down. Measurably crisper, and unbearably
+            laggy - 4x the pixels per frame on a layer that animates
+            continuously. Reverted.
+     1 is the point where nothing is being invented in between, and the
+     way to get more clarity out of that is a bigger glyph (--amb-font),
+     not a bigger buffer. */
+  --amb-scale: 1;
   --amb-op: 0.6;
   --amb-low: #8b0000;
   --amb-high: #fdd3ae;
