@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { useMemo } from "react";
 
+import { useIsNarrow } from "@/lib/use-is-narrow";
+
 import { authClient } from "@/lib/auth-client";
 import useSignOut from "@/lib/use-sign-out";
 
@@ -97,10 +99,35 @@ export default function UserMenu(props: {
    *
    * Anchoring to the trigger also puts the panel where the finger
    * already is, which is the point of having the control float.
+   *
+   * BUT NOT ON A PHONE, and that is the whole reason this prop has a
+   * companion. Below 640px the dashboard's control is `position: fixed`
+   * at `top: calc(var(--sp-3) + env(safe-area-inset-top))` — inset on
+   * purpose, because a button flush against the top edge sits under the
+   * notch and the status bar. Anchoring to that rect puts the panel at
+   * the same inset rather than at y=0, so on a phone it appeared as a
+   * panel hanging just under the button instead of descending from the
+   * top of the screen. The inset that makes the control tappable
+   * becomes the offset that makes the panel look mispositioned.
+   *
+   * So the panel pins to the top edge on narrow screens even where the
+   * trigger would be the better anchor, and the phone gets the shape the
+   * landing page has always had. See useIsNarrow, and NARROW_QUERY for
+   * why 640 is the number.
    */
   anchorToTrigger?: boolean;
 } = {}): React.JSX.Element {
   const { anchorToTrigger = false } = props;
+  const isNarrow = useIsNarrow();
+  /*
+   * One name for the decision rather than `anchorToTrigger && !isNarrow`
+   * repeated at the two use sites. They have to agree: if the anchor
+   * said "centre against the viewport" while `align` said "end against
+   * the trigger", the panel would be centred on the full width and
+   * clamped to the right edge, which is neither the old shape nor the
+   * new one.
+   */
+  const pinToTopEdge = !anchorToTrigger || isNarrow;
   const { data: session, isPending } = authClient.useSession();
 
   // Above the early returns below: a hook after a conditional return is
@@ -152,8 +179,8 @@ export default function UserMenu(props: {
           stays a slim, fixed-height strip on any screen instead of
           stretching to fill the viewport like the column did. */}
       <DropdownMenuContent
-        align={anchorToTrigger ? "end" : "center"}
-        anchor={anchorToTrigger ? undefined : anchor}
+        align={pinToTopEdge ? "center" : "end"}
+        anchor={pinToTopEdge ? anchor : undefined}
         collisionAvoidance={{ side: "shift", align: "shift", fallbackAxisSide: "none" }}
         positionMethod="fixed"
         side="bottom"
