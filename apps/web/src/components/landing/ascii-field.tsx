@@ -221,43 +221,37 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
      * blurry on yours", and why bumping the constant by hand was chasing
      * the wrong axis.
      *
-     * dpr is the actual answer. It makes the buffer one device pixel per
-     * device pixel, so nothing is invented anywhere along the chain and
-     * the glyphs land as sharp as the CSS text sitting next to them. And
-     * it costs nothing on a 1x screen - scale stays exactly 1 - while
-     * giving retina the 2x it genuinely needs. That is the opposite of the
-     * hand-tuned constant, which charged a 4x bill everywhere to help
-     * one kind of screen.
+     * dpr WAS multiplied in here, and it is reverted, because it made the
+     * landing page lag badly and the reasoning behind it was wrong in a way
+     * worth recording.
      *
-     * Capped at 2: a 3x phone would otherwise ask for 9x the pixels of a
-     * 1x one, on the layer that animates continuously.
+     * The claim was that the buffer should be one DEVICE pixel per device
+     * pixel, so nothing is resampled. That is true as a statement about
+     * crispness. What was missed is that the cost is not a property of the
+     * component - it is a property of the AREA the component covers, and
+     * the same component covers wildly different areas:
      *
-     * THE HERO GETS 1.5, AND IT IS THE ONLY DIFFERENCE ON THIS PAGE
-     * ------------------------------------------------------------
-     * Every other surface took DPR 2 without complaint; the landing hero
-     * did not, and the reason is four costs that only land there and
-     * multiply:
+     *   dashboard / tutor   a 20vh strip           (nt-dash__strip)
+     *   landing body        position: fixed, inset: 0  - FULL VIEWPORT
      *
-     *   1. AREA. .nt-landing is min-height 100svh - the whole viewport.
-     *      The dashboard strip is 20vh. Same 4x, but on ~5x the pixels.
-     *   2. IT IS THE ONLY INTERACTIVE VARIANT. The cursor well runs a
-     *      Math.sqrt PER CELL PER FRAME inside the double loop, so this
-     *      is the only surface paying arithmetic on top of the blit.
-     *   3. FASTEST LOOP. --ascii-fps is 26 against the ambient layer's
-     *      20, so it also asks for the most frames per second.
-     *   4. THE PAGE MOUNTS TWO FIELDS. page.tsx renders an ambient layer
-     *      AND the hero, so the 4x is paid twice over on one screen.
+     * So multiplying by dpr charged the dashboard strip 4x on a small strip
+     * (invisible) and charged the landing page's ambient layer 4x on the
+     * entire viewport, at 20fps, on a page that also mounts the fullscreen
+     * hero. That is why the lag was always, and only ever, the landing.
      *
-     * A 1.5 cap on the fullscreen variant is 2.25x rather than 4x - it
-     * keeps most of the crispness for 44% of the pixels, and it is
-     * scoped to the hero so the dashboard strip and the tutor keep the
-     * full treatment. On a 1x display this is a no-op (dpr is already 1),
-     * which is worth saying plainly: the cap cannot be verified here,
-     * because the lag it addresses only exists where dpr is 2.
+     * The 1.5 cap on the hero did not help, and that is consistent: the
+     * expensive layer is the ambient one it left at full dpr.
+     *
+     * So the token alone decides resolution again. The consequence is that
+     * the field is resampled by the compositor on a high-dpi screen and is
+     * soft there - which was true before this whole line of work, and is
+     * cheaper than a page that stutters. If crispness is ever worth that
+     * price again it should be bought per SURFACE by area, not by a
+     * multiplier on the shared token, and measured on a high-dpi display -
+     * which is not the display this was developed on, and that is precisely
+     * why it went unnoticed for four commits.
      */
-    const dprCap = isLanding ? 1.5 : 2;
-    const dpr = Math.min(dprCap, Math.max(1, globalThis.devicePixelRatio || 1));
-    scale = Math.min(dprCap, scale * dpr);
+    scale = Math.min(2, scale);
 
     let low = hexToRgb(t[`${P}-low`]);
     let high = hexToRgb(t[`${P}-high`]);
