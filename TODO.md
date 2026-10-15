@@ -233,6 +233,132 @@ revenue plan.
 
 ---
 
+# ROADMAP — what comes after
+
+Brainstormed 2026-10-15. Two tracks, because they interleave badly: **A is
+infrastructure** and everything in **B** depends on it.
+
+---
+
+## Track A — remove the server's Google key (do this first)
+
+**Why it is first:** it is a prerequisite, not a feature. It changes who pays for
+model calls, and B is a set of model-calling features.
+
+**The coupling that is easy to miss.** `GOOGLE_GENERATIVE_AI_API_KEY` is not only
+the tutor's server default. It is *also* the embedding model:
+
+| Site | What |
+| --- | --- |
+| `apps/web/src/lib/tutor-model.ts:212` | `google("gemini-3.8-flash")` — the server default |
+| `apps/web/src/lib/notes-embedding.ts:39,55` | `google.embedding("gemini-embedding-001")` — the RAG index |
+
+So deleting the key takes out the tutor's server default **and** the embedding
+pipeline together. Worth knowing before the deletion, not after. Mitigating
+detail: `note_chunks.embedding` is 0/12 in production — the index was never
+populated, so nothing user-visible regresses on the embeddings side today.
+
+- [ ] **A1. Remove "Server default (gemini)" from the model picker**
+      `model-picker.tsx:172`. The tutor becomes BYOK-only: the reader's own key,
+      their own spend, no server exposure. This is also the anti-abuse story — a
+      free account cannot drain the owner's quota, which is the same reason the
+      AI budget exists, one level up.
+- [ ] **A2. Make the absent key a state, not a 500.** Today a missing key throws
+      from the provider at call time. It must instead read as "no model
+      configured" and render the onboarding below.
+- [ ] **A3. A first-run tutorial session, in place of a working default.** This
+      is the replacement for the thing being removed, and it is better: the
+      reader ends up owning the thing instead of borrowing it. Covers: what a
+      key is, getting one from Google AI Studio, pasting it, what it costs them,
+      and that the key is sealed at rest and never leaves their own calls.
+- [ ] **A4. Delete the key from the account** and confirm the app runs with
+      `GOOGLE_GENERATIVE_AI_API_KEY` absent — locally and on Vercel.
+
+---
+
+## Track B — practice, tests, and the foundations they build
+
+The idea: **questions the reader has not seen, feedback that is specific, and a
+record of what they are weak at that gets better over time.**
+
+### B1. The question catalogue (the spine)
+
+Everything else is downstream of this, and it is mostly *editorial*, not
+engineering. A rolling supply of questions so practice never runs dry.
+
+- [ ] **B1a. The schema.** One `practice_questions` table. The three formats
+      below are different enough to warrant different storage for answers, but
+      they share enough fields — module, topic, difficulty, tags — that one
+      catalogue beats three tables.
+- [ ] **B1b. An import path, not an admin UI.** Questions get written somewhere
+      and added in batches. A file in the repo, validated on the way in
+      (`check-topics.mjs` is the precedent for "validate a content file in
+      tests"). An admin UI is a whole product and is not needed at this scale.
+- [ ] **B1c. Rolling updates.** Weekly or monthly, a batch lands. The property
+      that makes this work: a question's `id` is stable forever, so a reader's
+      history never robs when the catalogue is re-imported.
+
+### B2. Three question formats
+
+- [ ] **B2a. Multiple choice.** 4–5 options, one correct.
+      *Why first:* the cheapest to author, the cheapest to grade, and the
+      **best at exposing a specific misconception** — a distractor is a claim
+      about what the reader wrongly believes, and picking it names the
+      misconception rather than just the score. That is the highest
+      signal-per-second-of-feedback in the whole feature.
+- [ ] **B2b. Formal working, typed by the reader, checked word for word.**
+      Deviations highlighted red, hover explains *why*.
+      *This is the differentiated one and the hardest.* The naive version is a
+      string comparison and will be wrong constantly — LaTeX has many correct
+      forms. The honest version grades in stages: a structural pass first (does
+      a proof exist, is every variable defined, does every line follow), and
+      only then the prose. **Build B2b second, not first** — a red-highlighted
+      wrong answer is worse than no feedback, because a student who is told
+      their correct proof is wrong learns to distrust the tool.
+- [ ] **B2c. Application questions, then a full worked solution.** No red ink.
+      The feedback is a complete worked answer *for that question*, which is the
+      part that teaches — a worked example transfers; a score does not.
+
+### B3. What makes it compound (the actual goal)
+
+- [ ] **B3a. A weakness profile, not a score.** Per-topic accuracy and, once
+      B2b lands, per-error-type. The output is "you lose marks on
+      quantifier negation" rather than "68%".
+- [ ] **B3b. Drive the tutor from it.** The profile steers what the AI tutor
+      volunteers unprompted. This is the feature that justifies the rest.
+- [ ] **B3c. Spaced repetition** over the questions already got wrong. Only
+      meaningful once there is a history; deliberately last.
+
+### B4. Adjacent features wanted in the same era
+
+- [ ] **B4a. Flashcards** — term/definition pairs off the same catalogue.
+      Cheap because the catalogue already exists.
+- [ ] **B4b. Favourited sections** — a star per lesson. Trivial, and it becomes
+      the input to "revise what I starred" in B3c.
+- [ ] **B4c. Private notes** — a place to save tutor responses. Nearly free
+      (it is the chat history, plus a pin), and it gives the reader a reason to
+      keep the transcript that is theirs rather than the app's.
+
+---
+
+## Sequencing, and the honest risk
+
+**Order:** A1–A4, then B1a/B1b, then B2a, then B2c, then B3a/B3b, then B2b.
+Flashcards and favourites can be interleaved anywhere once B1a lands.
+
+**The risk worth naming now:** B is a lot of surface area, and B2b in particular
+can consume a long time while still being the least certain thing here — grading
+open-ended maths rigorously is a research problem wearing a feature's clothes.
+If it stalls, it should be *cut*, not half-shipped, because the other two
+formats deliver most of the learning value without it.
+
+**Dependencies already in place:** the tutor's streaming endpoint, the AI budget,
+the entitlement gate (the practice feature is a paid thing, so it hangs off the
+same purchase check as the PDFs), and `note_chunks` as the natural home for
+question text that wants to be retrievable by the tutor.
+
+---
+
 ## Progress
 
 - [x] Grounded in the code (surfaces, gates, and what exists)
