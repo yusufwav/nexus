@@ -142,6 +142,19 @@
   --amb-font: 10px;
   --amb-fps: 20;
   /*
+   * 1 means "one buffer pixel per CSS pixel", and the engine then
+   * multiplies by devicePixelRatio, so the real buffer is one pixel per
+   * DEVICE pixel on every screen. That is the whole definition of crisp,
+   * and it is why hand-picking a bigger constant never worked:
+   *
+   *   0.6  the browser had to invent the pixels in between -> blur
+   *   1    correct on a 1x screen, still resampled 2x on a retina one
+   *   2    charged 4x everywhere to help one kind of screen, and was
+   *        unbearably laggy doing it
+   *   1 * dpr  right on both, and free on a 1x screen
+   */
+  --amb-scale: 1;
+  /*
    * BACK TO WHERE IT WAS, on purpose, and the reason is not "0.6 looked
    * nice".
    *
@@ -168,10 +181,9 @@
    * stayed; what has been undone here is the two token changes that
    * made it worse.
    *
-   * The landing hero and the login screen, which are large and
-   * foreground rather than background, keep --ascii-font 11px at 1:1.
+   * The landing hero and the login screen keep --ascii-font 11px and the
+   * same 1 * dpr treatment, so all five surfaces are resolved the same way.
    */
-  --amb-scale: 0.6;
   --amb-op: 0.6;
   --amb-low: #8b0000;
   --amb-high: #fdd3ae;

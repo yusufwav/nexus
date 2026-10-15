@@ -1117,6 +1117,17 @@
   height: 100%;
   pointer-events: none;
   opacity: var(--amb-op);
+  /*
+     * Stated rather than inherited: `auto` is the browser's smooth
+     * scaling, the opposite of the blocky `pixelated`. Explicit here so
+     * that "no resampling filter touches this canvas" is a property of
+     * the stylesheet rather than an accident. At scale * dpr the backing
+     * store already matches the device grid, so it never has to do
+     * anything - and writing it down stops anyone "fixing" the blur later
+     * by adding image-rendering: pixelated here, which would alias the
+     * glyphs instead of sharpening them.
+     */
+  image-rendering: auto;
 }
 .nt-dash__id {
   position: relative;

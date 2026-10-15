@@ -180,6 +180,34 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
       scale = 1;
     }
 
+    /*
+     * THEN MULTIPLY BY THE DEVICE PIXEL RATIO, which is the part that was
+     * missing and the reason "clear resolution" kept failing.
+     *
+     * Every previous attempt asked "how many times bigger than a CSS
+     * pixel should the buffer be" and answered with a constant. But a CSS
+     * pixel is not a device pixel. On a 1x display they are the same and
+     * scale: 1 is already perfectly crisp. On a 2x display the compositor
+     * upscales the canvas 2x on its way to the screen REGARDLESS of what
+     * the backing store is, so a buffer chosen to look right in testing
+     * is resampled in the hand - which is exactly "crisp on my machine,
+     * blurry on yours", and why bumping the constant by hand was chasing
+     * the wrong axis.
+     *
+     * dpr is the actual answer. It makes the buffer one device pixel per
+     * device pixel, so nothing is invented anywhere along the chain and
+     * the glyphs land as sharp as the CSS text sitting next to them. And
+     * it costs nothing on a 1x screen - scale stays exactly 1 - while
+     * giving retina the 2x it genuinely needs. That is the opposite of the
+     * hand-tuned constant, which charged a 4x bill everywhere to help
+     * one kind of screen.
+     *
+     * Capped at 2: a 3x phone would otherwise ask for 9x the pixels of a
+     * 1x one, on the layer that animates continuously.
+     */
+    const dpr = Math.min(2, Math.max(1, globalThis.devicePixelRatio || 1));
+    scale = Math.min(2, scale * dpr);
+
     let low = hexToRgb(t[`${P}-low`]);
     let high = hexToRgb(t[`${P}-high`]);
 
