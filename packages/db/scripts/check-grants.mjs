@@ -70,6 +70,8 @@ const EXPECTED = [
   { table: "modules", mode: "READ" },
   { table: "note_topics", mode: "READ" },
   { table: "note_chunks", mode: "READ" },
+  { table: "practice_questions", mode: "READ" },
+  { table: "practice_attempts", mode: "READ WRITE" },
 ];
 
 let failures = 0;

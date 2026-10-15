@@ -438,6 +438,62 @@ check("tolerance is symmetric", () => {
 });
 
 /* ------------------------------------------------------------------ *
+ *  4. the canonical comparison the importer relies on
+ *
+ *  The importer must tell "this question changed" from "this question is
+ *  identical", and it compares against values read back out of a jsonb
+ *  column. Postgres reorders object keys on storage, so a plain
+ *  JSON.stringify comparison reports an unchanged question as edited —
+ *  forever, on every run. That is not a cosmetic bug: it means a weekly
+ *  catalogue import rewrites rows that never changed, and the importer's
+ *  own report of what it did is wrong.
+ * ------------------------------------------------------------------ */
+
+console.log("\nthe canonical comparison does not invent changes");
+
+/** Verbatim from apps/web/scripts/import-practice-questions.ts. */
+function canonical(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value) ?? "null";
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`);
+  return `{${entries.join(",")}}`;
+}
+
+check("key order does not make two equal objects look different", () => {
+  const stored = { accepted: [{ value: 7, relative: false, tolerance: 0 }], solution: "s", units: "u" };
+  const authored = { accepted: [{ tolerance: 0, value: 7, relative: false }], solution: "s", units: "u" };
+  assert(canonical(stored) === canonical(authored), "identical objects compared unequal");
+});
+
+check("nested key order is normalised too", () => {
+  const a = { spec: { options: [{ id: "a", text: "x", correct: true }] } };
+  const b = { spec: { options: [{ correct: true, text: "x", id: "a" }] } };
+  assert(canonical(a) === canonical(b), "nested objects compared unequal");
+});
+
+check("a genuine change is still detected", () => {
+  const stored = { solution: "s", accepted: [{ value: 7, tolerance: 0 }] };
+  const edited = { solution: "s", accepted: [{ value: 8, tolerance: 0 }] };
+  assert(canonical(stored) !== canonical(edited), "a real edit compared equal");
+});
+
+check("ARRAY order is data and is never normalised away", () => {
+  // Proof pieces and answer options are ordered. Reordering them is a real
+  // change to the question, so this must NOT compare equal.
+  const a = { pieces: [{ id: "p1", text: "first" }, { id: "p2", text: "second" }] };
+  const b = { pieces: [{ id: "p2", text: "second" }, { id: "p1", text: "first" }] };
+  assert(canonical(a) !== canonical(b), "reordered arrays compared equal — proof order would be unchangeable");
+});
+
+check("a missing key is distinguished from a key set to undefined", () => {
+  assert(canonical({ a: 1 }) === canonical({ a: 1, b: undefined }), "undefined should be dropped, matching JSON");
+  assert(canonical({ a: 1 }) !== canonical({ a: 1, b: null }), "null is a value and must not be dropped");
+});
+
+/* ------------------------------------------------------------------ *
  *  report
  * ------------------------------------------------------------------ */
 

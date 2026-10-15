@@ -16,6 +16,8 @@
  *     purchases       entitlement. A bug here hands over paid content.
  *     chat_threads    private transcripts, personal to one reader.
  *     chat_messages   same, reached through its thread.
+ *     practice_attempts
+ *                     the reader's own answers, personal to one reader.
  *
  *   deliberately NOT enabled
  *     modules         the catalogue is meant to be readable. Gating it
@@ -113,6 +115,20 @@ const STATEMENTS = [
        EXISTS (SELECT 1 FROM "chat_threads" t
                 WHERE t.id = thread_id AND t.user_id = app_reader_id())
      )`,
+
+  // ---- practice_attempts ------------------------------------------------
+  // Identical shape to chat_threads: one reader's record of their own
+  // attempts, and nothing else. practice_questions is NOT listed, for the
+  // same reason note_chunks is not -- it is global authored content whose
+  // entitlement is a module filter in SQL, and a policy that one
+  // set_config() could satisfy would be decoration.
+  `ALTER TABLE "practice_attempts" ENABLE ROW LEVEL SECURITY`,
+  `ALTER TABLE "practice_attempts" FORCE ROW LEVEL SECURITY`,
+  `DROP POLICY IF EXISTS practice_attempts_reader ON "practice_attempts"`,
+  `CREATE POLICY practice_attempts_reader ON "practice_attempts"
+     FOR ALL TO public
+     USING      (user_id = app_reader_id())
+     WITH CHECK (user_id = app_reader_id())`,
 
   /*
    * ---- Better Auth's four tables -------------------------------------

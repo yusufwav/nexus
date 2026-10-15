@@ -99,6 +99,14 @@ const GRANTS = [
   { table: "modules", mode: "READ" },
   { table: "note_topics", mode: "READ" },
   { table: "note_chunks", mode: "READ" },
+  // Practice. Same split as the corpus above, and for the same reason:
+  // questions are authored content that ingestion writes and the app never
+  // mutates, while attempts are the reader's own history, written at
+  // runtime and RLS-protected. Granting WRITE on the catalogue would let a
+  // compromised app role rewrite the questions every other reader is
+  // graded against.
+  { table: "practice_questions", mode: "READ" },
+  { table: "practice_attempts", mode: "READ WRITE" },
 ];
 
 const client = new Client({ connectionString: url });

@@ -388,12 +388,18 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 26.6.3
+      '@types/pg':
+        specifier: ^8.15.6
+        version: 8.23.1
       '@types/react':
         specifier: 'catalog:'
         version: 19.3.0
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.3.0(@types/react@19.3.0)
+      pg:
+        specifier: ^8.16.3
+        version: 8.23.1
       tailwindcss:
         specifier: 'catalog:'
         version: 4.3.3

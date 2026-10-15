@@ -43,8 +43,10 @@
     "@Main/config": "workspace:*",
     "@tailwindcss/postcss": "catalog:",
     "@types/node": "catalog:",
+    "@types/pg": "^8.15.6",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "pg": "^8.16.3",
     "tailwindcss": "catalog:",
     "typescript": "catalog:"
   }

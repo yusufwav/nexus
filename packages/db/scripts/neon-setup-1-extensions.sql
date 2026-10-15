@@ -40,6 +40,18 @@ CREATE EXTENSION IF NOT EXISTS vector;
 CREATE TYPE module_status AS ENUM ('available', 'coming-soon');
 CREATE TYPE purchase_status AS ENUM ('pending', 'paid', 'refunded');
 
+-- The practice formats and outcomes. Here rather than in
+-- neon-setup-7-practice.sql, because a CREATE TABLE naming a type that
+-- does not exist yet fails, and the convention in this directory is that
+-- setup-1 owns every type.
+--
+-- `partial` is the state the proof-order design turns on: every piece the
+-- reader placed belonged to the proof, but not all were in the right
+-- place. That is a different mistake from choosing a line that does not
+-- belong, and one "incorrect" value would have thrown the difference away.
+CREATE TYPE practice_format AS ENUM ('multiple-choice', 'application', 'proof-order');
+CREATE TYPE practice_outcome AS ENUM ('correct', 'incorrect', 'partial');
+
 
 -- ---- 3. Better Auth's user table -------------------------------------------
 -- session / account / verification are created by Better Auth on first
