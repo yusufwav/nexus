@@ -25,10 +25,29 @@ export type CoercedEnvSchema = {
   BETTER_AUTH_URL: string;
   
   /**
-   * **GOOGLE_GENERATIVE_AI_API_KEY** 🔐 _sensitive_  
+   * **OPENROUTER_API_KEY** 🔐 _sensitive_  
+   * The tutor's SERVER DEFAULT. Read at call time in lib/tutor-model.ts, and a  
+   * missing value is a state the reader can fix (Settings), not a boot failure.  
+   * Same provider the reader's own BYOK key uses, so there is one code path.  
+   *   
    * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
    */
-  GOOGLE_GENERATIVE_AI_API_KEY: string;
+  OPENROUTER_API_KEY: string;
+  
+  /**
+   * **GOOGLE_GENERATIVE_AI_API_KEY** 🔐 _sensitive_  
+   * ONLY the note EMBEDDINGS still use Google — OpenRouter serves no embedding  
+   * model at all (its whole catalogue was checked; there is not one). This is  
+   * called from lib/notes-retrieval.ts, i.e. only when the tutor grounds an  
+   * answer in the notes, so it is NOT a boot dependency. And note_chunks.embedding  
+   * is 0/12 — the index was never populated, so this path already returns  
+   * nothing. Deleting this key therefore regresses nothing that currently works;  
+   * what it costs is a note-grounded tutor until a real embedding provider is  
+   * chosen. Deliberately optional below for that reason.  
+   *   
+   * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
+   */
+  GOOGLE_GENERATIVE_AI_API_KEY?: string;
   
   /**
    * **DATABASE_URL** 🔐 _sensitive_  
@@ -47,9 +66,67 @@ export type CoercedEnvSchema = {
    */
   PROVIDER_KEYS_SECRET: string;
   
+  /**
+   * **MAILTRAP_TOKEN** 🔐 _sensitive_  
+   *   
+   * ALL OPTIONAL, AND THE GROUP IS ALL-OR-NOTHING.  
+   *   
+   * Without MAILTRAP_TOKEN, email verification is not merely unconfigured, it  
+   * is OFF: `emailVerificationRequired()` in packages/auth returns false and the  
+   * tutor gate in /api/ai does not apply. That is deliberate. Verification is  
+   * enforced by refusing unverified readers, so enforcing it on a deploy that  
+   * cannot send mail locks every new reader out of the tutor permanently and  
+   * for no security gain. required=false is what lets a fresh clone boot and  
+   * develop without a mail account at all.  
+   *   
+   * Marked @sensitive because the token authorises SENDING AS this account, not  
+   * just reading it. It is not a credential an attacker can spend, but a leak is  
+   * still a mail-sending capability and should not sit in a repo or a log.  
+   *   
+   * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
+   */
+  MAILTRAP_TOKEN?: string;
+  
+  /**
+   * **MAILTRAP_SANDBOX** 🔐 _sensitive_  
+   * Sandbox or live. Deliberately NOT inferred from the token.  
+   *   
+   * sandbox.api.mailtrap.io catches mail in a browser inbox and delivers nothing  
+   * to a real person, and only to addresses registered there. The two endpoints  
+   * take different credentials, so "a token is present" does not say which one  
+   * you are on. Getting this wrong on a live deploy reports success while  
+   * sending every verification link into a void, which presents as "nobody can  
+   * verify" with nothing in the dashboard to explain it. packages/auth warns  
+   * loudly when this is "true" in production.  
+   *   
+   * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M23%2023a7%207%200%201%201%207-7a7.01%207.01%200%200%201-7%207m0-12a5%205%200%201%200%205%205a5.006%205.006%200%200%200-5-5%22%2F%3E%3Ccircle%20cx%3D%229%22%20cy%3D%2216%22%20r%3D%227%22%20fill%3D%22%23808080%22%2F%3E%3C%2Fsvg%3E)   
+   */
+  MAILTRAP_SANDBOX?: boolean;
+  
+  /**
+   * **MAILTRAP_INBOX_ID** 🔐 _sensitive_  
+   * Required ONLY when MAILTRAP_SANDBOX is true, and it has no default.  
+   *   
+   * Sandbox sends to https://sandbox.api.mailtrap.io/api/send/<inboxId>, so  
+   * the id is part of the path. Mailtrap answers a missing one with a 404 that  
+   * is indistinguishable from a bad token, so sendMail() names this variable  
+   * rather than letting the request fail obscurely.  
+   *   
+   * Find it at https://mailtrap.io/sandboxes - the number beside your inbox.  
+   *   
+   * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M26%2012h-4v2h4v2h-3v2h3v2h-4v2h4a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-7%2010h-6v-4a2%202%200%200%201%202-2h2v-2h-4v-2h4a2%202%200%200%201%202%202v2a2%202%200%200%201-2%202h-2v2h4ZM8%2020v-8H6v1H4v2h2v5H4v2h6v-2z%22%2F%3E%3C%2Fsvg%3E)   
+   */
+  MAILTRAP_INBOX_ID?: number;
+  
+  /**
+   * **MAILTRAP_FROM** 🔐 _sensitive_  
+   * ![icon](data:image/svg+xml;utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2220%22%20height%3D%2220%22%20viewBox%3D%220%200%2032%2032%22%3E%3Cpath%20fill%3D%22%23808080%22%20d%3D%22M29%2022h-5a2.003%202.003%200%200%201-2-2v-6a2%202%200%200%201%202-2h5v2h-5v6h5ZM18%2012h-4V8h-2v14h6a2.003%202.003%200%200%200%202-2v-6a2%202%200%200%200-2-2m-4%208v-6h4v6Zm-6-8H3v2h5v2H4a2%202%200%200%200-2%202v2a2%202%200%200%200%202%202h6v-8a2%202%200%200%200-2-2m0%208H4v-2h4Z%22%2F%3E%3C%2Fsvg%3E)   
+   */
+  MAILTRAP_FROM?: string;
+  
 };
 
-type _CoercedEnvSchema_ee53d776 = CoercedEnvSchema;
+type _CoercedEnvSchema_3bd52dfb = CoercedEnvSchema;
 
 export type EnvSchemaAsStrings = {
   [Property in keyof CoercedEnvSchema]:
@@ -57,7 +134,7 @@ export type EnvSchemaAsStrings = {
       : (NonNullable<CoercedEnvSchema[Property]> extends boolean ? ('true' | 'false') : string)
 };
 
-type _EnvSchemaAsStrings_ee53d776 = EnvSchemaAsStrings;
+type _EnvSchemaAsStrings_3bd52dfb = EnvSchemaAsStrings;
 
 export type PublicCoercedEnvSchema = Readonly<Pick<CoercedEnvSchema, 'NODE_ENV'>>;
 

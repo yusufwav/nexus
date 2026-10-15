@@ -132,11 +132,6 @@ console.log("\nthe gate is on AI messages and nothing else");
 
   /*
    * The half that is easy to get wrong: verification is enforced by refusing
-   * something, so the moment it leaks into a shared layout or a middleware
-   * it stops being "AI only" and starts being "you cannot use the site".
-   */
-  /*
-   * The half that is easy to get wrong: verification is enforced by refusing
    * something, so the moment it leaks into a shared layout or a middleware it
    * stops being "AI only" and starts being "you cannot use the site".
    *
@@ -145,13 +140,23 @@ console.log("\nthe gate is on AI messages and nothing else");
    * `emailVerified` in a comment - a reminder, not a gate. A check looser than
    * a call fails for the wrong reason on unrelated code, and a check like that
    * gets ignored rather than fixed.
+   *
+   * AND the comments are stripped before matching. Matching the call shape was
+   * necessary but not sufficient: `src/env.ts` is generated from `.env.schema`,
+   * which explains in prose that without MAILTRAP_TOKEN verification is off
+   * because `emailVerificationRequired()` returns false. That is a
+   * documentation reference in a file that cannot enforce anything, and it
+   * failed this suite for the wrong reason - exactly the outcome the note above
+   * warns about. A file that only *describes* the gate is not calling it.
    */
   const CALL = /emailVerificationRequired\s*\(\s*\)/;
+  const stripComments = (src) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
   const gateCallers = [];
   const walk = (dir) => {
     for (const e of readdirDeep(dir)) {
       if (!e.endsWith(".ts") && !e.endsWith(".tsx")) continue;
-      if (CALL.test(readFileSync(e, "utf8"))) {
+      if (CALL.test(stripComments(readFileSync(e, "utf8")))) {
         gateCallers.push(relative(e).split("\\").join("/"));
       }
     }

@@ -196,14 +196,15 @@ function explainProviderFailure(error: unknown, source: "user-key" | "server"): 
   }
 
   // WHICH credential failed changes what the reader has to do about it.
-  // Saying "check GOOGLE_GENERATIVE_AI_API_KEY" to someone who pasted
-  // their own OpenRouter key sends them to fix the one credential that
-  // is not the problem — and there is only one they are actually able
-  // to fix.
+  // Naming the server's env var to a reader was wrong twice over: it sent
+  // someone who pasted their OWN key to fix the one credential that is not
+  // the problem, and it leaked an internal variable name to the public.
+  // There is nothing a reader can do about the server's credential, so the
+  // server branch says so plainly rather than inventing a fix.
   if (rejected) {
     return source === "user-key"
       ? "Your own model provider key was rejected. Re-enter it under Settings → model provider."
-      : "The tutor's API key was rejected. Check GOOGLE_GENERATIVE_AI_API_KEY.";
+      : "The tutor's own provider key was rejected, so it cannot answer right now. Please try again shortly.";
   }
 
   if (
@@ -310,7 +311,7 @@ export async function POST(req: Request): Promise<Response> {
    * THE SPENDING GATE
    * ------------------------------------------------------------
    * This route spends money on every call and there was nothing standing
-   * between a free account and the server's Gemini quota. Thirty
+   * between a free account and the server's OpenRouter credit. Thirty
    * consecutive POSTs all returned 200. A refused model selection does
    * not help the attacker either: it still falls through to
    * serverModel(), so "ask for a paid model and get rejected" burns the

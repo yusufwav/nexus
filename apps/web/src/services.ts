@@ -149,7 +149,7 @@ if (!secretStatus.ok) {
         : []),
       "  The tutor still works and answers with the server's model.",
       "  Until this is set, /api/keys returns 503 and every reader is served",
-      "  by GOOGLE_GENERATIVE_AI_API_KEY rather than their own.",
+      "  by the server's own OPENROUTER_API_KEY rather than their own.",
       "",
     ].join("\n"),
   );

@@ -166,10 +166,18 @@ export function ModelPicker(props: {
 }): React.JSX.Element {
   const { pick, onPick, models, hasKey, disabled } = props;
 
-  // "server default" is a real option rather than the absence of one,
+  // "No model selected" is a real option rather than the absence of one,
   // so it occupies the first slot in the same list every model follows.
+  //
+  // It was "Server default (gemini)", and the "(gemini)" was a lie the
+  // moment the server default moved to OpenRouter — a label naming a
+  // provider the server no longer uses is worse than no label, because
+  // the reader picks a model on the strength of it. The behaviour is
+  // unchanged and deliberate: picking this means "no explicit choice",
+  // and `resolveTutorModel` then uses the reader's own key if they have
+  // one and falls back to the server's model if they do not.
   const options: SelectOption[] = [
-    { value: SERVER_PICK_VALUE, label: "Server default (gemini)" },
+    { value: SERVER_PICK_VALUE, label: "No model selected" },
     ...models.map((m) => ({ value: `openrouter|${m.id}`, label: m.label, hint: m.id })),
   ];
 

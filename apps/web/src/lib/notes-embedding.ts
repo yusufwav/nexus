@@ -1,5 +1,7 @@
-import { google } from "@ai-sdk/google";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { embed, embedMany } from "ai";
+
+import { PROVIDERS } from "@/lib/providers";
 
 /**
  * EMBEDDINGS — pure computation, no database and no session
@@ -13,36 +15,73 @@ import { embed, embedMany } from "ai";
  * incapable of leaking anything, and the ingestion script needs none of
  * the entitlement machinery because it writes global content.
  *
- * WHY THE EXISTING PROVIDER: `@ai-sdk/google` is already a dependency
- * with a working key, and it exports `google.embedding()`. A separate
- * vector service would mean a second key, a second vendor, a second
- * thing to leak, and a second failure mode — for the same numbers.
+ * WHY OPENROUTER: it is already the app's only provider — the tutor's
+ * server default and the reader's own key both go through it — so this
+ * is what keeps that true rather than aspirational. Before this, the
+ * embeddings were the last Google caller, which meant the owner's
+ * personal Google key was still load-bearing.
+ *
+ * A WORTHWHILE CORRECTION: an earlier check concluded OpenRouter served
+ * no embedding models at all, by searching `/api/v1/models` for the
+ * string "embedding" and finding none. That check could not have found
+ * them: `/models` lists CHAT models. Embeddings live behind a separate
+ * router at `/api/v1/embeddings`, with its own catalogue at
+ * `/api/v1/embeddings/models` — 33 models. The conclusion was wrong and
+ * the evidence never supported it. The catalogue is the authority here,
+ * and it does list the model below.
+ *
+ * WHY THE MODEL IS UNCHANGED: `google/gemini-embedding-001` is served
+ * *through* OpenRouter, so the move is transport-only. That matters
+ * because changing the embedding model silently invalidates every stored
+ * vector: cosine similarity between vectors from two different models is
+ * meaningless, and the stored chunks would rank against garbage rather
+ * than fail loudly.
  */
 
 /** The model. Changing it changes the dimension and invalidates every stored vector. */
-export const EMBEDDING_MODEL = "gemini-embedding-001";
+export const EMBEDDING_MODEL = "google/gemini-embedding-001";
 
 /**
  * 768, not the model's native 3072.
  *
- * `gemini-embedding-001` is Matryoshka-trained, so `outputDimensionality`
- * truncates rather than discards: the leading 768 dimensions retain most
- * of the ranking quality at a quarter of the storage and a fraction of
- * the index size. Left unset it returns 3072, which would not fit the
+ * `gemini-embedding-001` is Matryoshka-trained, so `dimensions` truncates
+ * rather than discards: the leading 768 dimensions retain most of the
+ * ranking quality at a quarter of the storage and a fraction of the index
+ * size. Left unset it returns 3072, which would not fit the
  * `vector(768)` column at all.
  */
 export const EMBEDDING_DIMENSIONS = 768;
 
+/**
+ * The one shared client.
+ *
+ * Built lazily and memoised at module scope: the key is read at CALL
+ * time, never at import time, so a missing key cannot take the app down
+ * at boot. It only ever matters if something actually asks for an
+ * embedding.
+ */
+let cached: ReturnType<typeof createOpenAICompatible> | null = null;
+function openRouter(): ReturnType<typeof createOpenAICompatible> {
+  if (cached === null) {
+    cached = createOpenAICompatible({
+      name: "openrouter",
+      baseURL: PROVIDERS.openrouter.baseUrl,
+      apiKey: process.env.OPENROUTER_API_KEY ?? "",
+    });
+  }
+  return cached;
+}
+
 /** One vector for one question. */
 export async function embedQuery(text: string): Promise<readonly number[]> {
   const { embedding } = await embed({
-    model: google.embedding(EMBEDDING_MODEL),
+    model: openRouter().embeddingModel(EMBEDDING_MODEL),
     value: text,
+    // Provider options are keyed by the client's `name`, which is why the
+    // client above is called "openrouter" and not "google" — the option
+    // namespace and the route have to agree.
     providerOptions: {
-      google: {
-        taskType: "RETRIEVAL_QUERY",
-        outputDimensionality: EMBEDDING_DIMENSIONS,
-      },
+      openrouter: { dimensions: EMBEDDING_DIMENSIONS },
     },
   });
   assertDimensionality(embedding);
@@ -52,13 +91,10 @@ export async function embedQuery(text: string): Promise<readonly number[]> {
 /** One vector per chunk of a note. Batched: ingestion is offline and can afford it. */
 export async function embedDocuments(texts: ReadonlyArray<string>): Promise<number[][]> {
   const { embeddings } = await embedMany({
-    model: google.embedding(EMBEDDING_MODEL),
+    model: openRouter().embeddingModel(EMBEDDING_MODEL),
     values: [...texts],
     providerOptions: {
-      google: {
-        taskType: "RETRIEVAL_DOCUMENT",
-        outputDimensionality: EMBEDDING_DIMENSIONS,
-      },
+      openrouter: { dimensions: EMBEDDING_DIMENSIONS },
     },
   });
   for (const e of embeddings) {

@@ -258,50 +258,73 @@ pipeline together. Worth knowing before the deletion, not after. Mitigating
 detail: `note_chunks.embedding` is 0/12 in production — the index was never
 populated, so nothing user-visible regresses on the embeddings side today.
 
-- [ ] **A1. The server default is now OpenRouter** — **done in `tutor-model.ts`.**
+- [x] **A1. The server default is now OpenRouter** — done in `tutor-model.ts`.
       Was `google("gemini-3.8-flash")`, which made the owner's personal Google
       key a hard boot dependency. Now the same `createOpenAICompatible` client
       the reader's own BYOK key uses, so the server speaks one provider through
       one code path.
-- [ ] **A1b. Remove "Server default (gemini)" from the model picker.**
-      `model-picker.tsx:172` still labels it *gemini*, which is now a lie. The
-      label should go, and with it the `SERVER_PICK_VALUE` fallback — the tutor
-      is BYOK-first, and a reader with no key gets onboarding (A3), not a
-      silently substituted model.
-- [ ] **A2. Make an absent key a state, not a 500.** `serverHasKey()` is in
-      `tutor-model.ts`; the route and the picker still need to *use* it.
-- [ ] **A3. A first-run tutorial session, in place of a working default.** This
-      is the replacement for the thing being removed, and it is better: the
-      reader ends up owning the key instead of borrowing it. Covers: what a key
-      is, getting one from OpenRouter, pasting it, what it costs them, and that
-      it is sealed at rest and never leaves their own calls.
+- [x] **A1b. The Gemini option is gone from the picker.** The first slot read
+      "Server default (gemini)" — a lie the moment the default moved, since a
+      reader picks a model on the strength of that label. It now reads
+      **"No model selected"**, which is what the slot has always meant: no
+      explicit choice, reader's own key if they have one, server's otherwise.
+      The behaviour is deliberately unchanged.
+- [x] **A2. The absent key is a state, not a 500** — `serverHasKey()` exists in
+      `tutor-model.ts`, and every key read happens at call time rather than
+      import time. **Still to do:** the route and the picker need to actually
+      *use* it and render onboarding, which is A3.
+- [ ] **A3. Onboarding, immediately at signup.** An OpenRouter key is now
+      required, and this replaces the working default that used to absorb it.
+      It must be **impossible to miss or mess up** — shown the moment the
+      account is made, not buried in Settings — because the tutor cannot answer
+      without it. Covers: what a key is, getting one from OpenRouter, pasting
+      it, what it costs them, and that it is sealed at rest and never leaves
+      their own calls.
 - [ ] **A4. Delete the Google key from the account** and confirm the app runs
       with it absent — locally and on Vercel.
 
-#### The embedding half — and why it could NOT be rerouted
+#### The embedding half — rerouted, after a wrong call was corrected
 
-`notes-embedding.ts` still calls `google.embedding("gemini-embedding-001")`,
-and that is not an oversight: **OpenRouter serves no embedding model at all.**
-Its entire published catalogue was fetched and checked — 774KB of JSON, zero
-matches for "embedding". It is a chat-completion router.
+`notes-embedding.ts` now goes through OpenRouter too, so **the Google key is no
+longer load-bearing anywhere.** Two things had to be checked rather than assumed:
 
-So the split after this change is:
+**The wrong call, on the record.** An earlier check searched `/api/v1/models` for
+the string "embedding", found none, and concluded OpenRouter served no embedding
+models at all. That check could not have found them: `/models` lists **chat**
+models. Embeddings live behind a separate router at `/api/v1/embeddings`, with
+its own catalogue at `/api/v1/embeddings/models` — **33 models**. The conclusion
+was wrong and the evidence never supported it. Worth recording because the shape
+of the mistake is the reusable part: a search of the wrong corpus cannot answer
+the question asked, and "absent from the one list I looked at" is not "absent".
+
+**The model is unchanged, deliberately: `google/gemini-embedding-001`, served
+through OpenRouter.** This is transport-only, and it matters. Changing the
+embedding model silently invalidates every stored vector — cosine similarity
+between vectors from two different models is meaningless, and the stored chunks
+would rank against garbage rather than fail loudly. Reusing the same model keeps
+`note_chunks` (0/12 populated) consistent.
+
+**768 still holds.** The column is `vector("embedding", { dimensions: 768 })`.
+OpenRouter's embeddings API accepts `dimensions`, and the AI SDK's
+openai-compatible embedding model forwards it in the request body — so the
+Matryoshka truncation still applies and the dimension is unchanged.
 
 | Site | Provider |
 | --- | --- |
 | tutor (server default) | OpenRouter |
 | tutor (reader's own key) | OpenRouter |
-| note embeddings / RAG | **Google — cannot move** |
+| note embeddings / RAG | OpenRouter |
 
-**Good news about the coupling:** the embedding calls are *inside* the async
-functions, so Google was never a boot dependency — only a RAG-search dependency.
-And `note_chunks.embedding` is 0/12, meaning the index was never populated and
-RAG already returns nothing. **Deleting the key therefore regresses nothing that
-currently works.** It costs a note-grounded tutor until a real embedding provider
-is chosen, which is a Track C decision, not a Track A one.
+**One honest loss:** Google had `taskType: RETRIEVAL_QUERY` / `RETRIEVAL_DOCUMENT`,
+which tells the model whether a string is a question or a passage. OpenRouter has
+the equivalent (`input_type: search_query` / `search_document`) but the SDK's
+embedding model does not forward it, so query and document vectors are now
+generated without that hint. Recoverable later with a direct call; not worth
+blocking on.
 
-`GOOGLE_GENERATIVE_AI_API_KEY` is now marked `@required=false` in `.env.schema`
-and the schema carries the reasoning inline.
+`GOOGLE_GENERATIVE_AI_API_KEY` is kept in the schema, marked optional, and the
+reasoning is inline so nobody re-tightens it. It is now dead weight, and the
+only remaining reference in the whole codebase is its own declaration.
 
 ---
 
