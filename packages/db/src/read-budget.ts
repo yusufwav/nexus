@@ -88,6 +88,16 @@ export type ReadBudget = {
   readonly count: number;
   /** How far past the free allowance this request is. */
   readonly overFree: number;
+  /**
+   * True when the counter could not be reached and the request was served
+   * WITHOUT the pace.
+   *
+   * Exists because a silent fail-open is indistinguishable from a working
+   * one. Nothing in the app reads it, and that is correct — the caller
+   * should serve the file either way — but it makes the condition
+   * assertable, and the log line beside it makes it visible.
+   */
+  readonly degraded: boolean;
 };
 
 /**
@@ -147,43 +157,84 @@ export function readDelayMs(count: number): number {
 export async function consumeReadBudget(db: Database, userId: string): Promise<ReadBudget> {
   const windowSeconds = Math.round(WINDOW_MS / 1000);
 
-  const rows = await db.execute(sql`
-    insert into read_usage (id, user_id, window_started_at, count, updated_at)
-    values (gen_random_uuid()::text, ${userId}, now(), 1, now())
-    on conflict (user_id) do update set
-      count = case
-        when read_usage.window_started_at <= now() - make_interval(secs => ${windowSeconds})
-          then 1
-        else read_usage.count + 1
-      end,
-      window_started_at = case
-        when read_usage.window_started_at <= now() - make_interval(secs => ${windowSeconds})
-          then now()
-        else read_usage.window_started_at
-      end,
-      updated_at = now()
-    returning count
-  `);
+  /*
+   * THE COUNTER MUST NOT BE ABLE TO TAKE DOWN PAID CONTENT.
+   *
+   * This wraps the upsert because an exception here is a REFUSAL, and this
+   * file's entire argument is that the budget must never refuse anyone. A
+   * reader who cannot download a PDF they have paid for has been caught by a
+   * defence aimed at a different crime, and there is no route back: no link
+   * to click, no admin, no path in. A thrown error is the same outcome as a
+   * 429, arrived at by accident instead of on purpose.
+   *
+   * It was not hypothetical. `read_usage` exists in the local database and
+   * was never created in production, so on the deployed app this upsert
+   * threw `relation "read_usage" does not exist` on every single call, and
+   * `GET /api/topics/[slug]` 500ed instead of serving the file. Nothing had
+   * noticed for one reason only: production has zero purchases, so the
+   * purchase gate refused every caller before reaching this line. The bug
+   * was sitting directly behind the first sale.
+   *
+   * So: fail OPEN. The request is served with no delay, and the reason is
+   * logged loudly enough to find in a cold log. Failing open here is
+   * correct rather than merely convenient — the thing being protected is a
+   * counter that makes a loop slow, and a reader with a broken counter is a
+   * reader who has paid for nothing. An attacker gains nothing either: making
+   * this throw requires dropping the table, which needs owner credentials
+   * and would break every other query on the connection.
+   *
+   * The alternative — propagating — was considered and rejected for the same
+   * reason the 429 was: it converts a defence that should be invisible into
+   * an outage that is not.
+   */
+  try {
+    const rows = await db.execute(sql`
+      insert into read_usage (id, user_id, window_started_at, count, updated_at)
+      values (gen_random_uuid()::text, ${userId}, now(), 1, now())
+      on conflict (user_id) do update set
+        count = case
+          when read_usage.window_started_at <= now() - make_interval(secs => ${windowSeconds})
+            then 1
+          else read_usage.count + 1
+        end,
+        window_started_at = case
+          when read_usage.window_started_at <= now() - make_interval(secs => ${windowSeconds})
+            then now()
+          else read_usage.window_started_at
+        end,
+        updated_at = now()
+      returning count
+    `);
 
-  const count = Number((rows.rows[0] as { count: number } | undefined)?.count ?? 1);
-  const overFree = Math.max(0, count - FREE_PER_WINDOW);
+    const count = Number((rows.rows[0] as { count: number } | undefined)?.count ?? 1);
+    const overFree = Math.max(0, count - FREE_PER_WINDOW);
 
-  // Opportunistic cleanup: one statement, best effort, best-effort must never
-  // fail the request. 1-in-N rather than every call, because an unindexed-by-
-  // now() delete on the content path is a tax on every honest reader to pay
-  // for rare housekeeping. Matches the tutor budget's reasoning.
-  if (count % 25 === 1) {
-    void db
-      .execute(
-        sql`
-          delete from read_usage
-           where updated_at < now() - make_interval(secs => ${Math.round(RETENTION_MS / 1000)})
-        `,
-      )
-      .catch(() => undefined);
+    // Opportunistic cleanup: one statement, best effort, best-effort must never
+    // fail the request. 1-in-N rather than every call, because an unindexed-by-
+    // now() delete on the content path is a tax on every honest reader to pay
+    // for rare housekeeping. Matches the tutor budget's reasoning.
+    if (count % 25 === 1) {
+      void db
+        .execute(
+          sql`
+            delete from read_usage
+             where updated_at < now() - make_interval(secs => ${Math.round(RETENTION_MS / 1000)})
+          `,
+        )
+        .catch(() => undefined);
+    }
+
+    return { delayMs: readDelayMs(count), count, overFree, degraded: false };
+  } catch (err) {
+    // Name the table and the user-visible consequence. A log line that says
+    // only "error" would be found by nobody and changed by nobody.
+    console.error(
+      "[read-budget] counter unavailable, serving WITHOUT the pace:",
+      err instanceof Error ? err.message : String(err),
+      "| check that read_usage exists in this database (packages/db/scripts/neon-setup-6-read-budget.sql)",
+    );
+    return { delayMs: 0, count: 0, overFree: 0, degraded: true };
   }
-
-  return { delayMs: readDelayMs(count), count, overFree };
 }
 
 /** What the route and the test use. */

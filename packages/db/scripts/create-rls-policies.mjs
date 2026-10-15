@@ -32,6 +32,47 @@
  *                     policies would be silently wiped by the next
  *                     `auth:generate`.
  *     rateLimit         left alone: a counter keyed by a hashed path.
+ *     ai_usage,
+ *     read_usage
+ *                     THE COUNTERS ARE DELIBERATELY NOT ENABLED, and adding
+ *                     them here would be a silent outage rather than a
+ *                     security improvement. Both are per-reader tables, so on
+ *                     the pattern above they look like they belong. They
+ *                     cannot have a policy yet because neither call site runs
+ *                     inside `withReader`:
+ *
+ *                       api/topics/[slug]  consumeReadBudget(db, user.id)
+ *                       api/ai             consumeAiBudget(db, user.id)
+ *
+ *                     A policy on either table keys on `app.user_id`, which is
+ *                     unset outside `withReader`, so every upsert would be
+ *                     filtered out and both budgets would stop counting.
+ *
+ *                     WHAT MAKES THAT DANGEROUS rather than merely broken:
+ *                     `consumeReadBudget` now FAILS OPEN. It catches, logs,
+ *                     and returns `delayMs: 0` rather than letting an
+ *                     exception 500 a route that serves paid content — a
+ *                     reader blocked from a PDF they bought is a worse
+ *                     outcome than an unscraped loop, and the file's own
+ *                     argument is that this budget delays and never refuses.
+ *
+ *                     That is the right trade, and it is also why a policy
+ *                     added here later without wrapping both call sites
+ *                     would not throw, would not fail a test, and would
+ *                     quietly switch off the only thing slowing a bulk
+ *                     download. It would look like it was working.
+ *
+ *                     TO DO IT PROPERLY, in this order:
+ *                       1. wrap both call sites in withReader(db, user.id, …)
+ *                       2. then add the policies here
+ *                       3. then assert it — a test reading "reader A sees
+ *                          only their own count", which is the shape
+ *                          test-practice-rls.mjs already uses for attempts
+ *
+ *                     Until then these counters are protected the way the
+ *                     content is: every query names an explicit user_id, from
+ *                     a route that has already passed the session and
+ *                     purchase gates.
  *     note_topics,
  *     note_chunks
  *                     Entitlement here is a JOIN (purchases -> modules,
