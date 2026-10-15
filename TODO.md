@@ -297,23 +297,37 @@ was wrong and the evidence never supported it. Worth recording because the shape
 of the mistake is the reusable part: a search of the wrong corpus cannot answer
 the question asked, and "absent from the one list I looked at" is not "absent".
 
-**The model is unchanged, deliberately: `google/gemini-embedding-001`, served
-through OpenRouter.** This is transport-only, and it matters. Changing the
-embedding model silently invalidates every stored vector — cosine similarity
-between vectors from two different models is meaningless, and the stored chunks
-would rank against garbage rather than fail loudly. Reusing the same model keeps
-`note_chunks` (0/12 populated) consistent.
+**The model is now `nvidia/nemotron-3-embed-1b:free`**, chosen for one reason:
+it is free, and it is served through the router everything else already uses, so
+the app now depends on exactly one provider. `@ai-sdk/google` is uninstalled.
 
-**768 still holds.** The column is `vector("embedding", { dimensions: 768 })`.
-OpenRouter's embeddings API accepts `dimensions`, and the AI SDK's
-openai-compatible embedding model forwards it in the request body — so the
-Matryoshka truncation still applies and the dimension is unchanged.
+**And the 768 column is now an ASSERTION TO VERIFY, not a known quantity.**
+This is the one open risk in the change:
+
+- The column is `vector("embedding", { dimensions: 768 })`. 768 came from
+  `gemini-embedding-001`'s Matryoshka truncation, which is documented behaviour.
+- **Nemotron's width is not established.** OpenRouter's embeddings catalogue
+  publishes no `dimensions` field for it, and `supported_parameters` is empty
+  for *every* embedding model there — so neither endpoint can answer the
+  question, and there is no key here to measure it with.
+- It may truncate to 768, ignore the parameter, or reject it.
+
+So `assertDimensionality` **throws** rather than truncating client-side, and the
+error names the fix. That is the whole point: a silently-truncated vector is
+wrong in a way that never surfaces — cosine similarity still returns numbers,
+retrieval still returns chunks, and the tutor just grounds on nonsense with
+nothing in the logs. One loud failure beats quiet wrong answers.
+
+**To close it:** run one ingestion and read the error. If it reports a width
+other than 768, `EMBEDDING_DIMENSIONS` and the column move together, and there
+is no migration for that yet. `note_chunks` is empty (0 rows embedded), so
+re-ingesting is the only cost — and this is the last cheap moment to find out.
 
 | Site | Provider |
 | --- | --- |
 | tutor (server default) | OpenRouter |
 | tutor (reader's own key) | OpenRouter |
-| note embeddings / RAG | OpenRouter |
+| note embeddings / RAG | OpenRouter (`nvidia/nemotron-3-embed-1b:free`) |
 
 **One honest loss:** Google had `taskType: RETRIEVAL_QUERY` / `RETRIEVAL_DOCUMENT`,
 which tells the model whether a string is a question or a passage. OpenRouter has
@@ -322,9 +336,16 @@ embedding model does not forward it, so query and document vectors are now
 generated without that hint. Recoverable later with a direct call; not worth
 blocking on.
 
+**Also lost, and worth naming:** the `taskType` split is not the only thing
+`gemini-embedding-001` did. It was a much stronger retrieval model than a 1B
+embed is likely to be. Free beats good here because the index is empty and
+nothing user-visible depends on it yet — if retrieval quality ever matters,
+that is the trade to revisit, not the routing.
+
 `GOOGLE_GENERATIVE_AI_API_KEY` is kept in the schema, marked optional, and the
-reasoning is inline so nobody re-tightens it. It is now dead weight, and the
-only remaining reference in the whole codebase is its own declaration.
+reasoning is inline so nobody re-tightens it. No source imports Google any
+more and `@ai-sdk/google` is uninstalled; the only remaining references are
+its own declaration and comments explaining why it is unused.
 
 ---
 
