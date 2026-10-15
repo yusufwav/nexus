@@ -1,7 +1,9 @@
 "use client";
 
 import AsciiField from "@/components/landing/ascii-field";
-import EmailVerifyNotice from "@/components/email-verify-notice";
+// EmailVerifyNotice is intentionally not rendered — see the comment at the
+// shell. The import is dropped with it so nothing can re-render it by
+// accident; the component and its 37 assertions are untouched.
 import { ModelPicker, useModelPicker, type ModelPick } from "@/components/model-picker";
 import { useChat } from "@ai-sdk/react";
 import { createMathPlugin } from "@streamdown/math";
@@ -892,12 +894,35 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
 
       <div className="nt-ai__shell">
         {/*
-          The verification notice. First child of the shell so it sits above
-          the transcript rather than between the reader and their question —
-          the restriction is stated before they try, rather than arriving as a
-          403 after they have already composed something.
+          THE VERIFICATION NOTICE — NOT RENDERED, ON PURPOSE.
+
+          It used to be the first child of the shell, which is where it
+          belongs: above the transcript, so the restriction is stated
+          before the reader tries rather than arriving as a 403 after they
+          have composed something.
+
+          It is pulled for now because the shell is laid out to fill the
+          viewport exactly, and a block above the transcript pushes the
+          page past it — a scrollbar on a screen that has no business
+          having one.
+
+          The gate itself is UNCHANGED and still enforced: the 403 in
+          /api/ai is what stops an unverified reader, and it does not
+          depend on this component. So removing the banner removes a
+          scrollbar and nothing else. With mail unconfigured — which is
+          the case in production, and is deliberate until there is a
+          domain — the banner never rendered there in the first place.
+
+          To restore, put this back as the shell's first child:
+
+              <EmailVerifyNotice />
+
+          ...or import it and render it above <EmailVerifyNotice />'s
+          place when mail is finally configured. The fix, if the
+          scrollbar is wanted back, is to make the shell's scroll
+          container the transcript rather than the page — the banner
+          belongs outside the thing that scrolls.
         */}
-        <EmailVerifyNotice />
         {/*
           THE COLLAPSED TOGGLE.
           Rendered only once there is a conversation. It sits where the
