@@ -297,55 +297,53 @@ was wrong and the evidence never supported it. Worth recording because the shape
 of the mistake is the reusable part: a search of the wrong corpus cannot answer
 the question asked, and "absent from the one list I looked at" is not "absent".
 
-**The model is now `nvidia/nemotron-3-embed-1b:free`**, chosen for one reason:
-it is free, and it is served through the router everything else already uses, so
-the app now depends on exactly one provider. `@ai-sdk/google` is uninstalled.
+**The model is `gemini-embedding-001`, served through OpenRouter.** It was
+briefly swapped to `nvidia/nemotron-3-embed-1b:free` because it was free, and
+reverted after testing showed Gemini embedding measurably better. Worth
+recording the reasoning error, since "free" was the reason and it was the wrong
+one: retrieval quality *is* the point of an embedding. A cheaper vector that
+ranks worse makes the tutor confidently wrong, which is strictly worse than
+paying for the better one — and the index is empty, so cost was never the thing
+at stake. Cheap was not the objective; good was.
 
-**And the 768 column is now an ASSERTION TO VERIFY, not a known quantity.**
-This is the one open risk in the change:
+**768 is documented, not assumed.** `gemini-embedding-001` is Matryoshka-trained,
+so `dimensions: 768` truncates 3072 rather than discarding, and the
+`vector("embedding", { dimensions: 768 })` column is written to match. That
+truncation was the one thing the Nemotron swap could not offer: its width was
+unestablishable from any endpoint, which turned a known quantity into an
+assertion to verify.
 
-- The column is `vector("embedding", { dimensions: 768 })`. 768 came from
-  `gemini-embedding-001`'s Matryoshka truncation, which is documented behaviour.
-- **Nemotron's width is not established.** OpenRouter's embeddings catalogue
-  publishes no `dimensions` field for it, and `supported_parameters` is empty
-  for *every* embedding model there — so neither endpoint can answer the
-  question, and there is no key here to measure it with.
-- It may truncate to 768, ignore the parameter, or reject it.
+`@ai-sdk/google` stays uninstalled — and note it was **already unused** at the
+Gemini state, because `gemini-embedding-001` is served *through* OpenRouter, not
+by that package. Removing the dependency was independent of which model runs,
+so the revert did not bring it back. The Google key is still load-bearing
+nowhere, which was the actual goal.
 
-So `assertDimensionality` **throws** rather than truncating client-side, and the
-error names the fix. That is the whole point: a silently-truncated vector is
-wrong in a way that never surfaces — cosine similarity still returns numbers,
-retrieval still returns chunks, and the tutor just grounds on nonsense with
-nothing in the logs. One loud failure beats quiet wrong answers.
-
-**To close it:** run one ingestion and read the error. If it reports a width
-other than 768, `EMBEDDING_DIMENSIONS` and the column move together, and there
-is no migration for that yet. `note_chunks` is empty (0 rows embedded), so
-re-ingesting is the only cost — and this is the last cheap moment to find out.
+`assertDimensionality` now **throws with the fix in the message** rather than
+truncating client-side, and that part of the swap was kept. A silently-truncated
+vector is wrong in a way that never surfaces: cosine similarity still returns
+numbers, retrieval still returns chunks, and the tutor grounds on nonsense with
+nothing in the logs. One loud failure beats quiet wrong answers, and it is what
+makes the next model swap a one-line change instead of a corruption.
 
 | Site | Provider |
 | --- | --- |
 | tutor (server default) | OpenRouter |
 | tutor (reader's own key) | OpenRouter |
-| note embeddings / RAG | OpenRouter (`nvidia/nemotron-3-embed-1b:free`) |
+| note embeddings / RAG | OpenRouter (`google/gemini-embedding-001`) |
 
-**One honest loss:** Google had `taskType: RETRIEVAL_QUERY` / `RETRIEVAL_DOCUMENT`,
-which tells the model whether a string is a question or a passage. OpenRouter has
-the equivalent (`input_type: search_query` / `search_document`) but the SDK's
-embedding model does not forward it, so query and document vectors are now
-generated without that hint. Recoverable later with a direct call; not worth
-blocking on.
-
-**Also lost, and worth naming:** the `taskType` split is not the only thing
-`gemini-embedding-001` did. It was a much stronger retrieval model than a 1B
-embed is likely to be. Free beats good here because the index is empty and
-nothing user-visible depends on it yet — if retrieval quality ever matters,
-that is the trade to revisit, not the routing.
+**One honest loss, standing:** Google had `taskType: RETRIEVAL_QUERY` /
+`RETRIEVAL_DOCUMENT`, which tells the model whether a string is a question or a
+passage. OpenRouter has the equivalent (`input_type: search_query` /
+`search_document`) but the SDK's embedding model does not forward it, so query
+and document vectors are generated without that hint. Recoverable later with a
+direct call to the endpoint; not worth blocking on, and worth remembering as the
+first thing to try if retrieval underperforms.
 
 `GOOGLE_GENERATIVE_AI_API_KEY` is kept in the schema, marked optional, and the
-reasoning is inline so nobody re-tightens it. No source imports Google any
-more and `@ai-sdk/google` is uninstalled; the only remaining references are
-its own declaration and comments explaining why it is unused.
+reasoning is inline so nobody re-tightens it. No source imports Google and
+`@ai-sdk/google` is uninstalled; the only remaining references are its own
+declaration and comments explaining why it is unused.
 
 ---
 

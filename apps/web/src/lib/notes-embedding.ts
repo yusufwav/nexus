@@ -30,50 +30,35 @@ import { PROVIDERS } from "@/lib/providers";
  * the evidence never supported it. The catalogue is the authority here,
  * and it does list the model below.
  *
- * THE MODEL CHANGED TWICE, and that has a consequence worth stating
- * plainly: changing the embedding model silently invalidates every stored
- * vector. Cosine similarity between vectors from two different models is
- * meaningless — not approximately right, meaningless — so stale chunks
- * would rank against garbage and retrieval would keep returning confident
- * nonsense. The first move was transport-only (Gemini's model served
- * *through* OpenRouter, same model, same vectors). The second was not.
- * `assertDimensionality` is the guard that makes the second one safe to
- * make at all, and `note_chunks` is empty, so the cost today is zero.
+ * THE MODEL WAS `nvidia/nemotron-3-embed-1b:free` and is now back on Gemini,
+ * because the smaller free model measured worse. Worth recording why, since
+ * "free" was the reason for the swap and it was the wrong reason: retrieval
+ * quality is the entire point of an embedding, and a cheaper vector that ranks
+ * worse makes the tutor confidently wrong.
+ *
+ * It is still `gemini-embedding-001`, but served *through* OpenRouter rather
+ * than from Google directly. That is transport-only: same model, same vectors,
+ * and it keeps the app on a single provider so the Google key is load-bearing
+ * nowhere.
  */
 
-/**
- * The model.
- *
- * Now `nvidia/nemotron-3-embed-1b:free` — free, and served through the
- * same router as everything else, so the app depends on exactly one
- * provider. Changing this invalidates every stored vector; see
- * `EMBEDDING_DIMENSIONS` for the trap that goes with it.
- */
-export const EMBEDDING_MODEL = "nvidia/nemotron-3-embed-1b:free";
+/** The model. Changing it changes the dimension and invalidates every stored vector. */
+export const EMBEDDING_MODEL = "google/gemini-embedding-001";
 
 /**
- * 768 — and THIS NUMBER IS THE THING TO CHECK.
+ * 768, not the model's native 3072.
  *
- * `gemini-embedding-001` was Matryoshka-trained, so asking for 768
- * truncated 3072 cleanly and this column was written to match. Whether
- * this model behaves that way is **not established**: OpenRouter's
- * embeddings catalogue publishes no `dimensions` field for it, and
- * `supported_parameters` is empty for every embedding model there, so
- * neither endpoint can answer the question. It may truncate; it may
- * ignore the parameter; it may reject it.
+ * `gemini-embedding-001` is Matryoshka-trained, so `dimensions` truncates
+ * rather than discards: the leading 768 dimensions retain most of the
+ * ranking quality at a quarter of the storage and a fraction of the index
+ * size. Left unset it returns 3072, which would not fit the
+ * `vector(768)` column at all.
  *
- * That uncertainty is why `assertDimensionality` below throws rather than
- * truncating client-side. A silently-truncated vector is WRONG in a way
- * that never surfaces: cosine similarity still returns numbers, retrieval
- * still returns chunks, and the tutor just quietly grounds on nonsense. A
- * thrown error costs one failed ingestion run and tells us the real width
- * on the first attempt.
- *
- * So: run one ingestion after this change and read the error. If it
- * reports a width other than 768, this constant AND the `vector(768)`
- * column both have to move together — there is no migration for that yet,
- * and `note_chunks` is empty (0 rows embedded), so re-ingesting is the
- * only cost.
+ * That truncation is DOCUMENTED behaviour for this model, which is the
+ * property the Nemotron swap did not have — its width could not be
+ * established from any endpoint, so the column became an assertion to
+ * verify rather than a known quantity. `assertDimensionality` below is
+ * what makes swapping the model survivable either way.
  */
 export const EMBEDDING_DIMENSIONS = 768;
 

@@ -42,14 +42,12 @@ import { modules } from "./modules";
  * users, because a shared cache keyed wrongly here hands one reader
  * another's paid content.
  *
- * The vector column is 768 dimensions. That number is NOT derived from
- * the model any more — it was `gemini-embedding-001`'s Matryoshka
- * truncation, and the model has since moved to
- * `nvidia/nemotron-3-embed-1b:free`, whose width is unconfirmed. So
- * treat 768 as an assertion to be verified by the first ingestion run,
- * not as a known quantity: if the model disagrees, both this column and
- * `EMBEDDING_DIMENSIONS` move together and everything is re-embedded.
- * `note_chunks` is currently empty, so that is cheap while it stays so.
+ * The vector column is 768 dimensions, which is what
+ * `EMBEDDING_DIMENSIONS` in `apps/web/src/lib/notes-embedding.ts` asks
+ * `gemini-embedding-001` for — it is Matryoshka-trained, so 768 is a
+ * truncation of 3072 rather than a different model. If that model is ever
+ * swapped the column has to change and everything re-embedded, so it is
+ * worth knowing before writing rather than after.
  */
 
 export const noteTopics = pgTable(
@@ -115,17 +113,14 @@ export const noteChunks = pgTable(
      */
     tokenEstimate: integer("token_estimate"),
     /**
-     * 768 dimensions. Cosine distance, which is what `<=>` means below.
+     * 768 dimensions — `EMBEDDING_DIMENSIONS` in
+     * `apps/web/src/lib/notes-embedding.ts`, which names the model.
+     * Cosine distance, which is what `<=>` means below.
      *
-     * The width must agree with `EMBEDDING_DIMENSIONS` in
-     * `apps/web/src/lib/notes-embedding.ts`, and that constant names the
-     * model. The model has changed more than once — Gemini's
-     * `gemini-embedding-001` served directly, then the same model through
-     * OpenRouter, now `nvidia/nemotron-3-embed-1b:free` — and a width
-     * mismatch is caught by an explicit assert on the way in, NOT by this
-     * column. Postgres would reject a wrong-width vector too, but far from
-     * the cause. There is no vector index here; the table is small enough
-     * to scan, and adding one means reindexing on every width change.
+     * A wrong-width vector is caught by an explicit assert on the way in,
+     * NOT by this column. Postgres would reject one too, but far from the
+     * cause. There is no vector index here; the table is small enough to
+     * scan, and adding one means reindexing on every width change.
      */
     embedding: vector("embedding", { dimensions: 768 }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
