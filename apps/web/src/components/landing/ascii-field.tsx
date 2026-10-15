@@ -91,7 +91,34 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
       return;
     }
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const interactive = variant === "landing";
+
+    /*
+     * TWO FLAGS, WHERE THERE WAS ONE, AND THE SECOND IS THE POINT
+     * ------------------------------------------------------------
+     * `isLanding` picks the token set and decides how big the field is.
+     * `interactive` decides only whether the pointer drives it.
+     *
+     * They used to be the same flag, which is why the cursor could not be
+     * switched off on its own: flipping `interactive` off also rerouted
+     * the hero onto the ambient ramp, opacity and colours, so "turn the
+     * pointer off" would have silently changed how the page looks. Those
+     * are two unrelated decisions and they now have two names.
+     *
+     * OFF ON LOCALHOST, AS A DIAGNOSTIC
+     * The cursor well is the one cost nothing else in this file pays: a
+     * Math.sqrt PER CELL PER FRAME inside the double loop, over a
+     * fullscreen grid, at 26fps. It is also the only candidate left
+     * standing after scale, font and dpr were each ruled out one at a
+     * time and the lag persisted. So it is off in development - which
+     * costs the developer nothing (nobody is chasing a cursor well while
+     * building) and, if the lag goes away on localhost, identifies the
+     * cause outright rather than by elimination.
+     */
+    const isLanding = variant === "landing";
+    const onLocalhost = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(
+      globalThis.location?.hostname ?? "",
+    );
+    const interactive = isLanding && !onLocalhost;
 
     // The ambient layer honours reduced-motion: it is not started at all
     // rather than animating forever.
@@ -132,7 +159,7 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
       "--bg-0", "--fg",
     ]);
 
-    const P = interactive ? "ascii" : "amb";
+    const P = isLanding ? "ascii" : "amb";
     const ramp = (t[`${P}-ramp`] || " .:-=+*#%@").replace(/["']/g, "").split("");
     const cell = Number.parseFloat(t[`${P}-font`]) || 13;
     const fps = Number.parseFloat(t[`${P}-fps`]) || 24;
@@ -228,7 +255,7 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
      * which is worth saying plainly: the cap cannot be verified here,
      * because the lag it addresses only exists where dpr is 2.
      */
-    const dprCap = interactive ? 1.5 : 2;
+    const dprCap = isLanding ? 1.5 : 2;
     const dpr = Math.min(dprCap, Math.max(1, globalThis.devicePixelRatio || 1));
     scale = Math.min(dprCap, scale * dpr);
 
