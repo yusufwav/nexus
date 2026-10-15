@@ -141,11 +141,44 @@ export default function AsciiField({ variant }: AsciiFieldProps): React.JSX.Elem
     const cursorRadius = Number.parseFloat(t["ascii-cursor-radius"]) || 10;
     const cursorPower = Number.parseFloat(t["ascii-cursor-power"]) || 1;
 
-    // Resolution of the buffer relative to the screen. The canvas is
-    // CSS-scaled back up, so a sub-1.0 value is invisible on a
-    // background this faint but cuts the per-pixel work directly.
+    /*
+     * Resolution of the buffer relative to the screen, and the ONLY
+     * control over how sharp a character is.
+     *
+     * Two regimes, and the clamp used to forbid the useful one:
+     *
+     *   scale < 1   the buffer is smaller than its CSS box and the
+     *               browser scales it UP. Anything under 1 is blur by
+     *               construction - the browser is inventing the pixels
+     *               in between. This is why --amb-scale: 0.6 made the
+     *               dashboard field mush.
+     *
+     *   scale = 1   buffer is exactly the CSS box. Sharp as the screen
+     *               allows, but the glyph itself was rasterised at only
+     *               `cell` px — a 10px glyph drawn into a 10px cell has
+     *               very few antialiased edges to work with, so it reads
+     *               soft when you look at one character closely.
+     *
+     *   scale > 1   SUPERSAMPLING. The glyph is rasterised at
+     *               `cell * scale` — 20px for a 10px character — and the
+     *               browser scales the buffer back down. The character
+     *               ends up the same physical size with a far better
+     *               raster behind it, and the downscale averages several
+     *               samples per output pixel.
+     *
+     * Worth being precise about what this does and does not buy: it adds
+     * no detail beyond the `cell`-px design size, it makes the edges of
+     * that design cleaner. For a field made of 10px characters that is
+     * the difference between soft and crisp, but it will not make a 6px
+     * character legible.
+     *
+     * Capped at 2 rather than left open: the cost is quadratic in scale
+     * (4x the pixels at 2), and past 2 the returns are invisible while the
+     * frame cost is not. Only the ambient layer uses more than 1 — the
+     * landing field is fullscreen at 26fps and 4x that is not affordable.
+     */
     let scale = Number.parseFloat(t[`${P}-scale`]);
-    if (!(scale > 0 && scale <= 1)) {
+    if (!(scale > 0 && scale <= 2)) {
       scale = 1;
     }
 

@@ -141,19 +141,17 @@
   --amb-ramp: " .·:+=xX#";
   --amb-font: 10px;
   --amb-fps: 20;
-  /* Was 0.6. That value made the ambient field blurry in two separate
-     ways, and neither was visible as "low resolution" until you looked
-     at one character closely:
-       1. the glyph atlas is rasterised at cell * scale, so a 10px cell
-          became a 6px glyph - smaller than most of the ramps' ink
-       2. the canvas backing store was 0.6x its CSS size and CSS then
-          stretched it back up 1.67x
-     Both blur the same pixels, so raising the scale to 1 fixes both at
-     once: the glyph rasterises at its real 10px and nothing is scaled
-     up on the way to the screen. The cost is 1/0.6^2 = 2.8x the pixel
-     work, which is affordable here because this layer is a 20vh strip
-     rather than a fullscreen field. */
-  --amb-scale: 1;
+  /* Supersampled. The history of this value is the whole blur story:
+       0.6  buffer below CSS size, browser scaled it UP -> blurry, and
+            the atlas glyph was only 6px
+       1    buffer matched CSS size, no upscale, but a 10px glyph drawn
+            into a 10px cell is still soft on its own edges
+       2    the glyph rasterises at 20px and the browser scales back
+            down. Same physical character size, much cleaner edges.
+     2 and not more: the cost is quadratic, and this is why the landing
+     field is still at 1 — it is fullscreen at 26fps, where 4x the pixels
+     is not affordable. */
+  --amb-scale: 2;
   --amb-op: 0.6;
   --amb-low: #8b0000;
   --amb-high: #fdd3ae;
