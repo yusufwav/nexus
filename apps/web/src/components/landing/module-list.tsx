@@ -30,7 +30,7 @@ export default function ModuleList({
 }: ModuleListProps): React.JSX.Element {
   return (
     <section className="nt-modules" id="modules" aria-label="Modules">
-      <div className="nt-wrap">
+      <div className="nt-wrap nt-wrap--narrow">
         <div className="nt-sec-head" data-reveal="rise">
           <div className="nt-sec-head__bar">
             <span className="nt-sec-head__path">~/nexus</span>

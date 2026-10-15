@@ -31,7 +31,7 @@ export default function TerminalHero({
 }: TerminalHeroProps): React.JSX.Element {
   return (
     <section className="nt-hero" id="hero">
-      <div className="nt-wrap">
+      <div className="nt-wrap nt-wrap--narrow">
         <div className="nt-term nt-glass nt-hoverable" data-reveal="wipe">
           <div className="nt-term__bar">
             <span className="nt-term__dot" />
