@@ -297,53 +297,69 @@ was wrong and the evidence never supported it. Worth recording because the shape
 of the mistake is the reusable part: a search of the wrong corpus cannot answer
 the question asked, and "absent from the one list I looked at" is not "absent".
 
-**The model is `gemini-embedding-001`, served through OpenRouter.** It was
-briefly swapped to `nvidia/nemotron-3-embed-1b:free` because it was free, and
-reverted after testing showed Gemini embedding measurably better. Worth
-recording the reasoning error, since "free" was the reason and it was the wrong
-one: retrieval quality *is* the point of an embedding. A cheaper vector that
-ranks worse makes the tutor confidently wrong, which is strictly worse than
-paying for the better one — and the index is empty, so cost was never the thing
-at stake. Cheap was not the objective; good was.
+**The model is `gemini-embedding-001`, through Google's own endpoint.**
+`@ai-sdk/google` is a dependency again and `GOOGLE_GENERATIVE_AI_API_KEY` is
+what backs it.
+
+**A wrong conclusion, twice, and the shape of it.** OpenRouter's embeddings
+catalogue **lists** `google/gemini-embedding-001`. It does not serve it. The
+embeddings were routed through OpenRouter on the strength of that catalogue
+entry, and it failed. The error was treating a listing as a working route:
+
+- Round one: searched `/api/v1/models` for "embedding", found none, concluded
+  OpenRouter served no embeddings at all. Wrong — `/models` lists chat models,
+  and embeddings have their own router at `/api/v1/embeddings`.
+- Round two: found `/api/v1/embeddings/models`, saw the model listed, and
+  "corrected" the first error by routing through OpenRouter. Also wrong, in the
+  opposite direction, and this time it was acted on.
+
+Neither was tested; only the second was load-bearing, and it broke. **A
+catalogue entry means a slug is KNOWN, not that a ROUTE WORKS.** Verify by
+making the call, not by reading the list. Worth keeping as the standing rule,
+because the wrong answer here is confidently specific and looks researched.
 
 **768 is documented, not assumed.** `gemini-embedding-001` is Matryoshka-trained,
-so `dimensions: 768` truncates 3072 rather than discarding, and the
-`vector("embedding", { dimensions: 768 })` column is written to match. That
-truncation was the one thing the Nemotron swap could not offer: its width was
-unestablishable from any endpoint, which turned a known quantity into an
-assertion to verify.
+so `outputDimensionality: 768` truncates 3072 rather than discarding, and the
+`vector("embedding", { dimensions: 768 })` column is written to match. (Google
+names that parameter `outputDimensionality`; OpenAI's API calls the same idea
+`dimensions` — which is part of how this got tangled.)
 
-`@ai-sdk/google` stays uninstalled — and note it was **already unused** at the
-Gemini state, because `gemini-embedding-001` is served *through* OpenRouter, not
-by that package. Removing the dependency was independent of which model runs,
-so the revert did not bring it back. The Google key is still load-bearing
-nowhere, which was the actual goal.
+`assertDimensionality` **throws with the fix in the message** rather than
+truncating client-side. Kept from the Nemotron detour, because it is what makes
+the next model swap a one-line change instead of a silent corruption: a
+truncated vector still returns numbers and still returns chunks, so the tutor
+grounds on nonsense with nothing in the logs.
 
-`assertDimensionality` now **throws with the fix in the message** rather than
-truncating client-side, and that part of the swap was kept. A silently-truncated
-vector is wrong in a way that never surfaces: cosine similarity still returns
-numbers, retrieval still returns chunks, and the tutor grounds on nonsense with
-nothing in the logs. One loud failure beats quiet wrong answers, and it is what
-makes the next model swap a one-line change instead of a corruption.
+| Site | Provider | Key |
+| --- | --- | --- |
+| tutor (server default) | OpenRouter | `OPENROUTER_API_KEY` |
+| tutor (reader's own key) | OpenRouter | per-reader, sealed |
+| note embeddings / RAG | **Google** | `GOOGLE_GENERATIVE_AI_API_KEY` |
 
-| Site | Provider |
-| --- | --- |
-| tutor (server default) | OpenRouter |
-| tutor (reader's own key) | OpenRouter |
-| note embeddings / RAG | OpenRouter (`google/gemini-embedding-001`) |
+**Two providers is the correct shape here, not a compromise.** Each is used
+because its endpoint demonstrably works, not because it is convenient.
 
-**One honest loss, standing:** Google had `taskType: RETRIEVAL_QUERY` /
-`RETRIEVAL_DOCUMENT`, which tells the model whether a string is a question or a
-passage. OpenRouter has the equivalent (`input_type: search_query` /
-`search_document`) but the SDK's embedding model does not forward it, so query
-and document vectors are generated without that hint. Recoverable later with a
-direct call to the endpoint; not worth blocking on, and worth remembering as the
-first thing to try if retrieval underperforms.
+#### BOTH keys become per-reader, collected at onboarding (A3)
 
-`GOOGLE_GENERATIVE_AI_API_KEY` is kept in the schema, marked optional, and the
-reasoning is inline so nobody re-tightens it. No source imports Google and
-`@ai-sdk/google` is uninstalled; the only remaining references are its own
-declaration and comments explaining why it is unused.
+`OPENROUTER_API_KEY` and `GOOGLE_GENERATIVE_AI_API_KEY` are separate
+credentials with separate jobs — chat versus embeddings — and both end up
+belonging to the reader:
+
+- The **OpenRouter** key pays for the tutor. Already per-reader via `provider_keys`.
+- The **Gemini** key pays for embeddings of the reader's own notes. Currently
+  server-side, which means the owner's quota pays for every reader's retrieval.
+  That is the same exposure the AI budget exists to bound, one level down.
+- **Onboarding collects both**, at signup, impossible to miss. Neither is
+  optional for a working tutor: without the first there is no chat, without the
+  second there is no note grounding. Collecting one and not the other ships a
+  half-working product.
+- The Gemini key reuses the existing `provider_keys` machinery rather than a
+  second store. `PROVIDERS` in `lib/providers.ts` is already the single
+  allowlist mapping a stored slug to a base URL, so adding `google` there is the
+  intended extension point — but note the embeddings call currently reads
+  `process.env` directly, so making it per-reader means threading the reader's
+  key into `notes-retrieval.ts`. That is real work, not a config flip, and it is
+  why this is its own item rather than a line in the onboarding list.
 
 ---
 
