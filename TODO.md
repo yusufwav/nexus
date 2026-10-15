@@ -258,21 +258,50 @@ pipeline together. Worth knowing before the deletion, not after. Mitigating
 detail: `note_chunks.embedding` is 0/12 in production — the index was never
 populated, so nothing user-visible regresses on the embeddings side today.
 
-- [ ] **A1. Remove "Server default (gemini)" from the model picker**
-      `model-picker.tsx:172`. The tutor becomes BYOK-only: the reader's own key,
-      their own spend, no server exposure. This is also the anti-abuse story — a
-      free account cannot drain the owner's quota, which is the same reason the
-      AI budget exists, one level up.
-- [ ] **A2. Make the absent key a state, not a 500.** Today a missing key throws
-      from the provider at call time. It must instead read as "no model
-      configured" and render the onboarding below.
+- [ ] **A1. The server default is now OpenRouter** — **done in `tutor-model.ts`.**
+      Was `google("gemini-3.8-flash")`, which made the owner's personal Google
+      key a hard boot dependency. Now the same `createOpenAICompatible` client
+      the reader's own BYOK key uses, so the server speaks one provider through
+      one code path.
+- [ ] **A1b. Remove "Server default (gemini)" from the model picker.**
+      `model-picker.tsx:172` still labels it *gemini*, which is now a lie. The
+      label should go, and with it the `SERVER_PICK_VALUE` fallback — the tutor
+      is BYOK-first, and a reader with no key gets onboarding (A3), not a
+      silently substituted model.
+- [ ] **A2. Make an absent key a state, not a 500.** `serverHasKey()` is in
+      `tutor-model.ts`; the route and the picker still need to *use* it.
 - [ ] **A3. A first-run tutorial session, in place of a working default.** This
       is the replacement for the thing being removed, and it is better: the
-      reader ends up owning the thing instead of borrowing it. Covers: what a
-      key is, getting one from Google AI Studio, pasting it, what it costs them,
-      and that the key is sealed at rest and never leaves their own calls.
-- [ ] **A4. Delete the key from the account** and confirm the app runs with
-      `GOOGLE_GENERATIVE_AI_API_KEY` absent — locally and on Vercel.
+      reader ends up owning the key instead of borrowing it. Covers: what a key
+      is, getting one from OpenRouter, pasting it, what it costs them, and that
+      it is sealed at rest and never leaves their own calls.
+- [ ] **A4. Delete the Google key from the account** and confirm the app runs
+      with it absent — locally and on Vercel.
+
+#### The embedding half — and why it could NOT be rerouted
+
+`notes-embedding.ts` still calls `google.embedding("gemini-embedding-001")`,
+and that is not an oversight: **OpenRouter serves no embedding model at all.**
+Its entire published catalogue was fetched and checked — 774KB of JSON, zero
+matches for "embedding". It is a chat-completion router.
+
+So the split after this change is:
+
+| Site | Provider |
+| --- | --- |
+| tutor (server default) | OpenRouter |
+| tutor (reader's own key) | OpenRouter |
+| note embeddings / RAG | **Google — cannot move** |
+
+**Good news about the coupling:** the embedding calls are *inside* the async
+functions, so Google was never a boot dependency — only a RAG-search dependency.
+And `note_chunks.embedding` is 0/12, meaning the index was never populated and
+RAG already returns nothing. **Deleting the key therefore regresses nothing that
+currently works.** It costs a note-grounded tutor until a real embedding provider
+is chosen, which is a Track C decision, not a Track A one.
+
+`GOOGLE_GENERATIVE_AI_API_KEY` is now marked `@required=false` in `.env.schema`
+and the schema carries the reasoning inline.
 
 ---
 
@@ -300,24 +329,59 @@ engineering. A rolling supply of questions so practice never runs dry.
 
 ### B2. Three question formats
 
-- [ ] **B2a. Multiple choice.** 4–5 options, one correct.
-      *Why first:* the cheapest to author, the cheapest to grade, and the
-      **best at exposing a specific misconception** — a distractor is a claim
-      about what the reader wrongly believes, and picking it names the
-      misconception rather than just the score. That is the highest
-      signal-per-second-of-feedback in the whole feature.
-- [ ] **B2b. Formal working, typed by the reader, checked word for word.**
-      Deviations highlighted red, hover explains *why*.
-      *This is the differentiated one and the hardest.* The naive version is a
-      string comparison and will be wrong constantly — LaTeX has many correct
-      forms. The honest version grades in stages: a structural pass first (does
-      a proof exist, is every variable defined, does every line follow), and
-      only then the prose. **Build B2b second, not first** — a red-highlighted
-      wrong answer is worse than no feedback, because a student who is told
-      their correct proof is wrong learns to distrust the tool.
-- [ ] **B2c. Application questions, then a full worked solution.** No red ink.
-      The feedback is a complete worked answer *for that question*, which is the
-      part that teaches — a worked example transfers; a score does not.
+**A note that shapes all three:** feedback is *staged*. Every format below
+grades deterministically first and calls a model only if the reader asks for
+more. That ordering is the whole design — a model in the grading path makes
+every answer non-reproducible, and a non-reproducible grader teaches the
+student to argue with the tool instead of with the maths.
+
+- [ ] **B2a. Multiple choice.** 4–5 options, one correct. Grading AND the
+      explanation for every option are **static and authored**, so this is the
+      one format with no model call in it at all.
+      *Why first:* cheapest to author, cheapest to grade, and the **best at
+      exposing a specific misconception** — a distractor is a claim about what
+      the reader wrongly believes, and picking it names the misconception
+      rather than just the score.
+      Escape hatch: if the explanation still doesn't land, **the reader asks the
+      tutor themselves** — it is a button that opens a seeded conversation with
+      the question attached. No bespoke AI path needed.
+- [ ] **B2b. Application questions, graded in three stages.**
+      1. **Tolerance check, deterministic.** Compare the reader's answer to the
+         set of accepted final answers, numerically within a tolerance. Fast,
+         free, reproducible, and it is correct far more often than a model
+         would be.
+      2. **On a miss, reveal the full worked solution** for that specific
+         question. This is the part that teaches — a worked example transfers, a
+         score does not.
+      3. **Only then, optionally, a model** — "help me understand what I got
+         wrong", seeded with their answer and the solution. Opt-in per question.
+         Stage 1 failing is not a reason to spend a model call automatically.
+- [ ] **B2c. Formal proofs — puzzle style, and the reason it is B2c and not B2a.**
+      The blocker is not grading, it is **input**: nobody types LaTeX. They type
+      `2x+3(4` with mismatched brackets, or prose that is a third of the way
+      there, and every character of that is a legitimate reading of what a
+      student meant. So the question is never asked as free text.
+      Instead: the proof is dealt out as **pieces**, one per line, plus extra
+      pieces that are deliberately wrong. The reader assembles the argument.
+      They are not writing the proof; they are **reconstructing it**, which is
+      both something they can actually do and a better test of understanding
+      than typing it.
+      Grading is three-state and explains itself:
+
+      | | right piece | wrong piece |
+      |---|---|---|
+      | **right position** | green | red |
+      | **wrong position** | yellow | red |
+
+      Green = the argument assembled. **Yellow is the valuable one**: every
+      piece is genuinely part of the proof, only out of order — that is a
+      sequencing failure, and it is a different mistake from choosing a wrong
+      line, so it must not be collapsed into the same red.
+
+      A model still does the final judgement, because only it can tell a
+      defensible alternative ordering from a wrong one. The pieces do the heavy
+      lifting of making the input tractable; the model is a safety net on top,
+      not the thing doing the reading.
 
 ### B3. What makes it compound (the actual goal)
 

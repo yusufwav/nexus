@@ -1,7 +1,6 @@
 import "server-only";
 
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
-import { google } from "@ai-sdk/google";
 import type { LanguageModelV4 } from "@ai-sdk/provider";
 
 import * as q from "@Main/db/queries";
@@ -208,10 +207,42 @@ async function readKey(
 }
 
 function serverModel(): TutorModel {
+  /*
+   * THE SERVER DEFAULT IS NOW OPENROUTER, not Google.
+   *
+   * It was `google("gemini-3.8-flash")`, which made the owner's personal
+   * Google key a hard boot dependency: the app could not run without it,
+   * and a tutor that quietly spends someone's key is not a default worth
+   * keeping. This is the same `createOpenAICompatible` client the
+   * READER'S OWN key already uses, so the server now speaks one provider
+   * through one code path instead of two.
+   *
+   * The key is read at call time, not import time, so a missing one is a
+   * value rather than a throw at module load — `resolveTutorModel` reports
+   * it as something the reader can fix, instead of the provider
+   * exploding on first use.
+   */
+  const apiKey = process.env.OPENROUTER_API_KEY ?? "";
   return {
-    model: google("gemini-3.8-flash"),
+    model: createOpenAICompatible({
+      name: "openrouter",
+      baseURL: PROVIDERS.openrouter.baseUrl,
+      apiKey,
+    })(DEFAULT_OPENROUTER_MODEL),
     source: "server",
-    provider: "google",
-    modelId: "gemini-3.8-flash",
+    provider: "openrouter",
+    modelId: DEFAULT_OPENROUTER_MODEL,
   };
+}
+
+/**
+ * Can the server answer at all?
+ *
+ * An absent key is a STATE, not a crash. A2 in TODO.md: the whole point of
+ * removing the Google dependency is that a missing key has to read as
+ * "nothing configured yet" and invite the reader to add one, rather than
+ * taking the tutor down.
+ */
+export function serverHasKey(): boolean {
+  return (process.env.OPENROUTER_API_KEY ?? "").length > 0;
 }
