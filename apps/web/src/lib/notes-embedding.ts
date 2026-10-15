@@ -30,25 +30,50 @@ import { PROVIDERS } from "@/lib/providers";
  * the evidence never supported it. The catalogue is the authority here,
  * and it does list the model below.
  *
- * WHY THE MODEL IS UNCHANGED: `google/gemini-embedding-001` is served
- * *through* OpenRouter, so the move is transport-only. That matters
- * because changing the embedding model silently invalidates every stored
- * vector: cosine similarity between vectors from two different models is
- * meaningless, and the stored chunks would rank against garbage rather
- * than fail loudly.
+ * THE MODEL CHANGED TWICE, and that has a consequence worth stating
+ * plainly: changing the embedding model silently invalidates every stored
+ * vector. Cosine similarity between vectors from two different models is
+ * meaningless — not approximately right, meaningless — so stale chunks
+ * would rank against garbage and retrieval would keep returning confident
+ * nonsense. The first move was transport-only (Gemini's model served
+ * *through* OpenRouter, same model, same vectors). The second was not.
+ * `assertDimensionality` is the guard that makes the second one safe to
+ * make at all, and `note_chunks` is empty, so the cost today is zero.
  */
 
-/** The model. Changing it changes the dimension and invalidates every stored vector. */
-export const EMBEDDING_MODEL = "google/gemini-embedding-001";
+/**
+ * The model.
+ *
+ * Now `nvidia/nemotron-3-embed-1b:free` — free, and served through the
+ * same router as everything else, so the app depends on exactly one
+ * provider. Changing this invalidates every stored vector; see
+ * `EMBEDDING_DIMENSIONS` for the trap that goes with it.
+ */
+export const EMBEDDING_MODEL = "nvidia/nemotron-3-embed-1b:free";
 
 /**
- * 768, not the model's native 3072.
+ * 768 — and THIS NUMBER IS THE THING TO CHECK.
  *
- * `gemini-embedding-001` is Matryoshka-trained, so `dimensions` truncates
- * rather than discards: the leading 768 dimensions retain most of the
- * ranking quality at a quarter of the storage and a fraction of the index
- * size. Left unset it returns 3072, which would not fit the
- * `vector(768)` column at all.
+ * `gemini-embedding-001` was Matryoshka-trained, so asking for 768
+ * truncated 3072 cleanly and this column was written to match. Whether
+ * this model behaves that way is **not established**: OpenRouter's
+ * embeddings catalogue publishes no `dimensions` field for it, and
+ * `supported_parameters` is empty for every embedding model there, so
+ * neither endpoint can answer the question. It may truncate; it may
+ * ignore the parameter; it may reject it.
+ *
+ * That uncertainty is why `assertDimensionality` below throws rather than
+ * truncating client-side. A silently-truncated vector is WRONG in a way
+ * that never surfaces: cosine similarity still returns numbers, retrieval
+ * still returns chunks, and the tutor just quietly grounds on nonsense. A
+ * thrown error costs one failed ingestion run and tells us the real width
+ * on the first attempt.
+ *
+ * So: run one ingestion after this change and read the error. If it
+ * reports a width other than 768, this constant AND the `vector(768)`
+ * column both have to move together — there is no migration for that yet,
+ * and `note_chunks` is empty (0 rows embedded), so re-ingesting is the
+ * only cost.
  */
 export const EMBEDDING_DIMENSIONS = 768;
 
@@ -109,12 +134,21 @@ export async function embedDocuments(texts: ReadonlyArray<string>): Promise<numb
  * Postgres rejects a vector of the wrong width with an opaque error a long
  * way from its cause, and the cause — the model or the column changing —
  * is the thing worth naming.
+ *
+ * NOT client-side truncation. Padding or slicing to fit the column would
+ * satisfy the type and produce a vector that means nothing: cosine
+ * similarity keeps returning plausible numbers, retrieval keeps returning
+ * chunks, and the tutor grounds its answers on noise with nothing in the
+ * logs to say so. One loud failure is worth more than quiet wrong answers.
  */
 function assertDimensionality(embedding: readonly number[]): void {
   if (embedding.length !== EMBEDDING_DIMENSIONS) {
     throw new Error(
       `Embedding is ${embedding.length} dimensions, expected ${EMBEDDING_DIMENSIONS}. ` +
-        `The note_chunks vector column and ${EMBEDDING_MODEL} must agree.`,
+        `The note_chunks vector column and ${EMBEDDING_MODEL} must agree. ` +
+        `Either set EMBEDDING_DIMENSIONS to ${embedding.length} and widen the column to ` +
+        `vector(${embedding.length}), or pick a model that emits ${EMBEDDING_DIMENSIONS}. ` +
+        `Truncating here instead would be wrong — it produces vectors that rank without erroring.`,
     );
   }
 }
