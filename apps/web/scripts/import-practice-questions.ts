@@ -3,6 +3,11 @@ import pg from "pg";
 
 import { MODULE_TOPICS } from "../src/content/module-topics";
 import { PRACTICE_QUESTIONS } from "../src/content/practice-questions";
+// The target/guard lives in packages/db/scripts and is imported across the
+// package boundary rather than copied. Duplicating it here would mean two
+// implementations of "may this script write to production", and the second
+// one is the one nobody updates.
+import { resolveTarget } from "../../../packages/db/scripts/target.mjs";
 
 /**
  * IMPORT THE CATALOGUE
@@ -51,14 +56,7 @@ const APPLY = process.argv.includes("--write");
  * one needs it for every database call, so the body moves instead.
  */
 async function main(): Promise<void> {
-const url = readFileSync(new URL("../.env", import.meta.url), "utf8").match(
-  /^DATABASE_URL=(.*)$/m,
-)?.[1].trim();
-
-if (!url) {
-  console.error("DATABASE_URL is not set in apps/web/.env");
-  process.exit(1);
-}
+const { url, local } = resolveTarget({ script: "import-practice", write: true });
 
 /* ------------------------------------------------------------------ *
  *  1. cross-check the catalogue against MODULE_TOPICS BEFORE touching
