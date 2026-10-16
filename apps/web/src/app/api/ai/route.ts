@@ -378,6 +378,47 @@ export async function POST(req: Request): Promise<Response> {
   const capped = messages.slice(-50);
 
   const chosen = await resolveTutorModel(wanted);
+
+  /**
+   * THE BUDGET'S VETO, APPLIED WHERE IT CAN BE JUDGED CORRECTLY.
+   *
+   * The counter is consumed above, before the model is resolved, because it
+   * has to be: an attacker who never reaches the resolve step must still be
+   * charged for the attempt. But that ordering means the counter cannot know
+   * whose money is about to be spent, and that is the one fact its failure
+   * handling turns on.
+   *
+   * `consumeAiBudget` therefore reports `degraded` rather than deciding, and
+   * the decision is made here — the first place the source is known:
+   *
+   *   · the reader's OWN key — proceed. It is their money and their rate.
+   *     The counter exists to protect the server's account, and an uncounted
+   *     turn on their own card costs the owner nothing.
+   *
+   *   · the SERVER's key — refuse. That spend is the owner's, and an
+   *     unlimited counter on it is precisely the hole ai_usage was created
+   *     to close: thirty unguarded POSTs returning 200 is the situation that
+   *     prompted the table. "We cannot count, so we will spend anyway" is the
+   *     one response that guarantees the loss.
+   *
+   * Refusing here rather than at the counter is also what makes this safe to
+   * ship: a transient counter failure blocks the server-funded tutor, which
+   * is visible and self-correcting, instead of silently billing the owner
+   * without limit.
+   *
+   * 503 rather than 429, because nothing about waiting will fix it and a 429
+   * would tell the reader to retry something that will fail identically.
+   */
+  if (budget.degraded && chosen.source === "server") {
+    return NextResponse.json(
+      {
+        error:
+          "The tutor's own model provider is temporarily unavailable, so it cannot answer safely right now. Adding your own key under Settings → model provider will let you keep going.",
+      },
+      { status: 503 },
+    );
+  }
+
   const model = wrapLanguageModel({
     model: chosen.model,
     middleware: DEVTOOLS,

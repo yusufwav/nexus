@@ -45,6 +45,25 @@ export type AiBudget = {
   readonly remaining: number;
   /** 0 when allowed; milliseconds until the window frees up when not. */
   readonly retryAfterMs: number;
+  /**
+   * True when the counter could not be reached.
+   *
+   * `allowed` is then ALWAYS true and means nothing on its own — this budget
+   * deliberately does not decide alone. A degraded budget means "we do not
+   * know how many turns this reader has used", and whether that is survivable
+   * depends entirely on WHO PAYS for the next call:
+   *
+   *   · the reader's own key — survivable. It is their money and their rate,
+   *     and this counter exists to protect the server's account, not theirs.
+   *   · the server's key    — NOT survivable. That spend is the owner's, and
+   *     an unlimited counter is precisely the hole this table was built to
+   *     close. Thirty unguarded POSTs returning 200 is the situation this
+   *     whole file was written in response to.
+   *
+   * So the caller decides, using this flag. /api/ai checks it immediately
+   * after `resolveTutorModel`, because the source is not known any earlier.
+   */
+  readonly degraded: boolean;
 };
 
 /**
@@ -96,34 +115,53 @@ export type AiBudget = {
 export async function consumeAiBudget(db: Database, userId: string): Promise<AiBudget> {
   const windowSeconds = Math.round(WINDOW_MS / 1000);
 
-  const rows = await db.execute(sql`
-    insert into ai_usage (id, user_id, window_started_at, count, updated_at)
-    values (gen_random_uuid()::text, ${userId}, now(), 1, now())
-    on conflict (user_id) do update set
-      count = case
-        when ai_usage.window_started_at <= now() - make_interval(secs => ${windowSeconds})
-          then 1
-        else ai_usage.count + 1
-      end,
-      window_started_at = case
-        when ai_usage.window_started_at <= now() - make_interval(secs => ${windowSeconds})
-          then now()
-        else ai_usage.window_started_at
-      end,
-      updated_at = now()
-    returning
-      count,
-      greatest(
-        0,
-        extract(epoch from (
-          ai_usage.window_started_at + make_interval(secs => ${windowSeconds}) - now()
-        )) * 1000
-      )::bigint as retry_after_ms
-  `);
+  /*
+   * THE COUNTER MUST NOT THROW, BUT IT MUST NOT DECIDE ALONE EITHER.
+   *
+   * This function's own header promises that the budget "must be able to
+   * fail OPEN for the reader's own key while still refusing the server's".
+   * That was documented and not implemented: the upsert below sat bare, so
+   * a missing `ai_usage` table — or any other failure — propagated out of
+   * `/api/ai` as a 500. The promise in the comment was aspirational, which
+   * is the worst kind of documentation, because it reads as a guarantee.
+   *
+   * The failure is now caught and reported as `degraded`, and the DECISION
+   * moves to the caller, which is the only place that knows whose money is
+   * about to be spent. Failing open unconditionally would be wrong here in a
+   * way it is right on the content route: there, an uncounted request just
+   * means a bulk loop runs fast. Here, an uncounted request on the SERVER's
+   * key is a real drain of the owner's quota, and this table exists for no
+   * other purpose.
+   */
+  try {
+    const rows = await db.execute(sql`
+      insert into ai_usage (id, user_id, window_started_at, count, updated_at)
+      values (gen_random_uuid()::text, ${userId}, now(), 1, now())
+      on conflict (user_id) do update set
+        count = case
+          when ai_usage.window_started_at <= now() - make_interval(secs => ${windowSeconds})
+            then 1
+          else ai_usage.count + 1
+        end,
+        window_started_at = case
+          when ai_usage.window_started_at <= now() - make_interval(secs => ${windowSeconds})
+            then now()
+          else ai_usage.window_started_at
+        end,
+        updated_at = now()
+      returning
+        count,
+        greatest(
+          0,
+          extract(epoch from (
+            ai_usage.window_started_at + make_interval(secs => ${windowSeconds}) - now()
+          )) * 1000
+        )::bigint as retry_after_ms
+    `);
 
-  const row = rows.rows[0] as { count: number; retry_after_ms: number | string } | undefined;
-  const count = Number(row?.count ?? 1);
-  const retryAfterMs = Number(row?.retry_after_ms ?? 0);
+    const row = rows.rows[0] as { count: number; retry_after_ms: number | string } | undefined;
+    const count = Number(row?.count ?? 1);
+    const retryAfterMs = Number(row?.retry_after_ms ?? 0);
 
   // Opportunistic cleanup: one statement, best effort, and it must never
   // fail the request. 1-in-N rather than every call, because an
@@ -144,7 +182,18 @@ export async function consumeAiBudget(db: Database, userId: string): Promise<AiB
     allowed: count <= MAX_TURNS,
     remaining: Math.max(0, MAX_TURNS - count),
     retryAfterMs: count <= MAX_TURNS ? 0 : retryAfterMs,
+    degraded: false,
   };
+  } catch (err) {
+    // Loud, and it names the consequence: the caller is about to decide
+    // whether to refuse, and that decision should be traceable to this line.
+    console.error(
+      "[ai-budget] counter unavailable, decision deferred to the caller:",
+      err instanceof Error ? err.message : String(err),
+      "| check that ai_usage exists in this database (packages/db/scripts/create-ai-usage-table.mjs)",
+    );
+    return { allowed: true, remaining: 0, retryAfterMs: 0, degraded: true };
+  }
 }
 
 /** What the route calls. Exported for the test. */
