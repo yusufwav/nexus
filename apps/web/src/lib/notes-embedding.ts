@@ -35,8 +35,28 @@ import { embed, embedMany } from "ai";
  * a cheaper vector that ranks worse makes the tutor confidently wrong.
  */
 
-/** The model. Changing it changes the dimension and invalidates every stored vector. */
-export const EMBEDDING_MODEL = "google/gemini-embedding-001";
+/**
+ * The model.
+ *
+ * UNPREFIXED, and that is load-bearing. `google/gemini-embedding-001` is the
+ * OPENROUTER slug; Google's own endpoint wants `gemini-embedding-001` and
+ * answers the prefixed form with a bare 404. Measured against the live API,
+ * not assumed:
+ *
+ *     google/gemini-embedding-001  ->  Not Found
+ *     gemini-embedding-001         ->  OK, 768 dims
+ *
+ * The prefixed id survived the round trip through OpenRouter and came back
+ * with the tutor, which is the worst way for it to survive. The module looked
+ * correct, typechecked, and every layer above it reported a healthy search
+ * that never once returned a passage — the degradation guard added around
+ * this call turned a 404 into "note search is temporarily unavailable",
+ * blaming a provider outage for what was a bad model id.
+ *
+ * Changing this invalidates every stored vector, which is why it is asserted
+ * in test-notes-degradation.mjs rather than left to review.
+ */
+export const EMBEDDING_MODEL = "gemini-embedding-001";
 
 /**
  * 768, not the model's native 3072.

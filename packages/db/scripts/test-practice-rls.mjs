@@ -18,7 +18,21 @@ import pg from "pg";
  * Run from packages/db as a role that can create policies (the owner):
  *   node scripts/test-practice-rls.mjs
  */
-const url = readFileSync("../../apps/web/.env", "utf8").match(/^DATABASE_URL=(.*)$/m)[1].trim();
+/**
+ * Resolved from this script's own URL, not the process cwd, so the file works
+ * from anywhere. And unquoted: a `DATABASE_URL="postgres://..."` value makes pg
+ * fail to parse it, at which point libpq silently uses its built-in default of
+ * localhost:5432 — the error then reads as "the database is down" rather than
+ * "you passed a malformed argument". `target.mjs` exists for the same reason.
+ */
+function readLocalDbUrl() {
+  const raw = readFileSync(new URL("../../../apps/web/.env", import.meta.url), "utf8").match(
+    /^DATABASE_URL=(.*)$/m,
+  )?.[1];
+  if (raw === undefined) throw new Error("DATABASE_URL not found in apps/web/.env");
+  return raw.trim().replace(/^["']|["']$/g, "");
+}
+const url = readLocalDbUrl();
 
 let passed = 0;
 const failures = [];

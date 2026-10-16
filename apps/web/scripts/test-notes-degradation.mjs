@@ -71,7 +71,7 @@ function toolExecute() {
 
 console.log("\nthe search is guarded on the tutor's path");
 
-check("searchOwnNotes is called inside a try", () => {
+await check("searchOwnNotes is called inside a try", () => {
   const body = toolExecute();
   const call = body.indexOf("await searchOwnNotes");
   assert.ok(call > -1, "the tool must still call the search");
@@ -80,7 +80,7 @@ check("searchOwnNotes is called inside a try", () => {
   assert.ok(tryAt < call, "the try must come before the call, not after it");
 });
 
-check("there is a catch that returns rather than rethrows", () => {
+await check("there is a catch that returns rather than rethrows", () => {
   const body = toolExecute();
   const catchAt = body.indexOf("catch (err)", body.indexOf("await searchOwnNotes"));
   assert.ok(catchAt > -1, "the tool must catch");
@@ -98,7 +98,7 @@ check("there is a catch that returns rather than rethrows", () => {
 
 console.log("\nand the model is not told a search happened when it did not");
 
-check("the success path says searched: true", () => {
+await check("the success path says searched: true", () => {
   const body = toolExecute();
   assert.ok(
     /searched:\s*true/.test(body),
@@ -106,7 +106,7 @@ check("the success path says searched: true", () => {
   );
 });
 
-check("the failure path says searched: false", () => {
+await check("the failure path says searched: false", () => {
   const body = toolExecute();
   assert.ok(
     /searched:\s*false/.test(body),
@@ -114,7 +114,7 @@ check("the failure path says searched: false", () => {
   );
 });
 
-check("the failure path carries an instruction, not just an empty array", () => {
+await check("the failure path carries an instruction, not just an empty array", () => {
   const body = toolExecute();
   const catchAt = body.indexOf("catch (err)");
   const after = body.slice(catchAt, catchAt + 900);
@@ -128,7 +128,7 @@ check("the failure path carries an instruction, not just an empty array", () => 
   );
 });
 
-check("the failure is logged", () => {
+await check("the failure is logged", () => {
   const body = toolExecute();
   const catchAt = body.indexOf("catch (err)");
   assert.ok(
@@ -143,7 +143,7 @@ check("the failure is logged", () => {
 
 console.log("\nrouteQuestion degrades too, for whoever calls it next");
 
-check("its embedding calls are inside a try", () => {
+await check("its embedding calls are inside a try", () => {
   const start = retrievalSrc.indexOf("export async function routeQuestion");
   assert.ok(start > -1, "routeQuestion must be findable");
   const body = retrievalSrc.slice(start, start + 1400);
@@ -163,7 +163,7 @@ check("its embedding calls are inside a try", () => {
 
 console.log("\nand the two branches behave differently");
 
-check("a failing search yields searched:false, not an empty success", () => {
+await check("a failing search yields searched:false, not an empty success", () => {
   // Models the branches directly. The point being pinned is that they are
   // DIFFERENT results — a test asserting only "does not throw" would pass
   // against the version that lies to the model.
@@ -185,20 +185,78 @@ check("a failing search yields searched:false, not an empty success", () => {
   assert.equal(out.passages.length, 0);
 });
 
-check("a successful empty search is still marked searched:true", () => {
+await check("a successful empty search is still marked searched:true", () => {
   const out = { searched: true, passages: [] };
   assert.equal(out.searched, true, "finding nothing after searching IS a different outcome");
   assert.equal(out.unavailable, undefined, "no failure explanation on a real search");
 });
 
 /* ------------------------------------------------------------------ *
- *  5. the key really does throw at call time — the premise
+ *  5. the model id itself
+ *
+ *  THE BUG THIS FILE WAS MOST RECENTLY NEEDED FOR, and it was live.
+ *  `EMBEDDING_MODEL` was the OpenRouter slug `google/gemini-embedding-001`
+ *  being sent to GOOGLE's endpoint, which answers that with a bare 404.
+ *  Measured against the live API:
+ *
+ *      google/gemini-embedding-001  ->  Not Found
+ *      gemini-embedding-001         ->  OK, 768 dims
+ *
+ *  It typechecked, it reviewed as correct, and every layer above it reported
+ *  a healthy search that never once returned a passage. The guard added in
+ *  section 1 is what turned a 404 into "note search is temporarily
+ *  unavailable" — blaming a provider outage for a bad constant.
+ *
+ *  A string constant is the easiest thing in this codebase to get wrong and
+ *  the hardest to notice, so it is pinned here rather than trusted.
+ * ------------------------------------------------------------------ */
+
+console.log("\nand the model id is one Google's endpoint accepts");
+
+const embeddingSrc = readFileSync(
+  new URL("../src/lib/notes-embedding.ts", import.meta.url),
+  "utf8",
+);
+
+await check("the model id carries no provider prefix", () => {
+  const m = /export const EMBEDDING_MODEL = "([^"]+)"/.exec(embeddingSrc);
+  assert.ok(m, "EMBEDDING_MODEL must be findable");
+  const id = m[1];
+  assert.ok(
+    !/^[a-z]+\//.test(id),
+    `"${id}" looks like a routed slug (vendor/model). Google's endpoint wants the bare id — the prefixed form 404s.`,
+  );
+  assert.equal(id, "gemini-embedding-001", `unexpected model id: ${id}`);
+});
+
+await check("the embedding width matches the vector column it is stored in", () => {
+  // Cross-file on purpose: the module asks for 768 and the column is
+  // vector(768), and nothing in Postgres tells you they disagree until an
+  // INSERT fails a long way from the cause. `assertDimensionality` catches it
+  // at write time; this catches the two files drifting apart at all.
+  const width = /export const EMBEDDING_DIMENSIONS = (\d+)/.exec(embeddingSrc);
+  assert.ok(width, "EMBEDDING_DIMENSIONS must be findable");
+  const schemaSrc = readFileSync(
+    new URL("../../../packages/db/src/schema/notes.ts", import.meta.url),
+    "utf8",
+  );
+  const column = /vector\("embedding",\s*\{\s*dimensions:\s*(\d+)/.exec(schemaSrc);
+  assert.ok(column, "the note_chunks embedding column must be findable");
+  assert.equal(
+    Number(width[1]),
+    Number(column[1]),
+    `the module asks for ${width[1]} dimensions but note_chunks stores vector(${column[1]})`,
+  );
+});
+
+/* ------------------------------------------------------------------ *
+ *  6. the premise: the SDK throws at call time, not construction
  * ------------------------------------------------------------------ */
 
 console.log("\nand the premise holds: the SDK throws at call time, not construction");
 
 const { execFileSync } = await import("node:child_process");
-check("google.embedding() throws when the key is absent", () => {
+await check("google.embedding() throws when the key is absent", () => {
   const probe = `
     delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     const { google } = await import("@ai-sdk/google");

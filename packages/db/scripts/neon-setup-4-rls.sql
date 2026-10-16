@@ -92,6 +92,31 @@ CREATE POLICY chat_messages_reader ON "chat_messages"
   );
 
 
+-- ---- practice_attempts ------------------------------------------------------
+-- The reader's own answers. Which questions someone got wrong is exactly the
+-- kind of thing that follows a person around, and the weakness profile in
+-- TODO.md's Track B is built on top of this table, so it is worth protecting
+-- before the first row is written rather than after.
+--
+-- Identical shape to chat_threads: a user_id of its own, keyed on the session
+-- identity, NULL meaning nobody.
+--
+-- It was MISSING from this file while existing in create-rls-policies.mjs,
+-- which meant the two deployment paths disagreed. An operator following these
+-- SQL files -- the documented Neon SQL-editor route -- created the table with
+-- no RLS at all, while check-schema-drift.mjs reported the database as
+-- correct, because it compares object NAMES and a policy is not one it looks
+-- for.
+--
+-- ANY future per-reader table needs its policy in BOTH files. They are two
+-- copies of one list and nothing asserts they agree, which is why this drifted.
+ALTER TABLE "practice_attempts" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "practice_attempts" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS practice_attempts_reader ON "practice_attempts";
+CREATE POLICY practice_attempts_reader ON "practice_attempts"
+FOR ALL TO public
+USING (user_id = app_reader_id())
+WITH CHECK (user_id = app_reader_id());
 -- ---- Better Auth's tables: RLS DISABLED, deliberately -----------------------
 -- On a Supabase-shaped database these arrive ENABLED with NO POLICIES. That is
 -- harmless while the app connects as a role carrying BYPASSRLS, and it is a

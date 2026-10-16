@@ -87,10 +87,20 @@ export function resolveTarget({ script, write = false }) {
       );
       process.exit(1);
     }
-    const local = readFileSync(
-      new URL("../../../apps/web/.env", import.meta.url),
-      "utf8",
-    ).match(/^DATABASE_URL=(.*)$/m)?.[1];
+    // Wrapped: on a machine holding only the root .env.local — which is
+    // where the header says the production URL lives — this file does not
+    // exist, and an unguarded readFileSync dies with a raw ENOENT stack
+    // instead of the explanation below. A missing local file is an expected
+    // state, not a crash.
+    let local;
+    try {
+      local = readFileSync(
+        new URL("../../../apps/web/.env", import.meta.url),
+        "utf8",
+      ).match(/^DATABASE_URL=(.*)$/m)?.[1];
+    } catch {
+      local = undefined;
+    }
     url = unquote(local ?? "");
     source = "apps/web/.env (local)";
   }

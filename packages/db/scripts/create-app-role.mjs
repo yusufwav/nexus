@@ -89,6 +89,19 @@ const GRANTS = [
   { table: "chat_threads", mode: "READ WRITE" },
   { table: "chat_messages", mode: "READ WRITE" },
   { table: "ai_usage", mode: "READ WRITE" },
+  // The content read budget's counter. Was MISSING here, which meant nexus_app
+  // had no privilege on the table at all: the route's upsert raised
+  // 42501 permission denied, the budget caught it, and every download sailed
+  // through unpaced. The one defence against a bulk pull of paid PDFs did
+  // nothing, on every request, and the only trace was one console.error.
+  //
+  // It was easy to miss because `read_usage` is the only table the app
+  // grants that is not in `user`'s reach through Better Auth, is not part of
+  // the catalogue, and was added after this list was last read top to bottom.
+  // Both files must change together: check-grants.mjs asserts these two
+  // matrices agree, which is the only thing that caught this at all — and
+  // only if someone ran it.
+  { table: "read_usage", mode: "READ WRITE" },
   // Better Auth owns these and needs full DML.
   { table: "user", mode: "READ WRITE" },
   { table: "session", mode: "READ WRITE" },
@@ -197,7 +210,6 @@ try {
     );
     if (!exists.rows[0].t) {
       bad(`table "${table}" does not exist — a grant was skipped, and the app will fail at runtime`);
-      failures++;
       continue;
     }
     const verb = mode === "READ" ? "SELECT" : "SELECT, INSERT, UPDATE, DELETE";
