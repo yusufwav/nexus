@@ -582,34 +582,39 @@ function hexToRgb(hex: string | undefined): [number, number, number] {
  * lightening it further is how the dark theme ended up a desaturated rose
  * instead of the maroon-scarlet its palette actually specifies.
  *
- * FOUR STOPS, DARKEST TO LIGHTEST, HUE CONSTANT
- * The count matches the upstream component's default palette; the ordering
- * is ours, because the upstream four are in no meaningful order and the
- * shader assumes index 0 is the floor of the range and the last index is
- * the highlight.
+ * FOUR STOPS, HUE CONSTANT
+ * The count matches the upstream component's default palette; the ordering is
+ * ours, because the upstream four are in no meaningful order and the shader
+ * assumes index 0 is the floor of the range and the last index is the
+ * brightest thing in the frame.
  *
- * Index 1 IS THE ACCENT, UNTOUCHED — its own hue, its own saturation, its
- * own lightness. The other three are built around it by moving only
- * lightness and saturation downward, so the most saturated colour in the
- * ramp is provably the theme's own and nothing in the ramp can out-chroma
- * it. That is what makes the field read as the theme rather than as a
- * tinted approximation of it.
+ * THE ACCENT IS THE BRIGHTEST STOP. It carries the theme's own hue,
+ * saturation and lightness, unaltered, and every other stop is the same hue
+ * with its chroma scaled down. So the most saturated colour in the ramp is
+ * provably the palette's own, and nothing can out-chroma it — that is what
+ * makes the field read as the theme rather than as a tinted approximation of
+ * it. It reaches the top of the ramp by being swapped into the last slot
+ * (see THE SWAP in themeRamp).
  *
- * Stops come back already in the shader's space, so no colour is
- * converted on its way to the GPU a second time.
+ * Stops come back already in the shader's space, so no colour is converted on
+ * its way to the GPU a second time.
  */
 const RAMP_STOPS = 4;
 
-/** Where the theme's own colour sits, dark to light. */
+/**
+ * Where the theme's own colour sits BEFORE the swap. The swap moves it to the
+ * last slot; this constant is what names the slot being swapped out, so it is
+ * deliberately not the index the accent ends up at.
+ */
 const ACCENT_STOP = 1;
 
 /**
- * Saturation per stop, as a fraction of the accent's own.
+ * Saturation per stop, as a fraction of the accent's own, before the swap.
  *
- * Index 1 is exactly 1 by definition and everything else is under it, so
- * the most saturated stop is unique and is the accent. The top of the ramp
- * falls away hardest because that end is a highlight, and a highlight at
- * full chroma on a near-white page is a pink smear.
+ * The accent's own slot is exactly 1 and everything else is under it, so the
+ * most saturated stop is unique and is the accent. The highlight slot falls
+ * away hardest because at the bright end a full-chroma colour on a near-white
+ * page is a pink smear.
  */
 const RAMP_CHROMA = [0.86, 1, 0.82, 0.46] as const;
 
@@ -656,22 +661,20 @@ function themeRamp(): {
   const pageLight = 0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2];
 
   /*
-   * Lightness per stop, dark to light, built to exactly RAMP_STOPS entries.
+   * Build the ramp as authored — darkest first, accent in slot 1, walking up
+   * to the highlight — then swap the accent with the highlight below.
    *
-   * Slot 0 is a SCALED version of the accent rather than a fixed near-black.
-   * A fixed dark end is invisible on a dark page, which turns the ramp into a
-   * disc floating in a void: the horizon shape spends most of its area below
-   * the arch, so that is where the bottom two-thirds of the hero goes, and at
-   * L=0.05 there is nothing to see. Scaling keeps the hue present right down
-   * to the floor, so the sweep reads dark-to-light across the whole field.
-   * It also stays ordered without a clamp, since any fraction below 1 of the
-   * accent's own lightness is below the accent — including for a palette
-   * shipping a very dark primary.
+   * So slot 0 is a SCALED version of the accent rather than a fixed
+   * near-black. A fixed dark end is invisible on a dark page, which turns the
+   * ramp into a disc floating in a void: the horizon shape spends most of its
+   * area below the arch, so that is where the bottom two-thirds of the hero
+   * goes. Scaling keeps the hue present right down to the floor.
    *
-   * Slots 2 and up walk from the accent toward white. The spacing is then
-   * forced strictly ascending, because a palette whose accent is already
-   * light can otherwise produce two stops at the same lightness and the
-   * shader's fract() picks whichever one it lands on.
+   * The spacing is forced apart rather than merely monotonic, because a
+   * palette whose accent is already light can otherwise land two stops on the
+   * same lightness and the shader's fract() silently picks one of them. The
+   * 0.99 clamp stops that nudge walking past white and leaving HSL's range;
+   * no palette in the set currently reaches it.
    */
   const lightness: number[] = [lum * 0.45, lum];
   for (let i = 2; i < RAMP_STOPS; i++) {
@@ -679,11 +682,27 @@ function themeRamp(): {
     lightness.push(lum + (1 - lum) * (0.38 + 0.32 * k));
   }
   for (let i = 2; i < lightness.length; i++) {
-    lightness[i] = Math.max(lightness[i]!, lightness[i - 1]! + 0.06);
+    lightness[i] = Math.min(0.99, Math.max(lightness[i]!, lightness[i - 1]! + 0.06));
   }
 
+  /*
+   * THE SWAP: the accent and the highlight trade places, slot 0 untouched.
+   *
+   * That puts the palette's own colour, at full chroma, where the field is
+   * brightest — the one end of the ramp a theme is read from — and leaves the
+   * pale tint in the mid range where it behaves as light rather than as the
+   * subject.
+   *
+   * The ramp is therefore deliberately NOT darkest-to-lightest any more: it
+   * runs dark, pale, mid, saturated. Only slot 0 is held to the old ordering.
+   */
+  const chroma = [...RAMP_CHROMA];
+  const top = RAMP_STOPS - 1;
+  [lightness[ACCENT_STOP], lightness[top]] = [lightness[top]!, lightness[ACCENT_STOP]!];
+  [chroma[ACCENT_STOP], chroma[top]] = [chroma[top]!, chroma[ACCENT_STOP]!];
+
   const stops = lightness.map((l, i) =>
-    xyzToRamp(srgbToXyz(hslToRgb([hue, sat * RAMP_CHROMA[i]!, l]))),
+    xyzToRamp(srgbToXyz(hslToRgb([hue, sat * chroma[i]!, l]))),
   );
 
   return { stops, lightMode: pageLight > 0.5 };
