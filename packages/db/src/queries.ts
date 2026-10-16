@@ -5,6 +5,7 @@ import { withReader } from "./reader";
 import { chatMessages, chatThreads } from "./schema/chat";
 import { modules, purchases } from "./schema/modules";
 import { noteChunks, noteTopics } from "./schema/notes";
+import { practiceAttempts, practiceQuestions } from "./schema/practice";
 import { providerKeys } from "./schema/provider-keys";
 
 /**
@@ -664,3 +665,204 @@ export async function deleteChatThread(
     return rows.length > 0;
   });
 }
+/* ============================================================
+   PRACTICE — the question catalogue and the reader's record of it
+   ============================================================
+
+   Two shapes here, and the difference is the point.
+
+   READING the catalogue is entitlement-filtered but NOT wrapped in
+   `withReader`. That is deliberate and matches note_chunks: practice_questions
+   is global authored content, the reader's identity is irrelevant to which
+   questions exist, and the RLS identity would only be a second, weaker copy of
+   the `module_code = any(owned)` filter this function already applies. See
+   create-rls-policies.mjs for why the corpus tables carry no policy.
+
+   WRITING an attempt does go through `withReader`, because practice_attempts
+   is per-reader state and its policy is keyed on the session identity.
+   ============================================================ */
+
+/** One row of the catalogue, exactly as stored. */
+export type PracticeQuestionRow = {
+  id: string;
+  format: string;
+  module_code: string;
+  topic_slug: string;
+  difficulty: number;
+  prompt: string;
+  tags: string[];
+  spec: unknown;
+};
+
+/** How many questions a module holds, for the practice index page. */
+export type PracticeModuleCount = {
+  moduleCode: string;
+  count: number;
+};
+
+/**
+ * Questions the reader may practise.
+ *
+ * `accessibleCodes` comes from the caller and is the ONLY thing standing
+ * between a paying reader and a question they have not paid for. It is a
+ * parameter rather than something derived here so that this function cannot
+ * accidentally read entitlement from a request-supplied value — the caller
+ * resolves it from `getOwnedCodes(user.id)`, which counts only
+ * status === 'paid'.
+ *
+ * Questions the reader has already answered are still returned. Suppressing
+ * them would make a session impossible to finish on a small module, and
+ * re-answering is how a reader consolidates rather than how they cheat.
+ */
+export async function listPracticeQuestions(
+  db: Database,
+  accessibleCodes: ReadonlySet<string>,
+  opts: { readonly moduleCode?: string; readonly limit?: number } = {},
+): Promise<ReadonlyArray<PracticeQuestionRow>> {
+  if (accessibleCodes.size === 0) {
+    return [];
+  }
+  const codes = opts.moduleCode ? [...accessibleCodes].filter((c) => c === opts.moduleCode) : [...accessibleCodes];
+  if (codes.length === 0) {
+    return [];
+  }
+
+  const rows = await db
+    .select({
+      id: practiceQuestions.id,
+      format: practiceQuestions.format,
+      module_code: practiceQuestions.moduleCode,
+      topic_slug: practiceQuestions.topicSlug,
+      difficulty: practiceQuestions.difficulty,
+      prompt: practiceQuestions.prompt,
+      tags: practiceQuestions.tags,
+      spec: practiceQuestions.spec,
+    })
+    .from(practiceQuestions)
+    .where(inArray(practiceQuestions.moduleCode, codes))
+    // Difficulty first, because a practice session should open at the level
+    // the reader is least likely to already know rather than in whatever order
+    // the catalogue happens to import in.
+    .orderBy(asc(practiceQuestions.difficulty), asc(practiceQuestions.id))
+    .limit(opts.limit ?? 50);
+
+  return rows;
+}
+
+/** Per-module question counts, for the index page. Never for unowned modules. */
+export async function countPracticeQuestionsByModule(
+  db: Database,
+  accessibleCodes: ReadonlySet<string>,
+): Promise<ReadonlyArray<PracticeModuleCount>> {
+  if (accessibleCodes.size === 0) {
+    return [];
+  }
+  const rows = await db
+    .select({
+      moduleCode: practiceQuestions.moduleCode,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(practiceQuestions)
+    .where(inArray(practiceQuestions.moduleCode, [...accessibleCodes]))
+    .groupBy(practiceQuestions.moduleCode)
+    .orderBy(asc(practiceQuestions.moduleCode));
+
+  return rows;
+}
+
+/**
+ * One question by id, with NO entitlement filter.
+ *
+ * Used by the grading route, which MUST load the row before it can grade it,
+ * and which therefore cannot filter by module first. The entitlement check is
+ * applied by that route immediately after loading, against this row's own
+ * `module_code`.
+ *
+ * That ordering is deliberate and is the only safe one here: a route that
+ * graded before checking would have already told the reader the answer.
+ */
+export async function getPracticeQuestionById(
+  db: Database,
+  id: string,
+): Promise<PracticeQuestionRow | null> {
+  const rows = await db
+    .select({
+      id: practiceQuestions.id,
+      format: practiceQuestions.format,
+      module_code: practiceQuestions.moduleCode,
+      topic_slug: practiceQuestions.topicSlug,
+      difficulty: practiceQuestions.difficulty,
+      prompt: practiceQuestions.prompt,
+      tags: practiceQuestions.tags,
+      spec: practiceQuestions.spec,
+    })
+    .from(practiceQuestions)
+    .where(eq(practiceQuestions.id, id))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+/**
+ * Record one attempt.
+ *
+ * `format` is copied from the question rather than taken from the request, so
+ * a client cannot file a multiple-choice attempt under some other format and
+ * poison the per-format history the weakness profile will be built on.
+ *
+ * `detail` stores the ANSWER, not just the verdict, so a later change to the
+ * grading rule can recompute history without asking the reader again. That is
+ * the only reason the column exists rather than a bare outcome.
+ */
+export async function recordPracticeAttempt(
+  db: Database,
+  userId: string,
+  input: {
+    questionId: string;
+    format: string;
+    outcome: "correct" | "incorrect" | "partial";
+    detail: Record<string, unknown>;
+  },
+): Promise<string> {
+  const id = crypto.randomUUID();
+  return withReader(db, userId, async (tx) => {
+    await tx.insert(practiceAttempts).values({
+      id,
+      userId,
+      questionId: input.questionId,
+      format: input.format as PracticeAttemptFormat,
+      outcome: input.outcome,
+      detail: input.detail,
+    });
+    return id;
+  });
+}
+
+/** Every attempt a reader has made on one question, newest first. */
+export async function listAttemptsForQuestion(
+  db: Database,
+  userId: string,
+  questionId: string,
+): Promise<ReadonlyArray<{ outcome: string; detail: unknown; createdAt: Date }>> {
+  return withReader(db, userId, async (tx) => {
+    const rows = await tx
+      .select({
+        outcome: practiceAttempts.outcome,
+        detail: practiceAttempts.detail,
+        createdAt: practiceAttempts.createdAt,
+      })
+      .from(practiceAttempts)
+      .where(
+        and(
+          eq(practiceAttempts.userId, userId),
+          eq(practiceAttempts.questionId, questionId),
+        ),
+      )
+      .orderBy(desc(practiceAttempts.createdAt))
+      .limit(20);
+    return rows;
+  });
+}
+
+/** Narrowed so the enum column is written from a checked set, not a cast. */
+type PracticeAttemptFormat = "multiple-choice" | "application" | "proof-order";
