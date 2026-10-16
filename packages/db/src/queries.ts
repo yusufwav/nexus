@@ -682,10 +682,13 @@ export async function deleteChatThread(
    is per-reader state and its policy is keyed on the session identity.
    ============================================================ */
 
+/** The enum, as a type, so nothing downstream needs an unchecked cast. */
+export type PracticeFormat = "multiple-choice" | "application" | "proof-order";
+
 /** One row of the catalogue, exactly as stored. */
 export type PracticeQuestionRow = {
   id: string;
-  format: string;
+  format: PracticeFormat;
   module_code: string;
   topic_slug: string;
   difficulty: number;
@@ -740,30 +743,78 @@ export async function listPracticeQuestions(
     })
     .from(practiceQuestions)
     .where(inArray(practiceQuestions.moduleCode, codes))
-    // Difficulty first, because a practice session should open at the level
-    // the reader is least likely to already know rather than in whatever order
-    // the catalogue happens to import in.
+    /*
+     * EASIEST FIRST, and the comment used to claim the opposite — it said a
+     * session should open "at the level the reader is least likely to already
+     * know" while `asc(difficulty)` opens at 1, which the schema defines as
+     * "the definition itself". Easiest-first is the choice being made here:
+     * a session that opens on the hardest question in the module reads as the
+     * app being wrong about the reader, and the explanations are where the
+     * learning happens, so starting where they are most likely to succeed is
+     * what gets them there.
+     *
+     * The id tie-break is LEXICAL, which is only stable because authored ids
+     * zero-pad their suffix: `-02` before `-10`, not after. Past ten questions
+     * in one module at one difficulty that silently breaks, so the padding is
+     * a convention the schema documents rather than an accident.
+     */
     .orderBy(asc(practiceQuestions.difficulty), asc(practiceQuestions.id))
-    .limit(opts.limit ?? 50);
+    .limit(opts.limit ?? DEFAULT_PRACTICE_LIMIT);
 
   return rows;
 }
 
-/** Per-module question counts, for the index page. Never for unowned modules. */
+/**
+ * How many questions one session may hold.
+ *
+ * A cap rather than no cap, because a module with thousands of questions would
+ * otherwise ship a multi-megabyte payload of prompts the reader will never
+ * reach. It is REPORTED rather than silent — `questions/route.ts` returns the
+ * module's true count alongside the served slice, so the progress line can say
+ * how many exist rather than implying the reader has seen everything.
+ */
+export const DEFAULT_PRACTICE_LIMIT = 50;
+
+/** Attempts listAttemptsForQuestion returns. Stated so the cap is not mistaken for a whole history. */
+const ATTEMPT_HISTORY_LIMIT = 20;
+
+/**
+ * Per-module question counts, for the index page. Never for unowned modules.
+ *
+ * `formats` MUST match what the serving route will actually send, and it
+ * defaults to multiple choice because that is the only format B2a serves.
+ *
+ * It defaults that way on purpose rather than counting everything, because
+ * counting everything is how the index advertised modules it then refused to
+ * serve: MAPV112 showed "1 question" and delivered none, since its only
+ * question is an application one. MATT101 showed 3 and delivered 1. The page's
+ * own comment claimed it never offers a dead end, and the count was the thing
+ * that made that false.
+ *
+ * Both sides filtering is the durable fix; `test-practice-integration` asserts
+ * they agree on the same module.
+ */
 export async function countPracticeQuestionsByModule(
   db: Database,
   accessibleCodes: ReadonlySet<string>,
+  opts: { readonly formats?: ReadonlyArray<PracticeFormat> } = {},
 ): Promise<ReadonlyArray<PracticeModuleCount>> {
   if (accessibleCodes.size === 0) {
     return [];
   }
+  const formats = opts.formats ?? (["multiple-choice"] as ReadonlyArray<PracticeFormat>);
   const rows = await db
     .select({
       moduleCode: practiceQuestions.moduleCode,
       count: sql<number>`count(*)::int`,
     })
     .from(practiceQuestions)
-    .where(inArray(practiceQuestions.moduleCode, [...accessibleCodes]))
+    .where(
+      and(
+        inArray(practiceQuestions.moduleCode, [...accessibleCodes]),
+        inArray(practiceQuestions.format, formats as PracticeFormat[]),
+      ),
+    )
     .groupBy(practiceQuestions.moduleCode)
     .orderBy(asc(practiceQuestions.moduleCode));
 
@@ -819,7 +870,16 @@ export async function recordPracticeAttempt(
   userId: string,
   input: {
     questionId: string;
-    format: string;
+    /**
+     * Checked, not cast.
+     *
+     * This used to be typed `string` and narrowed at the write with
+     * `as PracticeAttemptFormat` — a cast that stops the check rather than
+     * performing one, sitting on the one write path whose failure the route
+     * swallows as best-effort. A lie there would vanish the attempt with no
+     * reader-visible symptom and silently under-count B3's history.
+     */
+    format: PracticeFormat;
     outcome: "correct" | "incorrect" | "partial";
     detail: Record<string, unknown>;
   },
@@ -830,7 +890,7 @@ export async function recordPracticeAttempt(
       id,
       userId,
       questionId: input.questionId,
-      format: input.format as PracticeAttemptFormat,
+      format: input.format,
       outcome: input.outcome,
       detail: input.detail,
     });
@@ -838,7 +898,15 @@ export async function recordPracticeAttempt(
   });
 }
 
-/** Every attempt a reader has made on one question, newest first. */
+/**
+ * A reader's attempts on one question, newest first, up to a cap.
+ *
+ * The cap used to be absent from the doc, which said "every attempt" while the
+ * query returned 20. B3c's spaced repetition wants the MOST RECENT, so the cap
+ * is the right shape — but it has to be stated, or a caller reading the
+ * comment thinks it is getting a complete history and silently reasons from a
+ * truncated one.
+ */
 export async function listAttemptsForQuestion(
   db: Database,
   userId: string,
@@ -859,10 +927,8 @@ export async function listAttemptsForQuestion(
         ),
       )
       .orderBy(desc(practiceAttempts.createdAt))
-      .limit(20);
+      .limit(ATTEMPT_HISTORY_LIMIT);
     return rows;
   });
 }
 
-/** Narrowed so the enum column is written from a checked set, not a cast. */
-type PracticeAttemptFormat = "multiple-choice" | "application" | "proof-order";

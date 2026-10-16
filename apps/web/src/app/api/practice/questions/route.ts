@@ -82,6 +82,20 @@ export async function GET(req: NextRequest): Promise<Response> {
    */
   const answerable = rows.filter((row) => row.format === "multiple-choice");
 
+  /*
+   * THE TRUE COUNT, not `answerable.length`.
+   *
+   * `rows` is already capped at DEFAULT_PRACTICE_LIMIT by the query, so once a
+   * module has more questions than that the length is the cap rather than the
+   * total. Counting separately is what lets the response say "50 of 212"
+   * instead of letting a capped session masquerade as a complete one.
+   */
+  const counts = await q
+    .countPracticeQuestionsByModule(db, owned, moduleCode ? { formats: ["multiple-choice"] } : {})
+    .then((c) => (moduleCode ? (c.find((r) => r.moduleCode === moduleCode)?.count ?? null) : answerable.length))
+    .catch(() => null);
+  const availableForThisModule = counts;
+
   const questions = [];
   const skipped: string[] = [];
   for (const row of answerable) {
@@ -106,7 +120,18 @@ export async function GET(req: NextRequest): Promise<Response> {
   }
 
   return NextResponse.json(
-    { questions, moduleCode: moduleCode ?? null, skipped: skipped.length },
+    {
+      questions,
+      moduleCode: moduleCode ?? null,
+      skipped: skipped.length,
+      // The module's TRUE multiple-choice count, which is >= questions.length
+      // whenever the 50 cap bit. Without it the progress line reads "1 of 50"
+      // and a reader who has answered all 50 has no way to know 162 exist —
+      // the session looks complete when it is a slice. The index card count
+      // comes from the same filter, so these two agree.
+      available: availableForThisModule ?? questions.length,
+      capped: availableForThisModule !== null && availableForThisModule > questions.length,
+    },
     // Private and uncached: this response is per-reader, and a cached copy
     // would be one reader's questions served to the next.
     { headers: { "cache-control": "private, no-store" } },

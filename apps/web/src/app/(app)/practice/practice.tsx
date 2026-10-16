@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
 import type { GradeResult, PublicQuestion } from "@/lib/practice-grading";
@@ -30,12 +29,20 @@ type ModuleEntry = { readonly code: string; readonly name: string; readonly coun
 
 type Props = {
   readonly modules: ReadonlyArray<ModuleEntry>;
+  /**
+   * The page could not load the catalogue.
+   *
+   * Distinct from "there are no questions yet", which is a fact about the
+   * content and this is a fact about the machine. Rendering the empty state
+   * for a dead database tells the reader their module has no practice
+   * questions when the truth is that nobody can be told anything right now.
+   */
+  readonly loadFailed: boolean;
 };
 
 const DIFFICULTY_WORDS = ["", "Foundation", "Working", "Stretch", "Hard"] as const;
 
-export default function Practice({ modules }: Props): React.JSX.Element {
-  const router = useRouter();
+export default function Practice({ modules, loadFailed }: Props): React.JSX.Element {
 
   const [session, setSession] = useState<ReadonlyArray<PublicQuestion> | null>(null);
   const [moduleCode, setModuleCode] = useState<string | null>(null);
@@ -62,6 +69,18 @@ export default function Practice({ modules }: Props): React.JSX.Element {
     ReadonlyArray<{ question: PublicQuestion; result: GradeResult }>
   >([]);
   const [finished, setFinished] = useState(false);
+
+  /**
+   * How many questions the module really has, when that is more than the
+   * session was given.
+   *
+   * The route caps a session at 50. Without this the progress line reads
+   * "3 of 50" and a reader who has answered all 50 has no way to know that 212
+   * exist — the session looks like it covered the module when it was a slice
+   * of it. Null means the session was not capped, which is the normal case
+   * today at seven multiple-choice questions in the whole catalogue.
+   */
+  const [moreAvailable, setMoreAvailable] = useState<number | null>(null);
 
   /**
    * A ref, not state.
@@ -94,6 +113,9 @@ export default function Practice({ modules }: Props): React.JSX.Element {
       const data = (await res.json()) as {
         questions: PublicQuestion[];
         skipped: number;
+        /** How many the module actually has, when it is more than we sent. */
+        available?: number;
+        capped?: boolean;
       };
       if (data.questions.length === 0) {
         setError("There are no practice questions for that module yet.");
@@ -107,6 +129,7 @@ export default function Practice({ modules }: Props): React.JSX.Element {
       setScore({ right: 0, wrong: 0 });
       setMissed([]);
       setFinished(false);
+      setMoreAvailable(data.capped === true ? data.available ?? null : null);
       if (data.skipped > 0) {
         console.warn(`${data.skipped} question(s) were skipped as unreadable`);
       }
@@ -173,6 +196,31 @@ export default function Practice({ modules }: Props): React.JSX.Element {
     setResult(null);
   }, [at, session]);
 
+  /**
+   * Move past a question that cannot be marked.
+   *
+   * A malformed row makes the answer route return 503 forever. Ordering is
+   * deterministic — `difficulty, id` — so the same question is at the same
+   * index in every session, and without this the reader dead-ends at it every
+   * time with the only escape being to quit and lose the whole session. The
+   * serve route already skips malformed rows, so this is for the narrow window
+   * where a row changes between serving and answering.
+   *
+   * A skipped question is not counted as wrong. It was never graded, so scoring
+   * it would be inventing a result.
+   */
+  const skipCurrent = useCallback((): void => {
+    setError(null);
+    setChosen(null);
+    setResult(null);
+    if (session === null) return;
+    if (at + 1 >= session.length) {
+      setFinished(true);
+      return;
+    }
+    setAt((n) => n + 1);
+  }, [at, session]);
+
   /** Leave the review. `session` staying set is what lets "go again" work. */
   const closeSession = useCallback((): void => {
     setSession(null);
@@ -182,6 +230,12 @@ export default function Practice({ modules }: Props): React.JSX.Element {
     setResult(null);
     setMissed([]);
     setFinished(false);
+    setMoreAvailable(null);
+    // `error` too. It used to survive the quit, so a reader who hit "that
+    // could not be marked" on question 2 and then bailed saw the same message
+    // on the module index — where no request had been made and nothing had
+    // failed. An error that outlives the thing that caused it is a lie.
+    setError(null);
   }, []);
 
   /* -- the index -- */
@@ -199,7 +253,12 @@ export default function Practice({ modules }: Props): React.JSX.Element {
 
         {error !== null && <p className="nt-practice__error">{error}</p>}
 
-        {modules.length === 0 ? (
+        {loadFailed ? (
+          <p className="nt-practice__error">
+            Practice could not load just now. This is a problem with the site, not with your
+            account — try again in a moment.
+          </p>
+        ) : modules.length === 0 ? (
           <p className="nt-practice__empty">
             No practice questions yet. They arrive with your module as they are written.
           </p>
@@ -315,6 +374,9 @@ if (finished && session !== null) {
         </button>
         <span className="nt-practice__progress">
           {at + 1} of {session.length}
+          {/* Only when the session was actually capped. Silently showing 50 of
+              212 as "50" is the same lie as the index count was. */}
+          {moreAvailable !== null && <em> ({moreAvailable} in this module)</em>}
           <span className="nt-practice__tally">
             {score.right} right, {score.wrong} to look at
           </span>
@@ -381,7 +443,19 @@ if (finished && session !== null) {
           })}
         </ul>
 
-        {error !== null && <p className="nt-practice__error">{error}</p>}
+        {error !== null && (
+          <>
+            <p className="nt-practice__error">{error}</p>
+            {/* Without this the session is stuck here, permanently, because the
+                failure is deterministic. Offered only after an error, so it is
+                never a way past a question the reader could have answered. */}
+            <p className="nt-practice__error">
+              <button type="button" className="nt-practice__skip" onClick={skipCurrent}>
+                Skip this question
+              </button>
+            </p>
+          </>
+        )}
 
         <footer className="nt-practice__actions">
           {!answered ? (
@@ -405,16 +479,30 @@ if (finished && session !== null) {
                 model path, a second set of prompts, a second thing to get
                 wrong — the reader can take the question to the tutor they
                 already have, with the question attached.
+
+                THE TEXT DEPENDS ON THE VERDICT. It used to be a constant
+                "I got this wrong… I don't understand why that's wrong",
+                rendered whenever an answer had been given — including a
+                CORRECT one. So a reader who got it right and wanted to
+                understand it better arrived at the tutor asserting that their
+                own correct answer was wrong, which is worse than no button:
+                it teaches the tutor something false about their answer.
               */}
               <Link
                 className="nt-practice__ask"
                 href={`/ai?ask=${encodeURIComponent(
-                  `I'm practising and got this wrong: "${current.prompt}"\n` +
-                    `I chose: ${result?.chosenOptionText ?? "nothing"}\n` +
-                    `I don't understand why that's wrong.`,
+                  result?.correct === true
+                    ? `I'm revising a practice question I got RIGHT and want to understand it better: "${current.prompt}"\n` +
+                      `I chose: ${result?.chosenOptionText ?? "nothing"}\n` +
+                      `I understand it's correct but not why.`
+                    : `I'm practising and got this wrong: "${current.prompt}"\n` +
+                      `I chose: ${result?.chosenOptionText ?? "nothing"}\n` +
+                      `I don't understand why that's wrong.`,
                 )}`}
               >
-                Still don't get it — ask the tutor
+                {result?.correct === true
+                  ? "Understand why — ask the tutor"
+                  : "Still don't get it — ask the tutor"}
               </Link>
             </>
           )}

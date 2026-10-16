@@ -30,35 +30,51 @@ export default async function PracticePage(): Promise<React.JSX.Element> {
   // Modules the reader owns AND that have questions written. A module with no
   // practice questions is omitted rather than shown empty, so the index never
   // offers a dead end — the catalogue is young and most modules are empty.
-  const counts = await q
-    .countPracticeQuestionsByModule(db, owned)
-    .then((rows) =>
-      rows
-        .filter((r) => r.count > 0)
-        .map((r) => ({ moduleCode: r.moduleCode, count: r.count })),
-    )
-    .catch((err: unknown) => {
-      // Throwing here would 500 the whole page over a counter. The index is a
-      // convenience; the API is the real gate.
-      console.error(
-        "[practice] could not count questions:",
-        err instanceof Error ? err.message : String(err),
-      );
-      return [];
-    });
+  //
+  // The COUNT filters to multiple choice, because that is all this route serves.
+  // Counting every row is what made the index lie: MAPV112 advertised
+  // "1 question" and delivered none, since its only question is an application
+  // one. The two sides must filter identically or the promise on the card is
+  // not the number the session delivers.
+  //
+  // A FAILURE IS NOT AN EMPTY LIST. Both queries used to `.catch(() => [])`,
+  // which made a dead database and a catalogue with nothing in it look
+  // identical — and the page said "No practice questions yet. They arrive with
+  // your module as they are written", which is simply untrue during an outage,
+  // with no retry and nothing on screen pointing at what happened. So the
+  // failure is carried through and rendered as a failure.
+  let counts: ReadonlyArray<{ moduleCode: string; count: number }> = [];
+  let loadFailed = false;
+  try {
+    const rows = await q.countPracticeQuestionsByModule(db, owned);
+    counts = rows.filter((r) => r.count > 0);
+  } catch (err) {
+    loadFailed = true;
+    console.error(
+      "[practice] could not count questions:",
+      err instanceof Error ? err.message : String(err),
+    );
+  }
 
-  const modules = await q
-    .listModules(db)
-    .then((rows) =>
-      rows
+  let modules: ReadonlyArray<{ code: string; name: string; count: number }> = [];
+  if (!loadFailed) {
+    try {
+      const rows = await q.listModules(db);
+      modules = rows
         .filter((m) => counts.some((c) => c.moduleCode === m.code))
         .map((m) => ({
           code: m.code,
           name: m.name,
           count: counts.find((c) => c.moduleCode === m.code)?.count ?? 0,
-        })),
-    )
-    .catch(() => [] as ReadonlyArray<{ code: string; name: string; count: number }>);
+        }));
+    } catch (err) {
+      loadFailed = true;
+      console.error(
+        "[practice] could not list modules:",
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
 
-  return <Practice modules={modules} />;
+  return <Practice modules={modules} loadFailed={loadFailed} />;
 }
