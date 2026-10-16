@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 
 import { createDb } from "@Main/db";
 import * as q from "@Main/db/queries";
+import { PRACTICE_QUESTIONS } from "../src/content/practice-questions";
 import { gradeAnswer, outcomeFor, parseQuestion, publicQuestion } from "../src/lib/practice-grading";
 
 /**
@@ -58,6 +59,13 @@ async function main(): Promise<void> {
 
   console.log("\nthe catalogue is in the database");
 
+  /**
+   * Every module code in the authored catalogue, so the count-agreement
+   * assertions below cover all of them rather than a hand-picked few. The bug
+   * they guard was per-module: MAPV112 was broken while MATT101 looked fine.
+   */
+  const ALL_CODES = new Set(PRACTICE_QUESTIONS.map((question) => question.moduleCode));
+
   const everything = await q.listPracticeQuestions(db, new Set(["MATT101", "MATT102", "MAPV111", "MAPV112"]));
   await check("questions come back for owned modules", () => {
     assert.ok(everything.length > 0, "no questions at all — has the import been run?");
@@ -84,6 +92,62 @@ async function main(): Promise<void> {
       assert.equal(gradeAnswer(question, correctId).correct, true, `${row.id}: right answer marked wrong`);
       assert.equal(gradeAnswer(question, wrongId).correct, false, `${row.id}: wrong answer marked right`);
     }
+  });
+
+  /* -- the index must not promise what the session will not deliver -- */
+
+  console.log("\nthe advertised count matches what is served");
+
+  /*
+   * The bug this guards: `countPracticeQuestionsByModule` counted every row,
+   * while the serving route filters to multiple choice before stripping. So the
+   * index card said "3 questions" and the session delivered 1, and MAPV112 —
+   * whose only question is an application one — advertised 1 and delivered 0,
+   * which is a dead end on a page whose own comment promised never to offer
+   * one.
+   *
+   * Asserted over EVERY module with questions, not just a hand-picked one,
+   * because the failure was per-module and a single-module assertion would
+   * have passed on MATT101 while MAPV112 stayed broken.
+   */
+  await check("no module advertises questions the multiple-choice route would not serve", async () => {
+    const counts = await q.countPracticeQuestionsByModule(db, ALL_CODES);
+    assert.ok(counts.length > 0, "no module has any practice questions at all");
+
+    for (const { moduleCode: code, count } of counts) {
+      assert.ok(typeof code === "string" && code.length > 0, `a count row had no module code: ${JSON.stringify(code)}`);
+      assert.ok(count > 0, `${code} is listed with a count of ${count}; the page filters these out`);
+
+      // What the route will actually hand the reader for this module.
+      const rows = await q.listPracticeQuestions(db, new Set([code]), { moduleCode: code });
+      const servable = rows.filter((r) => r.format === "multiple-choice");
+
+      assert.equal(
+        count,
+        servable.length,
+        `${code} advertises ${count} but only ${servable.length} are servable ` +
+          `(rows: ${rows.map((r) => `${r.id}=${r.format}`).join(", ") || "none"})`,
+      );
+    }
+  });
+
+  await check("a module with only non-multiple-choice questions is not advertised at all", async () => {
+    // The specific dead end that shipped. If MAPV112 gains a second application
+    // question this stops being the right module to test, which is exactly when
+    // this assertion should be revisited — the general one above already covers
+    // every other module, so nothing silently regresses.
+    const rows = await q.listPracticeQuestions(db, new Set(["MAPV112"]), { moduleCode: "MAPV112" });
+    const mc = rows.filter((r) => r.format === "multiple-choice");
+    if (mc.length > 0) {
+      console.log("    (MAPV112 now has a multiple-choice question; this assertion is spent)");
+      return;
+    }
+    const counts = await q.countPracticeQuestionsByModule(db, new Set(["MAPV112"]));
+    assert.equal(
+      counts.length,
+      0,
+      "MAPV112 has no servable questions but is still advertised on the index",
+    );
   });
 
   /* -- the entitlement filter -- */
