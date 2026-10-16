@@ -461,17 +461,60 @@ export async function POST(req: Request): Promise<Response> {
         .describe("Narrow to one subject, using a slug from an earlier search."),
     }),
     execute: async ({ query, topicSlug }) => {
-      const notes = await searchOwnNotes(query, { topicSlug });
-      for (const n of notes) {
-        cited.set(n.slug, { moduleCode: n.moduleCode, title: n.title });
+      /*
+       * A FAILED SEARCH MUST NOT FAIL THE TUTOR.
+       *
+       * `searchOwnNotes` embeds the question before it can search anything,
+       * and embedding reaches an external provider. Three things can throw
+       * here: a missing GOOGLE_GENERATIVE_AI_API_KEY (it is optional, and the
+       * SDK throws "Google Generative AI API key is missing" at CALL time
+       * rather than at construction, so nothing upstream can rule it out), a
+       * provider outage, and a rate limit.
+       *
+       * Unguarded, any of those ended the reader's turn mid-stream, because
+       * this runs inside `streamText`. A reader who has paid for a module asks
+       * a question and gets a broken stream because a SEARCH failed — the
+       * wrong trade in every direction: the model can still answer, the
+       * access control that matters has already passed, and note grounding is
+       * an enhancement rather than the thing being sold.
+       *
+       * What must NOT happen is the model reporting that it searched and
+       * found nothing, because that is a lie about a search that never ran.
+       * So the failure is reported to the model AS a failed search and it is
+       * told to say so, rather than being handed an empty result set dressed
+       * up as "nothing in your notes".
+       */
+      try {
+        const notes = await searchOwnNotes(query, { topicSlug });
+        for (const n of notes) {
+          cited.set(n.slug, { moduleCode: n.moduleCode, title: n.title });
+        }
+        return {
+          searched: true,
+          passages: notes.map((n) => ({
+            subject: n.title,
+            heading: n.heading,
+            content: n.content,
+          })),
+        };
+      } catch (err) {
+        console.error(
+          "[notes-tool] search unavailable, continuing without note grounding:",
+          err instanceof Error ? err.message : String(err),
+        );
+        return {
+          searched: false,
+          passages: [] as ReadonlyArray<{
+            subject: string;
+            heading: string | null;
+            content: string;
+          }>,
+          unavailable:
+            "Note search is temporarily unavailable. Answer from your own knowledge, and " +
+            "tell the reader that their notes could not be searched — do not claim their " +
+            "notes contain nothing on the topic.",
+        };
       }
-      return {
-        passages: notes.map((n) => ({
-          subject: n.title,
-          heading: n.heading,
-          content: n.content,
-        })),
-      };
     },
   });
 

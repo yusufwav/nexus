@@ -72,6 +72,17 @@ export async function ownTopics(): Promise<ReadonlyArray<q.NoteTopicSummary>> {
  * justify a real classifier (see JEV in IDEAS/TODO.md). Adopting one
  * before there is data on the error rate would be buying a dependency on
  * faith.
+ *
+ * THE EMBEDDING CALLS CAN THROW, and this is guarded for the same reason
+ * the tutor's tool call is: an external provider being unavailable must not
+ * become a failure of whatever asked for a routing. Returning no topics is
+ * a meaningful, non-destructive answer — the caller falls back to whatever it
+ * would have done without routing — whereas propagating takes down the
+ * caller.
+ *
+ * It currently has no callers outside this module, so this is insurance
+ * rather than a fix for a live incident. It is here because the next person
+ * to call it will not read the internals first.
  */
 export async function routeQuestion(
   question: string,
@@ -82,10 +93,20 @@ export async function routeQuestion(
     return [];
   }
 
-  const [qVec, topicVecs] = await Promise.all([
-    embedQuery(question),
-    embedDocuments(topics.map((t) => `${t.title}. ${t.description}`)),
-  ]);
+  let qVec: readonly number[];
+  let topicVecs: ReadonlyArray<readonly number[]>;
+  try {
+    [qVec, topicVecs] = await Promise.all([
+      embedQuery(question),
+      embedDocuments(topics.map((t) => `${t.title}. ${t.description}`)),
+    ]);
+  } catch (err) {
+    console.error(
+      "[notes-retrieval] routing unavailable, returning no topics:",
+      err instanceof Error ? err.message : String(err),
+    );
+    return [];
+  }
 
   return topics
     .map((topic, i) => ({ topic, score: cosine(qVec, topicVecs[i] ?? []) }))
