@@ -3926,3 +3926,47 @@
     grid-column: 1 / -1;
   }
 }
+/* -- the end-of-session review --------------------------------------------
+   The tally and the questions that were missed. This is the part of a
+   practice session worth spending a second one on, which is why it is a
+   screen rather than a toast the reader can miss. */
+
+.nt-practice__review-title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 600;
+}
+.nt-practice__review-sub {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--fg-muted);
+}
+.nt-practice__miss {
+  padding: 14px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.nt-practice__miss-prompt {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--fg);
+}
+.nt-practice__miss-line {
+  margin: 0 0 5px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg-muted);
+}
+.nt-practice__miss-line--wrong {
+  color: var(--danger);
+}
+.nt-practice__miss-line--right {
+  color: var(--ok);
+}
+.nt-practice__miss .nt-practice__ask {
+  display: inline-block;
+  margin-top: 6px;
+}

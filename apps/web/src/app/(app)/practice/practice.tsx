@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 import type { GradeResult, PublicQuestion } from "@/lib/practice-grading";
 
@@ -45,10 +45,41 @@ export default function Practice({ modules }: Props): React.JSX.Element {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [score, setScore] = useState<{ right: number; wrong: number }>({ right: 0, wrong: 0 });
+  /**
+   * What they got wrong, kept so the session can END on a review instead of
+   * on the index.
+   *
+   * The first version threw the score away: `next()` on the last question
+   * reset the session, and nothing ever rendered the tally. A reader who sat
+   * through eight questions was told nothing about how they did, and the
+   * questions they got wrong — the only part worth revisiting — were gone.
+   *
+   * This is the review, and it is the point of the format. A multiple-choice
+   * question with a static explanation per option is only worth doing twice if
+   * the second time is spent on the ones you missed.
+   */
+  const [missed, setMissed] = useState<
+    ReadonlyArray<{ question: PublicQuestion; result: GradeResult }>
+  >([]);
+  const [finished, setFinished] = useState(false);
+
+  /**
+   * A ref, not state.
+   *
+   * `disabled={busy}` already stops a second click after React re-renders, but
+   * two clicks inside one tick both read the stale `busy === false` and both
+   * fire. The second response then lands last and can overwrite the first, so
+   * a reader double-clicking a module can end up in the wrong one.
+   */
+  const starting = useRef(false);
 
   const current = session?.[at] ?? null;
 
   const start = useCallback(async (code: string): Promise<void> => {
+    // The ref guards the window React's `busy` state cannot see: two clicks
+    // landing in the same tick, before a re-render has disabled the button.
+    if (starting.current) return;
+    starting.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -74,6 +105,8 @@ export default function Practice({ modules }: Props): React.JSX.Element {
       setChosen(null);
       setResult(null);
       setScore({ right: 0, wrong: 0 });
+      setMissed([]);
+      setFinished(false);
       if (data.skipped > 0) {
         console.warn(`${data.skipped} question(s) were skipped as unreadable`);
       }
@@ -81,6 +114,7 @@ export default function Practice({ modules }: Props): React.JSX.Element {
       setError("Practice is temporarily unavailable. Try again shortly.");
     } finally {
       setBusy(false);
+      starting.current = false;
     }
   }, []);
 
@@ -105,6 +139,12 @@ export default function Practice({ modules }: Props): React.JSX.Element {
         right: s.right + (graded.correct ? 1 : 0),
         wrong: s.wrong + (graded.correct ? 0 : 1),
       }));
+      // Kept for the review at the end of the session. `current` is captured
+      // from the closure, which is correct here because submit() is disabled
+      // the moment `busy` is set.
+      if (!graded.correct && current !== null) {
+        setMissed((m) => [...m, { question: current, result: graded }]);
+      }
     } catch {
       setError("That could not be marked. Try again.");
     } finally {
@@ -115,17 +155,34 @@ export default function Practice({ modules }: Props): React.JSX.Element {
   const next = useCallback((): void => {
     if (session === null) return;
     if (at + 1 >= session.length) {
-      setSession(null);
-      setModuleCode(null);
-      setAt(0);
-      setChosen(null);
-      setResult(null);
+      /*
+       * END ON THE REVIEW, not on the index.
+       *
+       * This used to clear the session outright, which discarded the tally and
+       * every missed question — a reader who had just answered eight questions
+       * was shown nothing about how they had done. The questions they got wrong
+       * are the only part of a practice session worth spending a second one on,
+       * so throwing them away at the moment the session ended made the whole
+       * format pointless.
+       */
+      setFinished(true);
       return;
     }
     setAt((n) => n + 1);
     setChosen(null);
     setResult(null);
   }, [at, session]);
+
+  /** Leave the review. `session` staying set is what lets "go again" work. */
+  const closeSession = useCallback((): void => {
+    setSession(null);
+    setModuleCode(null);
+    setAt(0);
+    setChosen(null);
+    setResult(null);
+    setMissed([]);
+    setFinished(false);
+  }, []);
 
   /* -- the index -- */
 
@@ -170,6 +227,79 @@ export default function Practice({ modules }: Props): React.JSX.Element {
     );
   }
 
+  /* -- the review, at the end of a session -- */
+
+if (finished && session !== null) {
+    const total = score.right + score.wrong;
+    return (
+      <div className="nt-practice">
+        <header className="nt-practice__bar">
+          <button type="button" className="nt-practice__quit" onClick={closeSession}>
+            ← all modules
+          </button>
+          <span className="nt-practice__progress">{moduleCode}</span>
+        </header>
+
+        <article className="nt-practice__card">
+          <h1 className="nt-practice__review-title">
+            {score.right} of {total} right
+          </h1>
+          <p className="nt-practice__review-sub">
+            {missed.length === 0
+              ? "Nothing to look at. Try a harder module, or one you have not seen."
+              : `These ${missed.length} are the ones worth a second look.`}
+          </p>
+
+          {missed.map(({ question, result }) => (
+            <section key={question.id} className="nt-practice__miss">
+              <h2 className="nt-practice__miss-prompt">{question.prompt}</h2>
+              <p className="nt-practice__miss-line nt-practice__miss-line--wrong">
+                You chose: {result.chosenOptionText ?? "nothing"}
+              </p>
+              <p className="nt-practice__miss-line">{result.chosenExplanation}</p>
+              <p className="nt-practice__miss-line nt-practice__miss-line--right">
+                The answer: {result.correctOptionText}
+              </p>
+              {result.correctExplanation !== null && (
+                <p className="nt-practice__miss-line">{result.correctExplanation}</p>
+              )}
+              <Link
+                className="nt-practice__ask"
+                href={`/ai?ask=${encodeURIComponent(
+                  `I'm revising a practice question I got wrong: "${question.prompt}"\n` +
+                    `I chose: ${result.chosenOptionText ?? "nothing"}\n` +
+                    `I still don't understand why.`,
+                )}`}
+              >
+                Ask the tutor about this one
+              </Link>
+            </section>
+          ))}
+
+          <footer className="nt-practice__actions">
+            <button
+              type="button"
+              className="nt-practice__submit"
+              onClick={() => {
+                setAt(0);
+                setChosen(null);
+                setResult(null);
+                setMissed([]);
+                setScore({ right: 0, wrong: 0 });
+                setFinished(false);
+              }}
+            >
+              Go again
+            </button>
+            <button type="button" className="nt-practice__submit" onClick={closeSession}>
+              All modules
+            </button>
+          </footer>
+        </article>
+      </div>
+    );
+  }
+
   /* -- a session -- */
 
   if (current === null) return <div className="nt-practice" />;
@@ -180,16 +310,7 @@ export default function Practice({ modules }: Props): React.JSX.Element {
   return (
     <div className="nt-practice">
       <header className="nt-practice__bar">
-        <button
-          type="button"
-          className="nt-practice__quit"
-          onClick={() => {
-            setSession(null);
-            setModuleCode(null);
-            setChosen(null);
-            setResult(null);
-          }}
-        >
+        <button type="button" className="nt-practice__quit" onClick={closeSession}>
           ← {moduleCode}
         </button>
         <span className="nt-practice__progress">
