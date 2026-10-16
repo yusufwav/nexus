@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 import AiMarquee from "@/components/landing/ai-marquee";
-import AsciiField from "@/components/landing/ascii-field";
 import ChatPartner, { type ChatMessage } from "@/components/landing/chat-partner";
+import GradientAscii from "@/components/landing/gradient-ascii";
 import LandingNav from "@/components/landing/landing-nav";
 import MissionSection from "@/components/landing/mission-section";
 import ModuleList, { type ModuleEntry } from "@/components/landing/module-list";
@@ -200,8 +200,6 @@ const REVIEWS_LEAD =
 export default function Landing(): React.JSX.Element {
   return (
     <div className="nt-root">
-      {/* Fixed ASCII ambient layer, behind everything. */}
-      <AsciiField variant="ambient" />
       <div className="nt-grid-bg" aria-hidden="true" />
 
       <LandingNav />
@@ -210,9 +208,9 @@ export default function Landing(): React.JSX.Element {
       <main>
         {/* ---- LANDING: fullscreen, scrolls away to reveal the page ---- */}
         <section className="nt-landing" id="top">
-          {/* Interactive fluid ASCII field. Canvas is z-index 0; the copy
-              below is z-index 2 so it stays readable and clickable. */}
-          <AsciiField variant="landing" />
+          {/* The gradient field. Canvas is z-index 0; the copy below is
+              z-index 2 so it stays readable and clickable. */}
+          <GradientAscii />
           <div className="nt-landing__veil" aria-hidden="true" />
 
           <div className="nt-landing__inner">

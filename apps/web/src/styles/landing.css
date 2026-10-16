@@ -202,6 +202,27 @@
   opacity: var(--amb-op);
 }
 
+/* ---- The gradient field ----
+   Fills whichever positioned ancestor it is mounted in: .nt-landing on the
+   homepage, .nt-auth on /login. Both are position:relative with an isolation
+   context, so inset:0 anchors to them and z-index:0 lands the field under
+   the veil (z-index 1) and the copy (z-index 2).
+
+   NO opacity TOKEN HERE, deliberately. .nt-landing__ascii above needs one
+   because a canvas2d field is flat pixels that have to be faded back; the
+   gradient field carries its own alpha through the glyph and gradient
+   uniforms, so an opacity on top of it would multiply against an alpha that
+   is already resolved and quietly cost a chunk of the contrast the ramp
+   spends to separate from the page. */
+.nt-gradient {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .nt-landing__inner {
   position: relative;
   z-index: 2;

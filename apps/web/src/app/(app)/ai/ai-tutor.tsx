@@ -1,6 +1,5 @@
 "use client";
 
-import AsciiField from "@/components/landing/ascii-field";
 // EmailVerifyNotice is intentionally not rendered — see the comment at the
 // shell. The import is dropped with it so nothing can re-render it by
 // accident; the component and its 37 assertions are untouched.
@@ -39,10 +38,12 @@ import { Streamdown } from "streamdown";
  *
  * Look and feel, following the rest of the product:
  *
- *   · a slow, non-interactive ASCII field behind the whole
- *     conversation — the "ambient" variant, which ignores the
- *     pointer, so nothing the user is reaching for is ever
- *     intercepted by a canvas;
+ *   · a background field behind the whole conversation. It was the
+ *     "ambient" ASCII variant — non-interactive, so nothing the user
+ *     was reaching for was ever intercepted by a canvas — and that
+ *     instance is now removed, pending its replacement. Until that
+ *     lands, the shell's own surface carries the page and the two
+ *     panels below are what keep it from reading as flat;
  *   · a veil between that field and the text, so a page of LaTeX is
  *     readable over moving glyphs without hiding the field;
  *   · the header and the composer are glass panels floating over it,
@@ -920,9 +921,9 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
 
   return (
     <div className="nt-root nt-ai">
-      {/* The field is ambient: it ignores the pointer, so the header,
-          the transcript and the composer all stay clickable. */}
-      <AsciiField variant="ambient" />
+      {/* No field yet. The ambient ASCII instance that used to sit here is
+          removed ahead of the asset that replaces it; the shell's own
+          background and the composer scrim carry the surface until then. */}
 
       <div className="nt-ai__shell">
         {/*

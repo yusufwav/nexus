@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import AsciiField from "@/components/landing/ascii-field";
 import ScrollReveal from "@/components/landing/scroll-reveal";
 import { BookOpenIcon } from "lucide-react";
 
@@ -16,17 +15,23 @@ import ThemeToggle from "./theme-toggle";
 /**
  * THE DASHBOARD SHELL
  * ------------------------------------------------------------
- * Two pieces of the whole screen. The top fifth is left uncovered:
- * moving, non-interactive ASCII with the identity block floating on
- * it. The remaining four fifths is a single glass console holding
- * the tabs and the page body.
+ * Two pieces of the whole screen. The top fifth is left uncovered,
+ * with the identity block floating in it. The remaining four fifths is
+ * a single glass console holding the tabs and the page body.
  *
- * The ASCII uses the ambient variant deliberately — it ignores the
- * pointer, so nothing the user is trying to click is ever
- * intercepted by a canvas filling the strip.
+ * THE STRIP IS CURRENTLY EMPTY.
+ * It used to hold the flowing ASCII field on its ambient variant —
+ * deliberately non-interactive, so nothing the user was trying to click
+ * was ever intercepted by a canvas filling the strip. That instance has
+ * been removed ahead of the asset that replaces it.
  *
- * .nt-root carries the tokens AsciiField and the reveal engine read;
- * .nt-dash is the layout shell defined in styles/app.css.
+ * The strip itself is kept, along with .nt-dash__strip's scrims and the
+ * AsciiField component and its tokens: they are the mounting point for
+ * what goes here next, and re-deriving them from scratch would be work
+ * thrown away. What is gone is the instance, not the scaffolding.
+ *
+ * .nt-root carries the tokens the reveal engine reads; .nt-dash is the
+ * layout shell defined in styles/app.css.
  *
  * ScrollReveal is mounted here, and it has to be. styles/app.css hides
  * every [data-reveal] inside .nt-dash at opacity: 0 and only lifts it
@@ -62,9 +67,12 @@ export default function DashboardShell({
 
   return (
     <div className="nt-root nt-dash">
-      {/* ---- The uncovered strip: moving, non-interactive ASCII ---- */}
+      {/* ---- The uncovered strip ----
+          Held open for the background asset that replaces the ASCII field.
+          Until that lands the strip is bare, which is why ::after's scrims
+          now read against nothing: they dissolve an edge that has no field
+          behind it yet. */}
       <div className="nt-dash__strip">
-        <AsciiField variant="ambient" />
         <div className="nt-dash__id">
           <Avatar name={user.name} image={user.image} size="lg" />
 

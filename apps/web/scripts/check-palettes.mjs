@@ -165,7 +165,8 @@ for (const [selector, name] of paletteSelectors) {
 
 console.log("\nhex-only where the ASCII engine requires it");
 /*
- * ascii-field.tsx parses the ramp with a hex-only reader. A named colour or
+ * Both canvas background engines parse the ramp with a hex-only reader
+ * (hexToRgb in ascii-field.tsx and in gradient-ascii.tsx). A named colour or
  * an rgb() there renders as black - which reads as "the field is broken"
  * rather than "a token was written in the wrong notation".
  */

@@ -202,7 +202,7 @@ export default async function SettingsPage(): Promise<React.JSX.Element> {
         <div className="nt-setgroup__body">
           <PlaceholderSwitch
             label="Reduce motion"
-            description="Stops the ASCII field and the reveal animations. The OS-level setting already does this."
+            description="Stops the background fields and the reveal animations. The OS-level setting already does this."
             defaultOn
           />
           <ThemePicker />

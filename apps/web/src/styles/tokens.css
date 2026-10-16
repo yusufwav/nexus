@@ -309,8 +309,10 @@
    Spacing, type scale, radii, motion and layout tokens are
    theme-invariant and deliberately not repeated.
 
-   The four ASCII ramp colours must stay hex — ascii-field.tsx
-   parses them with a hex-only reader.
+   The four ASCII ramp colours must stay hex — both canvas engines
+   parse them with a hex-only reader (ascii-field.tsx and
+   gradient-ascii.tsx). The gradient field derives its own ramp from
+   --ascii-low/--ascii-high, so it depends on this too.
    ============================================================ */
 .light .nt-root {
   /* Surfaces — warm paper rather than clinical white, so the
@@ -352,7 +354,8 @@
 
   /* ASCII engine — the ramp now runs from near-paper to deep
      crimson, so the field reads as pale fog rather than soot.
-     Hex only; hexToRgb() in ascii-field.tsx parses nothing else. */
+     Hex only; hexToRgb() in both ascii-field.tsx and
+     gradient-ascii.tsx parses nothing else. */
   --ascii-op: 0.55;
   --ascii-low: #e8e2db;
   --ascii-high: #8b0000;
