@@ -284,6 +284,38 @@ export default function AiTutor({ name }: { readonly name: string }): React.JSX.
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
 
+  /*
+   * `?ask=` PRE-FILLS THE COMPOSER, and deliberately does not send.
+   *
+   * This is the practice page's escape hatch: a reader whose multiple-choice
+   * explanation did not land can bring the question here. An authored
+   * explanation will not work for everyone, and the alternative was building a
+   * bespoke "explain this answer" endpoint — a second model path, a second set
+   * of prompts, a second thing to get wrong.
+   *
+   * It PRE-FILLS rather than auto-sending, which is the whole decision here:
+   * sending on mount spends the reader's money before they have done anything,
+   * so a mistyped URL, a prefetch, or a browser restoring the page would each
+   * be a billed call they did not ask for. They can read it, edit it, and
+   * press send.
+   *
+   * Read from the URL directly rather than through a prop, because the page
+   * component is a server component that would otherwise have to await
+   * searchParams and re-render on every keystroke in the query string.
+   */
+  const [asked, setAsked] = useState(false);
+  useEffect(() => {
+    if (asked) return;
+    const ask = new URLSearchParams(window.location.search).get("ask");
+    if (ask !== null && ask.trim().length > 0) {
+      setInput(ask);
+      // Clear it from the address bar so a refresh does not silently re-arm
+      // the draft over whatever the reader has since typed.
+      window.history.replaceState(null, "", "/ai");
+    }
+    setAsked(true);
+  }, [asked]);
+
   // Which conversation is on screen. Minted once per chat and reused
   // for every turn in it, so the server upserts one thread rather than
   // making a new one per message.

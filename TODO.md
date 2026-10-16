@@ -373,17 +373,60 @@ record of what they are weak at that gets better over time.**
 Everything else is downstream of this, and it is mostly *editorial*, not
 engineering. A rolling supply of questions so practice never runs dry.
 
-- [ ] **B1a. The schema.** One `practice_questions` table. The three formats
-      below are different enough to warrant different storage for answers, but
-      they share enough fields — module, topic, difficulty, tags — that one
-      catalogue beats three tables.
-- [ ] **B1b. An import path, not an admin UI.** Questions get written somewhere
-      and added in batches. A file in the repo, validated on the way in
-      (`check-topics.mjs` is the precedent for "validate a content file in
-      tests"). An admin UI is a whole product and is not needed at this scale.
-- [ ] **B1c. Rolling updates.** Weekly or monthly, a batch lands. The property
-      that makes this work: a question's `id` is stable forever, so a reader's
-      history never robs when the catalogue is re-imported.
+- [x] **B1a. The schema.** `packages/db/src/schema/practice.ts`, applied to both
+      databases. One caveat on B1's "one table", which is right about the
+      catalogue and incomplete about the feature: there are **two**.
+      `practice_questions` is global authored content — one table, exactly as
+      written. `practice_attempts` is the reader's own record, and it cannot
+      share a table with it: a nullable `user_id` on every question would mean
+      "questions I have not seen" needs `WHERE user_id IS NULL` to mean
+      anything, and a per-reader copy of the corpus multiplies content by the
+      user count and turns an edit to a question into a migration. Splitting
+      them is also what lets the catalogue be re-imported without touching
+      anyone's history.
+- [x] **B1b. An import path, not an admin UI.**
+      `apps/web/src/content/practice-questions.ts` is the source, zod-validated
+      at import, and `apps/web/scripts/import-practice-questions.ts` upserts on
+      the authored `id`. **Dry run by default** — a command that silently
+      rewrites the rows every reader is graded against has the same shape as
+      the bulk-leak this project exists to stop. Retired questions are reported,
+      never deleted. 37 assertions, 23 of which confirm the validator REJECTS
+      broken questions, since a validator that only accepts is
+      indistinguishable from no validator.
+- [x] **B1c. Rolling updates.** The id is authored and stable; the importer
+      never deletes; and re-importing reports 0 changed. One trap worth
+      recording: **jsonb reorders keys on storage**, so comparing a read-back
+      row against the source with `JSON.stringify` reported three questions as
+      "updated" on every run forever. The comparison sorts keys recursively and
+      preserves array order, because order in a proof's pieces is data.
+- [x] **B2a. Multiple choice.** `lib/practice-grading.ts` (pure),
+      `api/practice/questions`, `api/practice/answer`, and `/practice`. 24
+      grading assertions + 15 integration assertions against the real database.
+
+      **The decision everything else follows from: the answer never reaches the
+      browser before the reader answers.** A `correct` flag in the payload
+      makes every reader's practice worthless, and so do the explanations —
+      the one for the right option explains why it is right. `publicQuestion`
+      strips both and is the only path to a client; `gradeAnswer` takes the
+      chosen option and nothing else, so there is no slot for a claimed
+      verdict even in the type.
+
+      **The ordering in the answer route is the security model:** session →
+      load → **check the purchase** → grade. Grading is what reveals the
+      answer, so the entitlement check has to precede it, and it cannot precede
+      the load because the module lives on the question. Both halves are
+      asserted, and both were verified by moving the check and watching the
+      suite fail.
+
+      The escape hatch is a link, not an endpoint: "still don't get it" hands
+      the question to `/ai` via `?ask=`, which **pre-fills the composer rather
+      than sending**. Auto-sending would spend the reader's money before they
+      did anything.
+
+### Still open on B2a
+- [ ] Read the feature in a browser and fix what looks wrong. Everything above
+      is asserted; none of it has been seen.
+- [ ] The `?ask=` draft needs confirming against a real tutor page load.
 
 ### B2. Three question formats
 
@@ -465,8 +508,8 @@ student to argue with the tool instead of with the maths.
 
 ## Sequencing, and the honest risk
 
-**Order:** A1–A4, then B1a/B1b, then B2a, then B2c, then B3a/B3b, then B2b.
-Flashcards and favourites can be interleaved anywhere once B1a lands.
+**Order:** B1a/B1b/B1c are done, B2a is done, then B2c (application), then B3a/B3b,
+then B2b. Flashcards and favourites can be interleaved anywhere.
 
 **The risk worth naming now:** B is a lot of surface area, and B2b in particular
 can consume a long time while still being the least certain thing here — grading

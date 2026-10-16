@@ -19,6 +19,11 @@ const LINKS = [
   { to: "/", label: "~/" },
   { to: "/modules", label: "~/modules" },
   { to: "/dashboard", label: "~/dashboard" },
+  // Practice sits before the tutor, not after: it is where a reader is meant
+  // to go when they do not know what to ask, and the tutor is where they go
+  // when they do. The tutor is the icon at the end because it is the one that
+  // costs them money to open.
+  { to: "/practice", label: "~/practice" },
   { to: "/ai", label: "~/ai", icon: true },
 ] as const;
 

@@ -277,7 +277,25 @@ try {
 }
 check("an untagged question is refused by the database itself", !untagged);
 
-await reset();
+/*
+ * CLEAN UP BY DELETING, NOT BY CALLING reset().
+ *
+ * `reset()` clears the fixture tables and then RE-CREATES the probe user,
+ * because the suite needs it for a fresh run. Calling it as the teardown
+ * therefore deletes and immediately re-inserts the row it just reported
+ * cleaning up — which is how a leftover `practice-import-probe` reader came to
+ * sit in the local database long after this suite last ran.
+ *
+ * A test that prints "probes cleaned up" while leaving one behind is worse than
+ * one that says nothing, because the next person to look at the database
+ * trusts the message.
+ */
+await client.query(`delete from practice_attempts where question_id = any($1::text[])`, [FIXTURE_IDS]);
+await client.query(`delete from practice_questions where id = any($1::text[])`, [FIXTURE_IDS]);
+await client.query(`delete from "user" where id = $1`, [READER]);
+const leftReader = await client.query(`select count(*)::int as n from "user" where id = $1`, [READER]);
+check("the probe reader is actually gone", leftReader.rows[0].n === 0, `${leftReader.rows[0].n} left behind`);
+
 console.log("\n  probes cleaned up");
 
 await client.end();

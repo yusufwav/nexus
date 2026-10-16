@@ -66,9 +66,25 @@ export async function GET(req: NextRequest): Promise<Response> {
    * in the log so the row can be found and fixed; the reader is not shown the
    * reason, because there is nothing they could do about it.
    */
+  /*
+   * FILTER TO WHAT THIS ENDPOINT CAN SERVE, BEFORE STRIPPING ANYTHING.
+   *
+   * `publicQuestion` only knows how to strip a multiple-choice spec, and it
+   * throws for any other format rather than guessing. That is the right
+   * behaviour for a security boundary — fail CLOSED rather than render a
+   * question whose shape this function does not understand — but it means the
+   * filter has to happen here, or a reader whose module holds both kinds would
+   * lose its application questions to an exception rather than to a decision.
+   *
+   * Explicit is better than exception-driven control flow here: B2a ships
+   * multiple choice alone, and this is where that decision is visible. When
+   * B2b lands, this line becomes the switch.
+   */
+  const answerable = rows.filter((row) => row.format === "multiple-choice");
+
   const questions = [];
   const skipped: string[] = [];
-  for (const row of rows) {
+  for (const row of answerable) {
     try {
       questions.push(publicQuestion(parseQuestion(row)));
     } catch (err) {

@@ -3633,3 +3633,296 @@
   }
 }
 
+
+/* ============================================================================
+   PRACTICE
+   ----------------------------------------------------------------------------
+   One question at a time, four option states, and an explanation under each
+   answered option.
+
+   THE COLOUR CARRIES THE PEDAGOGY, so it is worth being explicit about what
+   each state means rather than leaving it to look-and-see:
+
+     picked   the reader's selection, before answering. Neutral -- it must not
+              read as a verdict, because at this point it is not one.
+     right    the option that was correct. Green.
+     wrong    the option they chose, and it was wrong. Red.
+     idle     everything else. Deliberately near-invisible: a distractor that
+              is not the one they picked has told them nothing yet.
+
+   `right` on an option they did NOT choose is the interesting case. It is the
+   one that carries the teaching -- "not that one, and here is why" -- so it is
+   given the same green as a correct pick rather than a neutral "missed"
+   treatment, because being wrong and being the answer are different facts and
+   the colour should not collapse them.
+   ============================================================================ */
+
+.nt-practice {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 28px 20px 96px;
+}
+
+.nt-practice__head {
+  margin-bottom: 22px;
+}
+.nt-practice__title {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.nt-practice__sub {
+  margin: 0;
+  max-width: 62ch;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--fg-muted);
+}
+
+.nt-practice__empty,
+.nt-practice__error {
+  margin: 18px 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--fg-muted);
+}
+.nt-practice__error {
+  color: var(--danger);
+}
+
+/* -- the module index -- */
+
+.nt-practice__modules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.nt-practice__module {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  text-align: left;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  color: var(--fg);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.nt-practice__module:hover:not(:disabled) {
+  border-color: var(--accent-line);
+  background: var(--bg-1);
+}
+.nt-practice__module:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+.nt-practice__module-code {
+  font-family: var(--nt-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--fg-dim);
+}
+.nt-practice__module-name {
+  font-size: 15px;
+}
+.nt-practice__module-count {
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+
+/* -- a session -- */
+
+.nt-practice__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.nt-practice__quit {
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.nt-practice__quit:hover {
+  color: var(--fg);
+}
+.nt-practice__progress {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-family: var(--nt-font-mono);
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+/* A count, never a score out of ten. See practice.tsx for why. */
+.nt-practice__tally {
+  font-family: inherit;
+  color: var(--fg-muted);
+}
+
+.nt-practice__card {
+  padding: 20px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+.nt-practice__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 12px;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
+}
+.nt-practice__tags {
+  text-transform: none;
+  letter-spacing: 0.01em;
+  color: var(--fg-dim);
+  opacity: 0.8;
+}
+
+/*
+ * pre-wrap, and the authored \n in a prompt is preserved. Prompts carry maths
+ * in plain text; collapsing them onto one line mangles them.
+ */
+.nt-practice__prompt {
+  margin: 0 0 18px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  color: var(--fg);
+}
+
+.nt-practice__options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nt-practice__option {
+  display: block;
+  width: 100%;
+  padding: 11px 13px;
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.nt-practice__option:disabled {
+  cursor: default;
+}
+.nt-practice__option--idle:hover {
+  border-color: var(--line);
+}
+
+.nt-practice__option--picked {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.nt-practice__option--right {
+  border-color: var(--ok-line);
+  background: var(--ok-fill);
+}
+.nt-practice__option--wrong {
+  border-color: var(--danger-fill);
+  background: var(--danger-fill);
+  color: var(--danger);
+}
+
+/* -- the explanation -- */
+
+.nt-practice__why {
+  margin: 6px 2px 2px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--fg-muted);
+}
+.nt-practice__why--right strong {
+  color: var(--ok);
+}
+.nt-practice__why--wrong strong {
+  color: var(--danger);
+}
+
+.nt-practice__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+.nt-practice__submit {
+  padding: 9px 16px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--fg);
+  background: var(--bg-1);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background 140ms ease;
+}
+.nt-practice__submit:hover:not(:disabled) {
+  background: var(--bg-0);
+}
+.nt-practice__submit:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/*
+ * The escape hatch. Styled as text rather than a button because it is not an
+ * action inside the session -- it navigates away to the tutor.
+ */
+.nt-practice__ask {
+  font-size: 13px;
+  color: var(--fg-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.nt-practice__ask:hover {
+  color: var(--fg);
+}
+
+@media (max-width: 640px) {
+  .nt-practice {
+    padding: 20px 16px 72px;
+  }
+  .nt-practice__card {
+    padding: 16px;
+  }
+  .nt-practice__module {
+    grid-template-columns: 1fr auto;
+  }
+  .nt-practice__module-code {
+    grid-column: 1 / -1;
+  }
+}
