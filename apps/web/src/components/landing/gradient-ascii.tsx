@@ -502,18 +502,57 @@ const xyzToRamp = (xyz: readonly [number, number, number]): [number, number, num
  * between a near-black and a saturated crimson, a straight sRGB lerp passes
  * through mud, which is exactly the midpoint of this ramp.
  */
-const toCompanded = (rgb: readonly [number, number, number]): [number, number, number] =>
-  srgbToXyz(rgb).map((v) => Math.cbrt(Math.max(0, v))) as [number, number, number];
+/**
+ * HSL, because lightness and saturation have to move INDEPENDENTLY here.
+ *
+ * Every earlier attempt built this ramp by interpolating two endpoint
+ * colours, and that is structurally unable to keep a hue alive: a lerp
+ * toward the page background greys the colour out, and a lerp toward the
+ * page foreground pinks it out. On the dark theme that produced exactly
+ * the wrong thing - a desaturated rose where the palette says maroon.
+ *
+ * In HSL the hue is simply carried through untouched and only L and S are
+ * touched, so "a lighter version of scarlet" stays scarlet instead of
+ * decaying into pink.
+ */
+const rgbToHsl = (rgb: readonly [number, number, number]): [number, number, number] => {
+  const max = Math.max(...rgb);
+  const min = Math.min(...rgb);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d === 0) {
+    return [0, 0, l];
+  }
+  const s = d / (1 - Math.abs(2 * l - 1));
+  let h: number;
+  if (max === rgb[0]) {
+    h = ((rgb[1] - rgb[2]) / d) % 6;
+  } else if (max === rgb[1]) {
+    h = (rgb[2] - rgb[0]) / d + 2;
+  } else {
+    h = (rgb[0] - rgb[1]) / d + 4;
+  }
+  return [((h / 6) % 1 + 1) % 1, s, l];
+};
 
-const mixCompanded = (
-  a: readonly [number, number, number],
-  b: readonly [number, number, number],
-  t: number,
-): [number, number, number] => [
-  a[0] + (b[0] - a[0]) * t,
-  a[1] + (b[1] - a[1]) * t,
-  a[2] + (b[2] - a[2]) * t,
-];
+const hslToRgb = (hsl: readonly [number, number, number]): [number, number, number] => {
+  const [h, s, l] = hsl;
+  if (s === 0) {
+    return [l, l, l];
+  }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const channel = (t: number): number => {
+    let u = t;
+    if (u < 0) u += 1;
+    if (u > 1) u -= 1;
+    if (u < 1 / 6) return p + (q - p) * 6 * u;
+    if (u < 1 / 2) return q;
+    if (u < 2 / 3) return p + (q - p) * (2 / 3 - u) * 6;
+    return p;
+  };
+  return [channel(h + 1 / 3), channel(h), channel(h - 1 / 3)];
+};
 
 function hexToRgb(hex: string | undefined): [number, number, number] {
   const h = (hex ?? "").replace("#", "").trim();
@@ -526,40 +565,68 @@ function hexToRgb(hex: string | undefined): [number, number, number] {
 }
 
 /**
- * WHY LIGHT/DARK IS DECIDED BY LUMINANCE, NOT BY A CLASS
- * There are thirty-three generated palettes plus a hand-written light and
- * dark, and they are not all reached by a class named "light". Reading
- * `--bg-0` and asking how bright it is is the one test that is correct for
- * all of them and needs no registry to stay in sync.
- *
- * The ink mode is not cosmetic. It flips the composite from additive
- * (light on black) to over-blend (dark on paper); leaving it on additive
- * over a light page renders the glow as a white wash and the glyphs as
- * nothing at all.
- */
-const isLightPage = (bg: readonly [number, number, number]): boolean =>
-  0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2] > 0.5;
-
-/**
- * THE RAMP, DERIVED FROM THE CURRENT THEME
+ * THE RAMP: FOUR STOPS OF THE THEME'S OWN COLOUR
  * ------------------------------------------------------------
- * Reads the two ends the ASCII field was built from — `--ascii-low` (the
- * dim end, near the page background) and `--ascii-high` (the lit end, the
- * theme's accent ink) — and widens them, in Lab, into four stops.
+ * Anchored on `--accent-a`, which the palette generator documents as the
+ * palette's identity: "they stay exactly as seeded on both branches". That
+ * is the one token guaranteed to be neither diluted nor inverted for
+ * legibility, which makes it the only defensible candidate for the colour
+ * this field is supposed to be.
  *
- * Widening rather than using the pair verbatim is the same correction the
- * landing field made before it: the low end is pulled toward `--bg-0` and
- * the high end toward `--fg`. The field then sits ON the page instead of
- * inside it, and it has range rather than uniform strength — a ramp with
- * more range has shape, the same field turned up just looks like a filter.
- * It is the one thing that cannot be left to the upstream defaults, because
- * the defaults assume a fixed blue palette that no theme here shares.
+ * `--ascii-low`/`--ascii-high` were the obvious source, since they are the
+ * ASCII field's own two ends, and they are the wrong one. On a dark theme
+ * `--ascii-high` is the palette's SECONDARY colour, and on a light theme it
+ * is that secondary already mixed 45% toward the foreground — the
+ * generator does that on purpose so accents stay legible as ink on paper,
+ * which is a different job from being a luminous glow. Reading it and then
+ * lightening it further is how the dark theme ended up a desaturated rose
+ * instead of the maroon-scarlet its palette actually specifies.
  *
- * Stops are interpolated in a companded space rather than sRGB for the reason
- * given above. They are returned already in the form the shader consumes, so
- * no colour is converted on its way to the GPU a second time.
+ * FOUR STOPS, DARKEST TO LIGHTEST, HUE CONSTANT
+ * The count matches the upstream component's default palette; the ordering
+ * is ours, because the upstream four are in no meaningful order and the
+ * shader assumes index 0 is the floor of the range and the last index is
+ * the highlight.
+ *
+ * Index 1 IS THE ACCENT, UNTOUCHED — its own hue, its own saturation, its
+ * own lightness. The other three are built around it by moving only
+ * lightness and saturation downward, so the most saturated colour in the
+ * ramp is provably the theme's own and nothing in the ramp can out-chroma
+ * it. That is what makes the field read as the theme rather than as a
+ * tinted approximation of it.
+ *
+ * Stops come back already in the shader's space, so no colour is
+ * converted on its way to the GPU a second time.
  */
 const RAMP_STOPS = 4;
+
+/** Where the theme's own colour sits, dark to light. */
+const ACCENT_STOP = 1;
+
+/**
+ * Saturation per stop, as a fraction of the accent's own.
+ *
+ * Index 1 is exactly 1 by definition and everything else is under it, so
+ * the most saturated stop is unique and is the accent. The top of the ramp
+ * falls away hardest because that end is a highlight, and a highlight at
+ * full chroma on a near-white page is a pink smear.
+ */
+const RAMP_CHROMA = [0.86, 1, 0.82, 0.46] as const;
+
+/*
+ * The three tables that define a stop must agree, or the ramp silently
+ * grows a tail. `RAMP_CHROMA[stopCount]` being undefined is the failure that
+ * matters: `sat * undefined` is NaN, HSL conversion of NaN clamps to 0, and
+ * the extra stop ships as pure white with a perfectly plausible-looking
+ * highlight — no error, no NaN on screen, and `uCount` quietly stretches the
+ * ramp across it. Asserted at module scope so it cannot be reintroduced.
+ */
+if (RAMP_CHROMA.length !== RAMP_STOPS || ACCENT_STOP !== 1) {
+  throw new Error(
+    `ramp tables disagree: RAMP_STOPS=${RAMP_STOPS} ` +
+      `RAMP_CHROMA.length=${RAMP_CHROMA.length} ACCENT_STOP=${ACCENT_STOP}`,
+  );
+}
 
 function themeRamp(): {
   stops: [number, number, number][];
@@ -570,18 +637,56 @@ function themeRamp(): {
   const token = (name: string): string => cs.getPropertyValue(name).trim();
 
   const bg = hexToRgb(token("--bg-0"));
-  const fg = hexToRgb(token("--fg"));
-  const low = hexToRgb(token("--ascii-low"));
-  const high = hexToRgb(token("--ascii-high"));
+  const accent = hexToRgb(token("--accent-a"));
 
-  const from = mixCompanded(toCompanded(low), toCompanded(bg), 0.4);
-  const to = mixCompanded(toCompanded(high), toCompanded(fg), 0.32);
+  const [hue, sat, lum] = rgbToHsl(accent);
 
-  const stops = Array.from({ length: RAMP_STOPS }, (_, i) =>
-    xyzToRamp(mixCompanded(from, to, i / (RAMP_STOPS - 1))),
+  /*
+   * HOW BRIGHT THE PAGE IS, rather than looking for a class named "light".
+   *
+   * There are fifty generated palettes plus a hand-written pair, and they
+   * are not all reached by a class called light. Reading --bg-0 and asking
+   * how bright it is is the one test that is correct for all of them and
+   * needs no registry to stay in sync.
+   *
+   * It is not cosmetic either: it picks the composite's blend mode.
+   * Additive is right for light on black and wrong on paper, where it
+   * renders the glow as a white wash and the glyphs as nothing at all.
+   */
+  const pageLight = 0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2];
+
+  /*
+   * Lightness per stop, dark to light, built to exactly RAMP_STOPS entries.
+   *
+   * Slot 0 is a SCALED version of the accent rather than a fixed near-black.
+   * A fixed dark end is invisible on a dark page, which turns the ramp into a
+   * disc floating in a void: the horizon shape spends most of its area below
+   * the arch, so that is where the bottom two-thirds of the hero goes, and at
+   * L=0.05 there is nothing to see. Scaling keeps the hue present right down
+   * to the floor, so the sweep reads dark-to-light across the whole field.
+   * It also stays ordered without a clamp, since any fraction below 1 of the
+   * accent's own lightness is below the accent — including for a palette
+   * shipping a very dark primary.
+   *
+   * Slots 2 and up walk from the accent toward white. The spacing is then
+   * forced strictly ascending, because a palette whose accent is already
+   * light can otherwise produce two stops at the same lightness and the
+   * shader's fract() picks whichever one it lands on.
+   */
+  const lightness: number[] = [lum * 0.45, lum];
+  for (let i = 2; i < RAMP_STOPS; i++) {
+    const k = (i - 1) / (RAMP_STOPS - 2);
+    lightness.push(lum + (1 - lum) * (0.38 + 0.32 * k));
+  }
+  for (let i = 2; i < lightness.length; i++) {
+    lightness[i] = Math.max(lightness[i]!, lightness[i - 1]! + 0.06);
+  }
+
+  const stops = lightness.map((l, i) =>
+    xyzToRamp(srgbToXyz(hslToRgb([hue, sat * RAMP_CHROMA[i]!, l]))),
   );
 
-  return { stops, lightMode: isLightPage(bg) };
+  return { stops, lightMode: pageLight > 0.5 };
 }
 
 /**
