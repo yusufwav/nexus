@@ -77,7 +77,6 @@ export default function DashboardShell({
 
           <div className="nt-dash__who">
             <h1 className="nt-dash__name">{user.name}</h1>
-            <p className="nt-dash__email">{user.email}</p>
           </div>
 
             <div className="nt-dash__id-actions">

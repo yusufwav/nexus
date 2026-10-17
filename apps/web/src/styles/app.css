@@ -1235,7 +1235,7 @@
   height: 34px;
   font-size: 0.8rem;
 }
-/* THE IDENTITY BLOCK — glass, sized to the toolbar.
+/* THE IDENTITY BLOCK — glass, matched to the toolbar and sized to it.
    ------------------------------------------------------------
    This used to be a radial vignette: --bg-1 fading out to transparent,
    a soft patch of page colour under the text so the moving glyph field
@@ -1247,91 +1247,71 @@
    the one non-clickable member of the toolbar, and it should look like
    it belongs to the same set.
 
+   IT NOW LOOKS LIKE THE BUTTONS, EXACTLY, because the first attempt at
+   this got it wrong in the most obvious way available. It used
+   --glass-tint for the fill - 30% white on a dark palette - on the
+   reasoning that a near-opaque letter field needs the contrast. The
+   result was a pale box sitting beside six near-black buttons, which is
+   not a subtle difference from them, it is the opposite of them. The
+   buttons use --glass-bg at 2.8%, and every other property here now
+   matches theirs exactly: the same fill, the same --glass-edge border,
+   the same --r-sm radius, the same inset sheen, the same blur and
+   saturate. No --shadow-sm either - a button has no drop shadow at rest,
+   only on hover, and one here made the pill sit above the row rather
+   than in it.
+
+   The legibility that motivated the tint is not lost, because it was never
+   the tint doing the work. --glass-blur is 14px against a 44px-tall pill,
+   which is enough to turn the letter field behind it into flat tone, and
+   that is what the glass IS. The tint was a second, uglier answer to a
+   problem the blur had already solved.
+
    SAME SIZE AS THE BUTTONS, which is the part that has to be exact.
    Every control in .nt-dash__id-row takes its height from --nt-ctl-h:
    the three icon squares at width AND height var(--nt-ctl-h), and the
-   text buttons at min-height var(--nt-ctl-h). This block is min-height
-   var(--nt-ctl-h) for the same reason and no other - it is what makes
-   the name and email line up with the row rather than sitting taller
-   than everything beside it. --nt-ctl-h and not --nt-icon-btn, because
-   --nt-ctl-h is the height the toolbar actually resolved to.
-
-   The line heights are pinned rather than left to the font's default
-   because min-height is a FLOOR, not a clamp: without them the block's
-   natural height is name 1.1rem plus email 0.7rem at their default
-   leading, which is about 43px against a 44px floor, and on a font with
-   taller defaults it would push past the floor and break the alignment
-   the min-height exists to protect.
-
-   --glass-tint over --glass-bg is what carries the contrast. The strip
-   behind this is the letter field at baseOpacity 0.8 - near-opaque
-   glyphs - so the tint is doing real work here, more of it than on a
-   button over a flat page.
+   text buttons at min-height var(--nt-ctl-h). This block is height
+   var(--nt-ctl-h) for the same reason and no other - it is what makes the
+   name line up with the row rather than sitting taller than everything
+   beside it. Fixed height rather than min-height, because min-height is
+   a floor and the content overran it.
 
    z-index: -1 is retained and is still needed. The ::before is a
-   positioned box, and the <h1>/<p> inside are not positioned, so
-   without it the glass would paint on top of the text. */
+   positioned box, and the <h1> inside is not positioned, so without it
+   the glass would paint on top of the text. */
 .nt-dash__who::before {
   content: "";
   position: absolute;
   z-index: -1;
   inset: 0;
   border: 1px solid var(--glass-edge);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-sm);
   pointer-events: none;
-  background: var(--glass-tint);
+  background: var(--glass-bg);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
   backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
-  box-shadow:
-    inset 0 1px 0 0 var(--glass-sheen),
-    var(--shadow-sm);
+  box-shadow: inset 0 1px 0 0 var(--glass-sheen);
 }
 .nt-dash__who {
   position: relative;
   min-width: 0;
-  /* EXACTLY --nt-ctl-h, not min-height. min-height is a floor and the
-     content overran it: the two lines at --fs-lg and --fs-xs come to
-     50.2px naturally, which measured 6.2px taller than every button in
-     the row. The buttons take their height from this same token, so this
-     one has to be a fixed height or the alignment the token exists to
-     guarantee is not actually guaranteed. justify-content: centre is what
-     keeps the two lines centred inside it when a name is long enough to
-     ellipsise onto one line. */
   height: var(--nt-ctl-h);
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
-  /* Horizontal padding only, and that is not a style choice. The two lines
-     want 1.1rem + 0.7rem at default leading, which measures 50.2px, and
-     --nt-ctl-h is 44px. A block with vertical padding here is content that
-     cannot fit inside itself: with justify-content: centre the overflow spills
-     out of both ends equally and the email lands on top of the name. The
-     buttons beside this are single-line, so their --sp-2 of vertical padding
-     costs them nothing; a two-line block spending a line's worth of padding
-     above and below has 28px of box for 34px of text. Centring the lines in
-     the full 44px leaves 4.75px of air above and below instead, which is
-     what the single-line buttons get anyway. */
   padding: 0 var(--sp-4);
-  /* No negative margin, unlike the vignette this replaced. That one had
-     padding to bleed its gradient past the text and a negative margin to
-     claw the space back; the glass needs neither, because here the padding
-     is inside a visible edge rather than outside it. Carrying it over would
-     make the pill overlap its neighbours by --sp-4 on each side. */
+  /* Centred in both axes. With the email gone this is a single line, and
+     it is the one member of the toolbar whose width is set by its content
+     rather than by the grid, so centring it is what keeps the name from
+     reading as left-aligned text jammed against an edge. */
+  text-align: center;
 }
 .nt-dash__name {
   margin: 0;
+  max-width: 100%;
   font-size: var(--fs-lg);
   font-weight: 700;
   letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.nt-dash__email {
-  margin: 0;
-  font-size: var(--fs-xs);
-  color: var(--fg-dim);
-  letter-spacing: var(--tracking);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
