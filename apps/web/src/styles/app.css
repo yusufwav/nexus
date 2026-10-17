@@ -2948,41 +2948,64 @@
      strip, which is how "no way to reach the module listing on mobile"
      happened. The link itself never moved or disappeared, so nothing
      here changes where it points. */
-.nt-dash__modules {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
+/* Sign out, in the dashboard header.
+   ------------------------------------------------------------
+   Icon-only now, so it is the same square as every other control in the
+   row and carries `nt-btn--icon` for its --nt-ctl-h sizing. The label
+   that used to sit beside the icon is gone; `aria-label` and `title`
+   keep the name for a screen reader and for a hover, and the component
+   explains why both arms are needed.
+
+   A RED EDGE, VERY SLIGHTLY.
+   Signing out is not reversible from the page you land on, and it sits
+   beside Home, the AI tutor and Browse modules, where one mis-click is
+   an annoyance. So it needs to read as the odd one out — but a red
+   FILL would put it in competition with the letters glitching behind
+   the strip, and a red icon would undo the point of making it the same
+   square as the rest. An edge does the whole job: the button is still
+   one of the set, and the set has one member that is not quite the
+   same as the others.
+
+   22% of --danger in the border is deliberately near the threshold of
+   noticing. The old --danger token is #ff7b72 on dark and #cf222e on
+   light — a salmon and a true red — so the same percentage is a
+   different weight on each, and it should be: a hairline that reads as
+   warm on paper and as a faint ember on black is the right amount of
+   tint in both.
+
+   color-mix rather than a new token, because this is the second place in
+   the stylesheet that wants "the palette's danger colour at low
+   opacity" and a new token would have to be added to the hand-written
+   pair AND to build-palettes.mjs and regenerated across all fifty-two
+   palettes, for a hairline. The warn hover background already derives
+   itself this way. The plain declaration is first so that a browser
+   without color-mix falls back to the ordinary glass edge rather than
+   dropping the border colour to `currentColor`.
+
+   Scoped to .nt-dash__id-row rather than written bare, for the same reason
+   the row's sizing rules are: .nt-btn is the landing page's button too, both
+   selectors carry exactly one class, and the winner is then decided by which
+   stylesheet Next.js happens to emit last. That is not a thing to leave to
+   import order - the first attempt at this was silently dead for precisely
+   that reason, with the measured border still reading rgba(255,255,255,0.09)
+   straight from .nt-btn while the rule sat in the file looking correct. Two
+   classes beats one whatever the order.
+
+   Hover keeps .nt-btn's own glass and grows the same --danger-fill the
+   user menu's sign-out item uses, so the two sign-out affordances on
+   the two surfaces agree about what this one does. */
+.nt-dash__id-row .nt-signout {
+  border-color: var(--glass-edge);
+  border-color: color-mix(in srgb, var(--danger) 22%, transparent);
 }
-.nt-dash__modules-icon {
-  display: none;
-  width: 1rem;
-  height: 1rem;
-}
-/* Sign out: label above 640px, icon below. It carries an aria-label
-   either way, so the icon-only form still announces as "Sign out". */
-.nt-signout {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-}
-.nt-signout__icon {
-  display: none;
-  width: 1rem;
-  height: 1rem;
+.nt-dash__id-row .nt-signout:hover {
+  border-color: color-mix(in srgb, var(--danger) 52%, transparent);
+  background:
+    linear-gradient(var(--danger-fill), var(--danger-fill)),
+    var(--glass-bg-hover);
+  color: var(--danger);
 }
 @media (max-width: 640px) {
-  .nt-dash__modules-label {
-    display: none;
-  }
-  .nt-dash__modules-icon {
-    display: block;
-  }
-  .nt-signout__label {
-    display: none;
-  }
-  .nt-signout__icon {
-    display: block;
-  }
   /* The identity block and its actions share the strip; at this width
      the actions need their own line or the theme toggle and sign-out
      get pushed out of view. */

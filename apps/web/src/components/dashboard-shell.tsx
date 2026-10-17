@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import ScrollReveal from "@/components/landing/scroll-reveal";
 import LetterGlitch from "@/components/letter-glitch";
-import { BookOpenIcon } from "lucide-react";
 
 import { DASH_ACTIONS } from "@/lib/dash-actions";
 
@@ -105,11 +104,6 @@ export default function DashboardShell({
                     <Icon aria-hidden="true" />
                   </Link>
                 ))}
-                {/* Keeps its label on desktop, where there is room. */}
-                <Link className="nt-btn nt-btn--ghost nt-dash__modules" href="/modules">
-                  <BookOpenIcon className="nt-dash__modules-icon" aria-hidden="true" />
-                  <span className="nt-dash__modules-label">browse modules</span>
-                </Link>
                 <ThemeToggle />
                 <SignOutButton />
               </div>
