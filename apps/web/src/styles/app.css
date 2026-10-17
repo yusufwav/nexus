@@ -1103,31 +1103,48 @@
     linear-gradient(to bottom, var(--scrim-soft) 0%, transparent 45%),
     linear-gradient(to right, var(--bg-fade) 0%, transparent 14%, transparent 86%, var(--bg-fade) 100%);
 }
-/* The ambient field inside the dashboard strip.
-   .nt-ambient-bg is position:fixed with z-index:-2, which lets the
-   canvas fall behind .nt-dash's own opaque background -- it renders,
-   but is never seen. Re-anchor it to the strip and lift it to z-index:0
-   so it sits above that background while the identity block (z-index:2)
-   still floats over the field. */
-.nt-dash__strip > canvas.nt-ambient-bg {
+/* The Letter Glitch field inside the dashboard strip.
+   Same re-anchor, same reason: .nt-ambient-bg is position:fixed with
+   z-index:-2, which lets a canvas fall behind .nt-dash's own opaque
+   background - it renders, but is never seen. Re-anchored to the strip at
+   z-index:0 so it sits above that background while the identity block
+   (z-index:2) still floats over the field.
+
+   No `opacity` here, and that is deliberate rather than forgotten. The field
+   paints transparent (uBackground is 0,0,0,0) so the strip's own background,
+   its edge scrims and the identity block's glass all stay visible through it.
+   An element opacity would dim those along with the letters, which is the one
+   thing this slot cannot do. The field's own brightness is baseOpacity, in
+   the shader.
+
+   `image-rendering: auto` is stated rather than inherited, for the reason the
+   rule it replaces gave: `auto` is the browser's smooth scaling, the opposite
+   of `pixelated`, and at scale * dpr the backing store already matches the
+   device grid so it never has to do anything. Writing it down stops anyone
+   "fixing" the blur later by adding `image-rendering: pixelated` here, which
+   would alias the glyphs instead of sharpening them.
+
+   This selector supersedes `.nt-dash__strip > canvas.nt-ambient-bg`, the
+   ASCII field's instance in this same slot. */
+.nt-dash__strip > .nt-letter-glitch {
   position: absolute;
   inset: 0;
   z-index: 0;
+  pointer-events: none;
+  image-rendering: auto;
+}
+.nt-letter-glitch {
+  position: relative;
   width: 100%;
   height: 100%;
-  pointer-events: none;
-  opacity: var(--amb-op);
-  /*
-     * Stated rather than inherited: `auto` is the browser's smooth
-     * scaling, the opposite of the blocky `pixelated`. Explicit here so
-     * that "no resampling filter touches this canvas" is a property of
-     * the stylesheet rather than an accident. At scale * dpr the backing
-     * store already matches the device grid, so it never has to do
-     * anything - and writing it down stops anyone "fixing" the blur later
-     * by adding image-rendering: pixelated here, which would alias the
-     * glyphs instead of sharpening them.
-     */
-  image-rendering: auto;
+  overflow: hidden;
+}
+.nt-letter-glitch canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .nt-dash__id {
   position: relative;

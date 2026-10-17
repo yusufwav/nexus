@@ -1,15 +1,20 @@
 /**
- * THE HORIZON BLOOM PALETTE
+ * COLOURS DERIVED FROM THE ACTIVE PALETTE
  * ------------------------------------------------------------------------
- * The tutor chat's background is the Horizon Bloom effect, and it takes two
- * light colours and one page colour. All three are taken from the active
- * theme rather than hard-coded, so the background belongs to whichever of the
- * fifty palettes a reader has chosen instead of being a foreign object
- * sitting behind their text.
+ * Two canvas surfaces read their colours out of whichever theme is on
+ * <html> rather than carrying their own, because a reader can be on any of
+ * fifty-two palettes and hard-coded colours are wrong on fifty-one of them:
  *
- *   warm  = the BRIGHTEST colour in the palette
- *   cool  = the MOST SATURATED colour in the palette
- *   page  = the palette's own background
+ *   · the tutor transcript's Horizon Bloom scene - src/components/
+ *     horizon-bloom.tsx, policy in horizonPalette() below;
+ *   · the dashboard header's Letter Glitch field - src/components/
+ *     letter-glitch.tsx, which wants the single most saturated accent and
+ *     nothing else.
+ *
+ * So the maths is here once and the two policies are thin on top of it. This
+ * file is pure and DOM-free on purpose: scripts/audit-horizon-colours.mjs
+ * imports it directly and runs it over every generated palette, which is the
+ * only way to know all fifty-two still produce something usable.
  *
  * WHY OKLAB AND NOT HSL
  * ------------------------------------------------------------------------
@@ -27,36 +32,21 @@
  *
  * WHY THE POOL IS EXPLICIT
  * ------------------------------------------------------------------------
- * The alternative - feed the effect every token and let it rank them - picks
- * --fg on every single theme. --fg is near-white in the dark palettes and
- * near-black in the light ones, so it wins "brightest" on dark and also wins
- * on light, and the effect renders as a white line on a white line on every
- * palette in the registry. --fg is the colour of TEXT. It is not one of the
- * palette's lights.
+ * The alternative - feed every token and let it rank them - picks --fg on
+ * every single theme. --fg is near-white in the dark palettes and near-black
+ * in the light ones, so it wins "brightest" on dark and also wins on light,
+ * and the effect renders as a white line on a white line on every palette in
+ * the registry. --fg is the colour of TEXT. It is not one of the palette's
+ * lights.
  *
- * So the pool is the chromatic tokens, named. Two further rules apply to it:
- *
- *   · a candidate must actually have some chroma (C >= MIN_CHROMA). This is
- *     what keeps --grad-mid out: it is #ffffff in the base palette and would
- *     be "the brightest colour" by a wide margin, and it is white. The rule is
- *     about the colour rather than its name, so a future palette cannot slip
- *     a neutral in through a token nobody thought to exclude.
- *
- *   · translucent values are composited over the palette's own background
- *     before ranking. --accent-dot is rgba(139,0,0,0.8), which over black is
- *     a dark red and over paper is a mid red; the same token is two different
- *     colours and ranking the raw rgba would rank an alpha.
- *
- * Pure and DOM-free on purpose: the audit in scripts/audit-horizon-colours.mjs
- * imports this module directly and runs it over every generated palette, which
- * is the only way to know all fifty still produce a usable pair.
+ * So the pool is the tokens that say what the palette IS.
  */
 
 /** An RGB triple in 0-255, and the alpha it was written with. */
 export type Rgba = { readonly r: number; readonly g: number; readonly b: number; readonly a: number };
 
 /**
- * The tokens ranked for the effect.
+ * The tokens that count as the palette's colours.
  *
  * Order is the tiebreak, and it is a deliberate one: the brand accents come
  * first, so a palette where two accents tie on lightness resolves to the one
@@ -76,10 +66,8 @@ export type Rgba = { readonly r: number; readonly g: number; readonly b: number;
  * it in the pool the effect's warm colour - the light along the surface of the
  * planet - became a colour that is essentially invisible on the page it is
  * drawn on. A control value was being used as an identity value.
- *
- * So the pool is the tokens that say what the palette IS.
  */
-export const HORIZON_CANDIDATES: readonly string[] = [
+export const PALETTE_ACCENT_TOKENS: readonly string[] = [
   "--accent-b",
   "--accent-c",
   "--accent-a",
@@ -255,40 +243,116 @@ export function toHex({ r, g, b }: Rgba): string {
 /** A CSS custom-property read off the theme. Names carry their leading `--`. */
 export type ThemeTokens = Readonly<Record<string, string>>;
 
+/** One accent, parsed and scored. */
+export type ScoredAccent = {
+  readonly name: string;
+  /** `#rrggbb`, alpha already composited away. */
+  readonly hex: string;
+  /** OKLab lightness. "Brightest" is this. */
+  readonly L: number;
+  /** OKLCh chroma. "Most saturated" is this. */
+  readonly C: number;
+};
+
+/** The palette's own background, composited to opaque, as hex. */
+export function paletteBackground(tokens: ThemeTokens): string {
+  return toHex({ ...(parseColor(tokens["--bg-0"]) ?? { r: 0, g: 0, b: 0, a: 1 }), a: 1 });
+}
+
 /**
- * The effect's colours for one theme.
+ * Is this a light palette?
  *
- * `tokens` is whatever `getComputedStyle` reports off `.nt-root`, which is
- * what the other canvas engines in this app already read - so this module and
- * the theme cannot disagree about what a palette contains.
+ * Read off the background's luminance rather than off a class named light,
+ * because the fifty generated palettes are not all reached by a class called
+ * light. This is also the threshold the two shaders branch on for ink
+ * rendering, so "is this theme light" is answered in exactly one place and the
+ * JS and the GLSL cannot disagree about where the line falls.
  */
-export function horizonPalette(tokens: ThemeTokens): HorizonPalette {
-  const backgroundRaw = parseColor(tokens["--bg-0"]) ?? { r: 0, g: 0, b: 0, a: 1 };
-  const background = { ...backgroundRaw, a: 1 };
-  const light = relativeLuminance(background) > LIGHT_LUMA;
+export function isLightTheme(tokens: ThemeTokens): boolean {
+  const bg = parseColor(tokens["--bg-0"]) ?? { r: 0, g: 0, b: 0, a: 1 };
+  return relativeLuminance(bg) > LIGHT_LUMA;
+}
 
-  type Scored = { readonly name: string; readonly hex: string; readonly L: number; readonly C: number };
-  const scored: Scored[] = [];
+/**
+ * Every accent in the palette, parsed and scored, in preference order.
+ *
+ * Two rules apply while building it, and both are about ranking a COLOUR
+ * rather than a token:
+ *
+ *   · translucency is composited away first. --accent-dot is rgba(139,0,0,
+ *     0.8), which over black is a dark red and over paper a mid red; the
+ *     same token is two different colours, and ranking the raw value ranks
+ *     an alpha.
+ *
+ *   · a candidate with almost no chroma is dropped. This is what keeps
+ *     --grad-mid out - it is #ffffff in the base palette and would be "the
+ *     brightest colour" by a wide margin. The rule is about the colour
+ *     rather than its name, so a future palette cannot slip a neutral in
+ *     through a token nobody remembered to exclude.
+ */
+export function scoredAccents(tokens: ThemeTokens): ScoredAccent[] {
+  const bg = parseColor(tokens["--bg-0"]) ?? { r: 0, g: 0, b: 0, a: 1 };
+  const opaque = { ...bg, a: 1 };
+  const out: ScoredAccent[] = [];
 
-  for (const name of HORIZON_CANDIDATES) {
+  for (const name of PALETTE_ACCENT_TOKENS) {
     const parsed = parseColor(tokens[name]);
     if (parsed === null) continue;
-
-    // Rank the colour, not the alpha.
-    const flat = over(parsed, background);
+    const flat = over(parsed, opaque);
     const ok = srgbToOklab(flat);
     const C = chroma(ok);
     if (C < MIN_CHROMA) continue;
-
-    scored.push({ name, hex: toHex(flat), L: ok.L, C });
+    out.push({ name, hex: toHex(flat), L: ok.L, C });
   }
+  return out;
+}
 
+/**
+ * The single most saturated colour in the palette, as `#rrggbb`.
+ *
+ * The dashboard's Letter Glitch field wants exactly this and nothing else: one
+ * colour for the letters to glitch into, so the flash reads as a shift in
+ * intensity rather than as a two-colour animation.
+ *
+ * Falls back to the base palette's crimson rather than to black, because a
+ * field with no glitch colour is not obviously wrong - it is simply letters
+ * that flash white - and a silent fallback that blends into the surface hides
+ * the bug. A visible wrong colour does not.
+ */
+export function mostSaturatedAccent(tokens: ThemeTokens): string {
+  let best: ScoredAccent | null = null;
+  for (const s of scoredAccents(tokens)) {
+    if (best === null || s.C > best.C) best = s;
+  }
+  return best?.hex ?? FALLBACK.cool;
+}
+
+/* ------------------------------------------------------------------ */
+/* the Horizon Bloom policy                                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * THE HORIZON BLOOM PALETTE
+ * ------------------------------------------------------------------------
+ * The tutor transcript's scene takes two light colours:
+ *
+ *   warm  = the BRIGHTEST colour in the palette
+ *   cool  = the MOST SATURATED colour in the palette
+ *   page  = the palette's own background
+ *
+ * Both are ranked in OKLab by scoredAccents() above.
+ */
+export function horizonPalette(tokens: ThemeTokens): HorizonPalette {
+  const background = paletteBackground(tokens);
+  const light = isLightTheme(tokens);
+
+  const scored = scoredAccents(tokens);
   if (scored.length === 0) {
-    return { ...FALLBACK, background: toHex(background), light };
+    return { ...FALLBACK, background, light };
   }
 
   // Brightest. Strictly-greater keeps the earlier token on a tie, which is
-  // why HORIZON_CANDIDATES is ordered by preference.
+  // why PALETTE_ACCENT_TOKENS is ordered by preference.
   let warm = scored[0]!;
   for (const s of scored) if (s.L > warm.L) warm = s;
 
@@ -297,10 +361,10 @@ export function horizonPalette(tokens: ThemeTokens): HorizonPalette {
    *
    * This is the one place the derivation departs from a literal reading of
    * "warm is the brightest, cool is the most saturated", and it departs only
-   * when those two are the same colour - which seven palettes in the registry
-   * are, all of them single-hue greens: solarized, everforest, kanagawa,
-   * oxocarbon, sonokai, material and github all rank one token first on both
-   * measures.
+   * when those two are the same colour - which eleven palettes in the
+   * registry are, all of them single-hue greens: solarized, everforest,
+   * kanagawa, oxocarbon, sonokai, material and github all rank one token
+   * first on both measures.
    *
    * Picking it twice is not harmless. The effect blends warm into cool across
    * its whole atmosphere in OKLab, and that blend is where its depth comes
@@ -310,17 +374,14 @@ export function horizonPalette(tokens: ThemeTokens): HorizonPalette {
    * Whenever the two are genuinely different - every palette not on that list -
    * this is exactly the most saturated colour in the palette.
    *
-   * Eleven palettes in the registry are single-hue in this sense: solarized,
-   * everforest, kanagawa, oxocarbon, sonokai, material and github rank one
-   * colour first on both measures.
+   * Excluded by COLOUR, not by token name. Several palettes assign one hex to
+   * several tokens - github alone uses one for five - so skipping by name
+   * leaves four registries still handing the effect the same colour twice.
+   * What matters downstream is that the two ends differ, not that they came
+   * from different names.
    */
-  let cool: Scored | null = null;
+  let cool: ScoredAccent | null = null;
   for (const s of scored) {
-    // Excluded by COLOUR, not by token name. Several palettes assign one hex
-    // to several tokens - github alone uses one for five - so skipping by name
-    // leaves four registries still handing the effect the same colour twice.
-    // What matters downstream is that the two ends differ, not that they came
-    // from different names.
     if (s.hex.toLowerCase() === warm.hex.toLowerCase()) continue;
     if (cool === null || s.C > cool.C) cool = s;
   }
@@ -328,10 +389,5 @@ export function horizonPalette(tokens: ThemeTokens): HorizonPalette {
   // than a fallback palette that belongs to no theme at all.
   if (cool === null) cool = warm;
 
-  return {
-    warm: warm.hex,
-    cool: cool.hex,
-    background: toHex(background),
-    light,
-  };
+  return { warm: warm.hex, cool: cool.hex, background, light };
 }

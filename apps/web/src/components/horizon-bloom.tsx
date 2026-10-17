@@ -30,7 +30,7 @@
  * There are fifty-two palettes in the registry and a reader can be on any
  * of them. Two hard-coded light colours would be wrong on fifty-one of
  * them, so warm, cool and the page background all come out of the active
- * palette - see lib/horizon-colours.ts for the rules and
+ * palette - see lib/palette-colours.ts for the rules and
  * scripts/audit-horizon-colours.mjs for the check that all fifty-two still
  * produce a usable pair.
  *
@@ -51,7 +51,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import { HORIZON_CANDIDATES, horizonPalette } from "@/lib/horizon-colours";
+import { PALETTE_ACCENT_TOKENS, horizonPalette } from "@/lib/palette-colours";
 
 /**
  * The effect's settings, as chosen for the tutor chat.
@@ -704,7 +704,7 @@ export default function HorizonBloom(): React.JSX.Element {
       const bag: Record<string, string> = { "--bg-0": cs.getPropertyValue("--bg-0").trim() };
       // The candidate list is the derivation's, imported rather than restated
       // here. Two lists of one fact is how the two drift.
-      for (const n of HORIZON_CANDIDATES) bag[n] = cs.getPropertyValue(n).trim();
+      for (const n of PALETTE_ACCENT_TOKENS) bag[n] = cs.getPropertyValue(n).trim();
       return horizonPalette(bag);
     }
     let palette = readPalette();

@@ -43,8 +43,8 @@ const web = path.join(here, "..");
 
 // pathToFileURL, not a bare path: on Windows an absolute path arrives with a
 // `c:` protocol and the ESM loader rejects it as an unknown scheme.
-const { horizonPalette, relativeLuminance, parseColor, srgbToOklab, HORIZON_CANDIDATES } = await import(
-  pathToFileURL(path.join(web, "src", "lib", "horizon-colours.ts")).href
+const { horizonPalette, relativeLuminance, parseColor, srgbToOklab, PALETTE_ACCENT_TOKENS } = await import(
+  pathToFileURL(path.join(web, "src", "lib", "palette-colours.ts")).href
 );
 
 /* ---------- token extraction, straight from the stylesheets ---------- */
@@ -105,7 +105,7 @@ const fail = (id, msg) => {
   console.log(`  FAIL  ${id.padEnd(14)} ${msg}`);
 };
 
-console.log(`Horizon Bloom palette — ${HORIZON_CANDIDATES.length} candidate tokens\n`);
+console.log(`Horizon Bloom palette — ${PALETTE_ACCENT_TOKENS.length} candidate tokens\n`);
 console.log("  palette      warm      cool      bg        light  contrast(warm/bg, cool/bg)");
 
 for (const { id, tokens: t } of palettes()) {

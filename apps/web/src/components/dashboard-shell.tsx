@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import ScrollReveal from "@/components/landing/scroll-reveal";
+import LetterGlitch from "@/components/letter-glitch";
 import { BookOpenIcon } from "lucide-react";
 
 import { DASH_ACTIONS } from "@/lib/dash-actions";
@@ -19,16 +20,17 @@ import ThemeToggle from "./theme-toggle";
  * with the identity block floating in it. The remaining four fifths is
  * a single glass console holding the tabs and the page body.
  *
- * THE STRIP IS CURRENTLY EMPTY.
+ * THE STRIP NOW HOLDS THE LETTER GLITCH FIELD.
  * It used to hold the flowing ASCII field on its ambient variant —
  * deliberately non-interactive, so nothing the user was trying to click
- * was ever intercepted by a canvas filling the strip. That instance has
- * been removed ahead of the asset that replaces it.
+ * was ever intercepted by a canvas filling the strip. Letter Glitch
+ * keeps that property — interactive is off and cursorRadius is 0 — and
+ * replaces the drifting glyphs with a field that flickers and tears.
  *
- * The strip itself is kept, along with .nt-dash__strip's scrims and the
- * AsciiField component and its tokens: they are the mounting point for
- * what goes here next, and re-deriving them from scratch would be work
- * thrown away. What is gone is the instance, not the scaffolding.
+ * The strip itself and .nt-dash__strip's scrims are unchanged. Those
+ * scrims dissolve the strip's two ends against whatever field sits
+ * behind them, and since the ASCII instance was removed they had been
+ * dissolving an edge with nothing behind it. They have a field again.
  *
  * .nt-root carries the tokens the reveal engine reads; .nt-dash is the
  * layout shell defined in styles/app.css.
@@ -68,11 +70,13 @@ export default function DashboardShell({
   return (
     <div className="nt-root nt-dash">
       {/* ---- The uncovered strip ----
-          Held open for the background asset that replaces the ASCII field.
-          Until that lands the strip is bare, which is why ::after's scrims
-          now read against nothing: they dissolve an edge that has no field
-          behind it yet. */}
+          The Letter Glitch field, mounted as the first child so it paints
+          under the identity block rather than over it. This is the asset
+          the ASCII instance was removed to make room for; the two edge
+          scrims on ::after read against it now, which is what they were
+          written for. */}
       <div className="nt-dash__strip">
+        <LetterGlitch />
         <div className="nt-dash__id">
           <Avatar name={user.name} image={user.image} size="lg" />
 
