@@ -2331,31 +2331,52 @@
   overflow: hidden;
 }
 
-/* The canvas. Same re-anchor as the dashboard strip: .nt-ambient-bg
-   is fixed at z-index -2, which would drop it behind this opaque
-   background, so pull it into normal flow above it. */
-.nt-ai > canvas.nt-ambient-bg {
+/* The tutor's background, which is the Horizon Bloom scene rather than a
+   character field.
+
+   It takes the slot the ambient ASCII canvas used to occupy, which is why
+   the re-anchor here is the one that rule had: .nt-ambient-bg is
+   position:fixed at z-index -2, and a negative z-index behind an opaque
+   .nt-ai background would never be seen.
+
+   It does NOT take --amb-op, which is what that rule applied. The scene
+   paints the palette's own background opaquely, so dimming the canvas
+   dims the page with it — the shell would sit on a darkened page rather
+   than on a lit scene. It draws at full strength and the veil does the
+   only dimming there is.
+
+   The sibling rule for `.nt-ai > canvas.nt-ambient-bg` is GONE rather
+   than left behind. Nothing renders that class on /ai any more — the
+   module pages put it on a div, and the dashboard strip's copy is still
+   pending its own replacement — so keeping a positioning override for an
+   element that cannot exist is drift waiting to mislead the next reader.
+   .nt-dash__strip's rule is the one that still has a caller. */
+.nt-ai > canvas.nt-horizon-bloom {
   position: absolute;
   inset: 0;
   z-index: 0;
   width: 100%;
   height: 100%;
+  display: block;
   pointer-events: none;
-  opacity: var(--amb-op);
 }
 
 /* The veil, between the field and the text.
    ::after rather than ::before because the canvas is a real child:
    among siblings that share z-index:0 the later one paints on top, and
    ::after is the last child. The shell sits at z-index:1 so it is
-   above the veil and unaffected by it. */
+   above the veil and unaffected by it.
+
+   --ai-bloom-veil, not --ai-veil: see the note on both tokens in
+   tokens.css. This one is tuned for the lit scene now, not for the
+   character field the old value was measured against. */
 .nt-ai::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: var(--ai-veil);
+  background: var(--ai-bloom-veil);
 }
 
 .nt-ai__shell {

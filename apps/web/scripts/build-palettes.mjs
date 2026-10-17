@@ -480,6 +480,15 @@ function derive(p) {
      * hand-written .light block calls "paper, not ink".
      */
     "--ai-veil": rgba(bg, 0.4),
+    /*
+     * The veil over the tutor's LIT scene, as opposed to the one over the
+     * character field --ai-veil was measured against. Half the strength, and
+     * branch-free for the same reason: the scene behind this one is mostly
+     * its own background with a band of light in it, so a wash strong enough
+     * to calm a full-bleed field of characters takes the horizon with it.
+     * See the note on both tokens in tokens.css.
+     */
+    "--ai-bloom-veil": rgba(bg, 0.2),
 
     "--grad-from": hex(...primary),
     "--grad-mid": hex(...secondary),

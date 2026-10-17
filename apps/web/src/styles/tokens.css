@@ -192,8 +192,17 @@
   /* Veil over the ambient field on the /ai transcript only. The field
      renders at --amb-op 0.6 with bright glyphs, which is a lot to read
      a page of LaTeX against. 0.4 sits in the 30-40% the tutor needs
-     without hiding the field, which is the point of having it. */
+     without hiding the field, which is the point of having it.
+
+     The /ai background is the Horizon Bloom scene now, and this is
+     --amb-op's veil, which is to say the one tuned for a field of
+     characters rather than for a lit horizon. A character field is
+     uniform noise across the whole viewport and needs 40% knocked off
+     everything; the horizon is mostly black with its light in a band, so
+     the same veil flattens the only interesting part of the frame. The
+     scene's own veil is below, at a fifth of the strength. */
   --ai-veil: rgba(0, 0, 0, 0.4);
+  --ai-bloom-veil: rgba(0, 0, 0, 0.2);
 
   /* Title gradient — the "learn you" phrase */
   --grad-from: #fdd3ae;
@@ -367,6 +376,11 @@
   /* Paper, not ink: the veil has to wash the field toward the
      background rather than darken it, or light mode turns muddy. */
   --ai-veil: rgba(250, 248, 246, 0.4);
+  /* Same argument at the same strength as the dark value. The scene
+     paints the palette's own --bg-0 on this theme, so a white wash
+     over it costs almost no contrast; a black one would grey out the
+     paper and put a smudge behind the transcript. */
+  --ai-bloom-veil: rgba(250, 248, 246, 0.2);
 
   /* Title gradient re-anchored: the dark run leans on white as
      its midpoint, which vanishes on paper. */

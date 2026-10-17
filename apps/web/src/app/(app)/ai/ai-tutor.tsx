@@ -4,6 +4,7 @@
 // shell. The import is dropped with it so nothing can re-render it by
 // accident; the component and its 37 assertions are untouched.
 import { ModelPicker, useModelPicker, type ModelPick } from "@/components/model-picker";
+import HorizonBloom from "@/components/horizon-bloom";
 import { useChat } from "@ai-sdk/react";
 import { createMathPlugin } from "@streamdown/math";
 import { DefaultChatTransport, type UIMessage } from "ai";
@@ -40,12 +41,17 @@ import { Streamdown } from "streamdown";
  *
  *   · a background field behind the whole conversation. It was the
  *     "ambient" ASCII variant — non-interactive, so nothing the user
- *     was reaching for was ever intercepted by a canvas — and that
- *     instance is now removed, pending its replacement. Until that
- *     lands, the shell's own surface carries the page and the two
- *     panels below are what keep it from reading as flat;
+ *     was reaching for was ever intercepted by a canvas — and it is now
+ *     the Horizon Bloom scene: a sunrise over the edge of a dark
+ *     planet, its two light colours derived from whichever palette is
+ *     active. Still non-interactive, still filling the viewport, still
+ *     behind the glass rather than beside it;
  *   · a veil between that field and the text, so a page of LaTeX is
- *     readable over moving glyphs without hiding the field;
+ *     readable over a lit scene. It is weaker than the one the ASCII
+ *     field needed and the reason is on the token: a character field is
+ *     uniform noise across the whole viewport, while the horizon is
+ *     mostly black with its light in a band — so the old 40% would
+ *     flatten the only interesting part of the frame;
  *   · the header and the composer are glass panels floating over it,
  *     so the field reads as depth behind the UI rather than as
  *     decoration beside it;
@@ -921,9 +927,16 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
 
   return (
     <div className="nt-root nt-ai">
-      {/* No field yet. The ambient ASCII instance that used to sit here is
-          removed ahead of the asset that replaces it; the shell's own
-          background and the composer scrim carry the surface until then. */}
+      {/* The background. A sunrise over the edge of a dark planet, its two
+          light colours taken from the active palette rather than hard-coded,
+          because a reader can be on any of fifty-two themes and two fixed
+          colours would be wrong on fifty-one of them. Non-interactive: the
+          reader is typing on this page, so nothing moves toward the pointer.
+          See components/horizon-bloom.tsx, and
+          scripts/audit-horizon-colours.mjs for the check that all fifty-two
+          palettes still yield a usable pair. */}
+
+      <HorizonBloom />
 
       <div className="nt-ai__shell">
         {/*
