@@ -2,7 +2,7 @@
 
 import { Toaster } from "@Main/ui/components/sonner";
 
-import { THEME_IDS } from "@/lib/themes";
+import { DEFAULT_THEME, THEME_IDS } from "@/lib/themes";
 
 import { ThemeProvider } from "./theme-provider";
 import { ThemeSync } from "./theme-sync";
@@ -10,28 +10,38 @@ import { ThemeSync } from "./theme-sync";
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     /*
-     * Light is the default. This value is used only when a visitor has no
-     * stored preference AND no account preference - a first visit, or
-     * anyone whose storage has been cleared.
+     * Dark is the default, and it is read from DEFAULT_THEME rather than typed
+     * as a literal so this and every pre-mount fallback in ThemeToggle and
+     * ThemePicker cannot drift apart. Those two components render a glyph
+     * before next-themes has read storage; if this said "dark" and they said
+     * "light", the first painted palette and the first painted icon would be
+     * from two different themes for as long as storage took to answer.
+     *
+     * This value is used only when a visitor has no stored preference AND no
+     * account preference AND has not pressed the header button - a first
+     * visit, or anyone whose storage has been cleared.
      *
      * Three sources, consulted in this order:
      *
-     *   1. localStorage, written by next-themes the moment they choose
-     *   2. the signed-in account's saved theme, restored by <ThemeSync />
+     *   1. the header button's override, in localStorage, if it has one
+     *   2. next-themes' own storage, written by whoever called setTheme
+     *   3. the signed-in account's saved theme, restored by <ThemeSync />
      *      once the session resolves
-     *   3. this default
+     *   4. this default
      *
      * So changing it here does not override anyone who has already picked a
      * theme; it only decides what someone who never has sees.
      *
-     * enableSystem stays, because "system" is still one of the three states
-     * the toggle offers. A reader whose OS is dark and who never touches
-     * the toggle still follows their machine - until they sign in, at which
-     * point the account preference wins over the OS.
+     * enableSystem stays because "system" is still an option in the Settings
+     * picker. It is NOT one of the header button's three states, contrary to
+     * what this comment claimed for a while - headerThemes() returns light,
+     * dark, and the reader's own theme, and nothing else. A reader on a dark
+     * OS who has never chosen gets dark, because defaultTheme says so and not
+     * because their machine says so.
      */
     <ThemeProvider
       attribute="class"
-      defaultTheme="light"
+      defaultTheme={DEFAULT_THEME}
       enableSystem
       disableTransitionOnChange
       /*
@@ -44,8 +54,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       themes={THEME_IDS}
     >
       {children}
-      {/* Applies the account's saved theme once the session resolves, and
-          writes changes back. Renders nothing. */}
+      {/* Applies the account's default theme once the session resolves, unless
+          the header button has overridden it. Renders nothing, and never
+          writes. */}
       <ThemeSync />
       <Toaster richColors />
     </ThemeProvider>

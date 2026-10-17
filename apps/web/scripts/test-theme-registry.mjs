@@ -30,7 +30,6 @@ import {
   nextTheme,
   resolveTheme,
   shouldRestoreTheme,
-  shouldSaveTheme,
   themeGlyph,
   themeLabel,
 } from "../src/lib/themes.ts";
@@ -46,8 +45,8 @@ const eq = (label, actual, expected) => {
   else bad(`${label}\n          expected: ${JSON.stringify(expected)}\n          actual:   ${JSON.stringify(actual)}`);
 };
 
-console.log("the default is light, per product decision");
-eq("DEFAULT_THEME", DEFAULT_THEME, "light");
+console.log("the default is dark, per product decision");
+eq("DEFAULT_THEME", DEFAULT_THEME, "dark");
 if (!THEMES.some((t) => t.id === DEFAULT_THEME)) {
   bad("the default is not in the registry, so it could never be selected");
 } else {
@@ -124,55 +123,19 @@ console.log("\n  label and glyph degrade readably for a value that is gone");
 eq("a theme that was removed", themeLabel("no-such-theme"), "Unknown");
 eq("glyph for a removed theme", typeof themeGlyph("no-such-theme"), "string");
 
-console.log("\nthe save rule, which was wrong the first time");
 /*
- * The original rule was "save whenever stored differs from current". On a
- * first-ever sign-in stored is NULL and current is the site default, so it
- * saved - turning "never chose" into "chose light" for every reader who
- * simply loaded a page. Nothing looked broken; the damage only appeared
- * when the default changed and those accounts refused to follow it.
+ * THERE IS NO SAVE RULE ANY MORE, and that is the fix rather than a gap.
  *
- * The rule that replaced it asks whether the theme changed since the page
- * settled, which is the only thing a save is meant to record.
- */
-const save = (signedIn, settled, current) =>
-  shouldSaveTheme({ signedIn, settled, current });
-
-console.log("\n  a reader who signs in and touches nothing");
-/*
- * `settled` is the theme this page resolved to on arrival - not the stored
- * value, and not null. That distinction is the whole fix, so it is worth
- * stating: settled="light", current="light" means "we arrived on light and
- * are still on light", which is not a choice.
+ * ThemeSync used to hold a shouldSaveTheme() that wrote the account row on any
+ * theme change. It existed only because the header button and the Settings
+ * picker shared one slot, so something had to persist the button's choice.
  *
- * The tempting wrong version of this test is settled=null, current="light",
- * which reads as "nothing was stored and the page is light" - but that is
- * not the state the component is ever in, because it refuses to settle
- * until next-themes has actually read storage. Left unfixed, that is a race
- * that reinvents the original bug.
+ * The header button now keeps its choice in localStorage under its own key and
+ * ThemePicker writes the account directly, so no component saves on change and
+ * no rule is needed to decide when that would be correct. Deleting the rule is
+ * what guarantees it: a component cannot save what it has no predicate for.
  */
-eq("arrived light, still light", save(true, "light", "light"), false);
-eq("arrived dark, still dark", save(true, "dark", "dark"), false);
-eq("arrived on system, still system", save(true, "system", "system"), false);
-eq("arrived light, storage not read yet", save(true, undefined, "light"), false);
-
-console.log("\n  a reader who actually chooses");
-eq("picked dark from light", save(true, "light", "dark"), true);
-eq("picked light from dark", save(true, "dark", "light"), true);
-eq("picked system from dark", save(true, "dark", "system"), true);
-
-console.log("\n  the same choice twice writes once");
-eq("already settled on dark, still dark", save(true, "dark", "dark"), false);
-
-console.log("\n  a signed-out visitor never writes");
-eq("not signed in", save(false, "light", "dark"), false);
-eq("not signed in, first choice", save(false, undefined, "dark"), false);
-
-console.log("\n  a value we cannot render is never written");
-eq("a theme that does not exist", save(true, "light", "no-such-theme"), false);
-eq("null", save(true, "light", null), false);
-eq("undefined", save(true, "light", undefined), false);
-eq("not a string", save(true, "light", 7), false);
+console.log("\nthe save rule is gone, so nothing can save by accident");
 
 console.log("\nevery generated palette is selectable and every seed reached the build");
 /*
@@ -180,11 +143,24 @@ console.log("\nevery generated palette is selectable and every seed reached the 
  * registry. The failure this guards against is a seed that produces a block
  * but no registry entry, or the reverse - either way a theme is offered that
  * does not render, or renders but cannot be picked, and neither throws.
+ *
+ * THE COUNTS ARE NOT ASSERTED HERE, and used to be: this file hardcoded 33 and
+ * then 30 generated palettes, and both numbers were stale by twenty before
+ * anyone could see it - the whole suite had been failing to import since
+ * themes.ts grew a Node-resolvable import, so a broken suite looks exactly
+ * like an unrun one. Registry-vs-stylesheet agreement is check-palettes.mjs's
+ * job and it does it by scanning both files rather than by counting, so a
+ * palette added tomorrow needs no edit here. What is left to assert is that
+ * the hand-written three are present and that nothing is a duplicate.
  */
-eq("registry size", THEMES.length, 33);
-eq("palettes plus light, dark and system", THEMES.length - 3, 30);
+for (const required of ["light", "dark", "system"]) {
+  if (isTheme(required)) ok(`the hand-written "${required}" is in the registry`);
+  else bad(`MISSING from the registry: ${required}`);
+}
 const labels = new Set(THEMES.map((t) => t.label));
 eq("no duplicate labels", labels.size, THEMES.length);
+const registryIds = new Set(THEMES.map((t) => t.id));
+eq("no duplicate ids", registryIds.size, THEMES.length);
 for (const expected of ["light", "dark", "system", "gruvbox", "dracula", "nord", "solarized", "catppuccin", "tokyo-night", "monokai", "one-dark", "everforest", "rose-pine", "night-owl", "kanagawa", "ayu", "zenburn", "iceberg", "oxocarbon", "edge", "sonokai", "nightfox", "oceanic-next", "material", "horizon", "poimandres", "cobalt2", "vesper", "shades-of-purple", "synthwave", "github", "jellybeans", "base16"]) {
   if (isTheme(expected)) ok(`selectable: ${expected}`);
   else bad(`MISSING from the registry: ${expected}`);
@@ -229,11 +205,15 @@ eq("null current", nextTheme(null, undefined), "light");
 
 console.log("\n  every registered palette is still REACHABLE - just not from the header");
 /*
- * The header being narrowed must not mean the picker is. All thirty-three
- * have to remain selectable somewhere, or the whole feature is decoration.
+ * The header being narrowed must not mean the picker is. Every registered theme
+ * has to remain selectable somewhere, or the whole feature is decoration.
+ *
+ * This is a completeness check over whatever the registry currently holds,
+ * rather than a count: it fails if a theme stops being selectable, and it does
+ * not need editing when palettes are added.
  */
 const ids = THEMES.map((t) => t.id);
-eq("registry is intact", ids.length, 33);
+eq("every id is unique", new Set(ids).size, ids.length);
 for (const id of ids) {
   if (isTheme(id)) ok(`selectable in the picker: ${id}`);
   else bad(`NOT selectable: ${id}`);
@@ -295,9 +275,67 @@ eq(
   false,
 );
 
+console.log("\nthe header button's override outranks the account's default");
+/*
+ * This is the behaviour that was asked for and the one the old code got exactly
+ * wrong: pressing the small light/dark button used to write into the account
+ * row and destroy the palette the reader had chosen as their default.
+ *
+ * The rule is a veto rather than a comparison, and that matters. The header
+ * button's cycle INCLUDES the reader's own default theme as its third stop, so
+ * arriving at the default by pressing the button is a deliberate act too - and
+ * it must stay recorded, or the very mechanism meant to honour that choice
+ * would drag the same palette over the reader who just asked for it.
+ */
+const override = (quick) => restore({ ...late, quickOverride: quick, isPending: false, error: null });
+eq("no override at all", override(null), true);
+eq("override is undefined", override(undefined), true);
+eq("overridden to light", override("light"), false);
+eq("overridden to the account's own theme", override("dracula"), false);
+eq("junk in storage is not an override", override("no-such-theme"), true);
+eq("a number in storage is not an override", override(7), true);
+
+console.log("\n  and the veto does not resurrect the settled-flag bug");
+eq(
+  "an override is honoured even while the session is still arriving",
+  restore({ ...late, quickOverride: "light", isPending: true, error: null }),
+  false,
+);
+eq(
+  "and when the session has not answered at all",
+  restore({ ...late, quickOverride: "light", isPending: false, error: new Error("network") }),
+  false,
+);
+
+console.log("\n  and the picker cannot be undone by the session it is still writing to");
+/*
+ * The race that made the picker write this key instead of clearing it.
+ *
+ * A reader picks nord. updateUser is in flight, so the session still carries
+ * the old default, gruvbox. ThemeSync sees a current theme that disagrees with
+ * the stored one and concludes the reader wandered off - which is exactly the
+ * inference that is right on arrival and wrong here - and restores gruvbox over
+ * the choice they just made. The picker applies, says "Saved to your account",
+ * and watches it get taken back.
+ *
+ * Both sides of the fix are asserted. The picker writing the key is what stops
+ * it, and the assertion below is what fails loudly if someone "tidies" that
+ * line back into a clear().
+ */
+eq(
+  "picker wrote its choice, stale session must not win",
+  restore({ storedTheme: "gruvbox", currentTheme: "nord", applied: null, quickOverride: "nord", isPending: false, error: null }),
+  false,
+);
+eq(
+  "the same moment with no key at all is the bug, not a safety net",
+  restore({ storedTheme: "gruvbox", currentTheme: "nord", applied: null, quickOverride: null, isPending: false, error: null }),
+  true,
+);
+
 console.log(
   failures === 0
-    ? "\nan unknown theme degrades to light instead of breaking the page."
+    ? "\nan unknown theme degrades to dark instead of breaking the page."
     : `\n${failures} failure(s).`,
 );
 process.exitCode = failures === 0 ? 0 : 1;

@@ -1,22 +1,40 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 import { authClient } from "@/lib/auth-client";
-import { isTheme, shouldRestoreTheme, shouldSaveTheme } from "@/lib/themes";
+import { readQuickTheme } from "@/lib/theme-override";
+import { isTheme, shouldRestoreTheme } from "@/lib/themes";
 
 /**
- * THEME FOLLOWS THE ACCOUNT
+ * THE ACCOUNT'S DEFAULT THEME APPLIES ON ARRIVAL
  * ------------------------------------------------------------------------
- * The requirement, precisely: an anonymous browser is light; a signed-in
- * reader gets whatever they chose, on any device, for as long as they stay
- * signed in.
+ * One job. When the session resolves, if the reader has a default theme on
+ * their account and has not overridden it with the header button, put it on
+ * the page.
  *
  * next-themes already persists to localStorage, which covers the easy half -
  * same browser, next week. What it does not do is follow the *account*. Clear
- * the storage, or sign in on another device, and the choice is gone even
- * though the session says who you are. That gap is what this closes.
+ * the storage, or open another device, and the choice is gone even though the
+ * session says who you are. That gap is what this closes.
+ *
+ * IT NO LONGER SAVES, AND THAT IS THE FIX
+ * ------------------------------------------------------------------------
+ * There was a second effect here that watched the theme and wrote any change
+ * into the account row. It existed because the header button and the Settings
+ * picker shared one slot and something had to persist the button's choice.
+ *
+ * They do not share one slot any more - the button's choice lives in
+ * localStorage under its own key, see lib/theme-override - so the effect had
+ * no reason to exist and was actively harmful. It made pressing the small
+ * light/dark button write `light` into the reader's row and overwrite the
+ * palette they had chosen as their default, with nothing on screen to say so
+ * and no way back except going into Settings and picking again.
+ *
+ * ThemePicker writes the account directly, in one place, where the reader has
+ * just deliberately chosen something. A component that saves on every change
+ * cannot tell that difference, which is the whole problem with it.
  *
  * WHY THERE IS NO "ONLY DO THIS ONCE" FLAG
  * ------------------------------------------------------------------------
@@ -30,8 +48,8 @@ import { isTheme, shouldRestoreTheme, shouldSaveTheme } from "@/lib/themes";
  * clears isPending both when the fetch succeeds AND when it fails. So "the
  * query settled" does not mean "the reader is anonymous" - it can mean "we did
  * not find out". The flag was set on that first settle, and whenever the
- * session actually arrived afterwards - a slow fetch, one transient failure,
- * a cold start, a cold Next.js chunk in production - the effect returned early
+ * session actually arrived afterwards - a slow fetch, one transient failure, a
+ * cold start, a cold Next.js chunk in production - the effect returned early
  * and the account's theme was never applied. The reader saw their device's
  * theme and had no way back but a reload, which retried the query and usually
  * worked. Which is precisely "it doesn't take effect until the website
@@ -46,9 +64,9 @@ import { isTheme, shouldRestoreTheme, shouldSaveTheme } from "@/lib/themes";
  * WHY A LOCAL CHANGE IS NEVER REVERTED
  * ------------------------------------------------------------------------
  * `applied` records the account theme once it has been used. A reader who
- * then picks a different theme in Settings must keep it, even though the
- * account still holds the old value until the save lands - so the restore
- * condition stops matching and leaves it alone.
+ * then picks a different one must keep it, even though the account still
+ * holds the old value - so the restore condition stops matching and leaves it
+ * alone.
  *
  * WHY THERE IS A FLASH, AND WHY IT IS ACCEPTABLE
  * ------------------------------------------------------------------------
@@ -65,14 +83,22 @@ import { isTheme, shouldRestoreTheme, shouldSaveTheme } from "@/lib/themes";
  */
 export function ThemeSync(): null {
   const { theme, setTheme } = useTheme();
-  const settled = useRef<string | null>(null);
   const applied = useRef<string | null>(null);
-  const [ready, setReady] = useState(false);
 
   const { data: session, isPending, error } = authClient.useSession();
   const user = session?.user as { theme?: unknown } | undefined;
 
-  /* -- restore: whenever the account says something new -------------------- */
+  /*
+   * Read on every render rather than once in an effect or a ref.
+   *
+   * This has to be evaluated inside the decision, not captured at mount: the
+   * header button writes that key from a click handler in a component that
+   * mounts long after this one, so anything read earlier is stale. Reading it
+   * here costs one localStorage get per render, which is nothing next to the
+   * session query already running.
+   */
+  const quickOverride = readQuickTheme();
+
   useEffect(() => {
     const current = isTheme(theme) ? theme : null;
     const stored = user?.theme;
@@ -84,45 +110,13 @@ export function ThemeSync(): null {
         storedTheme: stored,
         currentTheme: current,
         applied: applied.current,
+        quickOverride,
       })
     ) {
       applied.current = stored as string;
       setTheme(stored as string);
-      // The page is now (about to be) showing the account's theme, so that is
-      // the baseline a later local change is measured against.
-      settled.current = stored as string;
-      setReady(true);
-      return;
     }
-
-    /*
-     * The baseline is only meaningful once the query has actually answered.
-     * Seeding it while still fetching would record "whatever the device had"
-     * as the starting point, and a reader who changed the theme in the gap
-     * would have their change written to their account without ever having
-     * seen the account's value.
-     */
-    if (isPending || error) return;
-
-    settled.current = current;
-    setReady(true);
-  }, [isPending, error, user?.theme, theme, setTheme]);
-
-  /* -- save: only a change the reader made --------------------------------- */
-  useEffect(() => {
-    if (!ready) return;
-    if (!user) return;
-
-    const chosen = isTheme(theme) ? theme : null;
-    if (!shouldSaveTheme({ signedIn: true, settled: settled.current, current: chosen })) return;
-
-    const timer = setTimeout(() => {
-      settled.current = chosen;
-      void authClient.updateUser({ theme: chosen });
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [ready, theme, user]);
+  }, [isPending, error, user?.theme, theme, setTheme, quickOverride]);
 
   return null;
 }

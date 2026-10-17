@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import CenteredSelect from "@/components/centered-select";
 import { authClient } from "@/lib/auth-client";
+import { writeQuickTheme } from "@/lib/theme-override";
 import { DEFAULT_THEME, THEMES, isTheme, resolveTheme } from "@/lib/themes";
 import type { ThemeEntry } from "@/lib/themes";
 
@@ -15,6 +16,13 @@ import type { ThemeEntry } from "@/lib/themes";
  * choice from next-themes and writes it to the reader's account, which is
  * what makes it survive signing out and signing back in, and follow it to
  * another device.
+ *
+ * It is also the ONLY thing on the site that writes that account field. The
+ * header's small light/dark button used to as well, via an effect in
+ * ThemeSync that saved on any theme change at all - so pressing that button
+ * overwrote whatever was chosen here. The two now have separate slots; see
+ * lib/theme-override. This file is the account half and the button is the
+ * local half, and neither writes the other's.
  *
  * WHY CenteredSelect RATHER THAN A RADIO GROUP
  *
@@ -135,6 +143,31 @@ export function ThemePicker(): React.JSX.Element {
     const chosen = resolveTheme(id);
     setTheme(chosen);
     setSaved("idle");
+
+    /*
+     * Record the choice in this browser as well as on the account, and this
+     * line is the reason that is not redundant.
+     *
+     * The obvious thing here is to CLEAR the header button's override - "the
+     * reader has made a real choice, so stand down". That reintroduces a race
+     * the split was meant to end. Between the clear and updateUser landing, the
+     * session still carries the OLD default, ThemeSync sees a current theme
+     * that disagrees with it, concludes the reader wandered off, and puts the
+     * old palette back over the one they just picked. The picker would apply
+     * its choice, say "Saved to your account", and watch it get undone.
+     *
+     * Writing it instead makes the override and the account agree, so there is
+     * nothing left to restore over the top. It also makes the failure case
+     * true rather than aspirational: if updateUser fails, the account still
+     * holds the old value and this browser still holds the new one, which is
+     * precisely what the message below promises - "your browser will remember
+     * for now".
+     *
+     * The cost is that this device stops following the account silently. It is
+     * one header-button press away - the cycle's third stop is the reader's
+     * own default theme, so they can get back to it from anywhere.
+     */
+    writeQuickTheme(chosen);
 
     if (!session?.user) return;
     void authClient

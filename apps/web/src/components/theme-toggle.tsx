@@ -4,6 +4,7 @@ import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
+import { writeQuickTheme } from "@/lib/theme-override";
 import { DEFAULT_THEME, isTheme, nextTheme, themeGlyph, themeLabel } from "@/lib/themes";
 
 /**
@@ -23,6 +24,20 @@ import { DEFAULT_THEME, isTheme, nextTheme, themeGlyph, themeLabel } from "@/lib
  * It needs the session to know what "their" theme is, which is why this
  * component talks to authClient. Signed out, it offers two.
  *
+ * WHAT IT REMEMBERS, AND WHAT IT DOES NOT
+ * ------------------------------------------------------------------------
+ * Pressing this writes the choice to localStorage under its own key and
+ * touches NOTHING on the account. It used to overwrite the reader's default
+ * theme - see lib/theme-override for why that was destructive and what the
+ * two slots are for. The account's palette is reachable from here, because
+ * the cycle includes it as its third stop, but arriving there is a press of
+ * this button and not a change of preference.
+ *
+ * That is why writeQuickTheme runs on every press including the one that
+ * lands on the reader's own theme: the key means "the reader has said which
+ * one they want", and it must not mean "the reader has said something other
+ * than their default" or the two cannot be told apart.
+ *
  * DERIVED, NOT HARDCODED
  * ------------------------------------------------------------------------
  * The cycle was once a literal three-entry map, which was correct only for
@@ -33,7 +48,7 @@ import { DEFAULT_THEME, isTheme, nextTheme, themeGlyph, themeLabel } from "@/lib
  *
  * Nothing renders before mount: the stored theme is unknown until next-themes
  * has read localStorage, and rendering the wrong icon first causes a hydration
- * mismatch. Until then it reports light, which is the same default
+ * mismatch. Until then it reports DEFAULT_THEME, which is the same default
  * ThemeProvider is given, so the pre-mount icon and the first painted palette
  * agree.
  */
@@ -56,7 +71,9 @@ export default function ThemeToggle(): React.JSX.Element {
       // Until the session resolves, cycle the two universal options. Acting on
       // a saved theme that may still be loading would make the button jump.
       onClick={() => {
-        setTheme(nextTheme(current, isPending ? undefined : saved));
+        const next = nextTheme(current, isPending ? undefined : saved);
+        setTheme(next);
+        writeQuickTheme(next);
       }}
       title={`theme: ${themeLabel(current)}`}
       aria-label={`Switch theme (currently ${themeLabel(current)})`}

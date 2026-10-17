@@ -52,7 +52,15 @@
  *     is an instruction to follow the OS, and next-themes resolves it to
  *     light or dark.
  */
-import { GENERATED_THEMES } from "./themes.generated";
+/*
+ * The `.ts` extension is written out, unlike every other import in this
+ * repo, and it is load-bearing: scripts/test-theme-registry.mjs imports this
+ * module directly under Node, whose ESM resolver will not guess an extension.
+ * Extensionless worked for webpack and for tsc and failed at runtime with
+ * ERR_MODULE_NOT_FOUND, which is the one failure mode that reaches the test
+ * suite rather than the type checker.
+ */
+import { GENERATED_THEMES } from "./themes.generated.ts";
 
 /*
  * The registry's shape, declared once here rather than inferred at each use.
@@ -116,10 +124,10 @@ export const THEME_IDS: string[] = GENERATED_THEMES.map((t) => t.id);
 /**
  * The theme a reader sees when they have expressed no preference.
  *
- * Light, per product decision. Note this is NOT "system": a reader on a
- * dark OS who has never chosen, and has no account, gets light.
+ * Dark, per product decision. Note this is NOT "system": a reader on a light
+ * OS who has never chosen, and has no account, gets dark.
  */
-export const DEFAULT_THEME: ThemeId = "light";
+export const DEFAULT_THEME: ThemeId = "dark";
 
 /**
  * Is this a theme we know how to render?
@@ -197,50 +205,6 @@ export function nextTheme(current: unknown, saved?: unknown): ThemeId {
 }
 
 /**
- * Should this be written to the reader's account?
- *
- * Extracted from ThemeSync because the rule was wrong the first time and the
- * wrongness was invisible. The original compared the *stored* value against
- * the *current* theme and saved on any difference - which meant that signing
- * in and loading any page, with no choice ever made, wrote the site default
- * into the row. "Never chose" became "chose light".
- *
- * The damage is deferred. The row looks fine, the reader sees the right
- * colours, and the bug only surfaces the day DEFAULT_THEME changes and every
- * one of those accounts stays stubbornly on the old value, with nothing in
- * the database to explain why.
- *
- * So the question is not "does stored differ from current". It is "did the
- * theme change since this page settled" - which is the only thing a save is
- * ever meant to record.
- *
- *   signedIn  false  -> no. A visitor gets next-themes' local storage and no
- *                      account to write to; ThemePicker says so in its copy.
- *   settled not a real theme -> no. We have not established what the page
- *                      arrived on, so any difference is meaningless. ThemeSync
- *                      already refuses to settle until next-themes has read
- *                      storage; this is the same rule stated where the
- *                      decision is made, so a future caller cannot skip it.
- *   current not a real theme -> no. Never write a value we cannot render.
- *   current === settled     -> no. Nothing changed, so nothing was chosen.
- *   otherwise               -> yes.
- */
-export function shouldSaveTheme({
-  signedIn,
-  settled,
-  current,
-}: {
-  readonly signedIn: boolean;
-  readonly settled: unknown;
-  readonly current: unknown;
-}): boolean {
-  if (!signedIn) return false;
-  if (!isTheme(settled)) return false;
-  if (!isTheme(current)) return false;
-  return current !== settled;
-}
-
-/**
  * Should the account's saved theme be applied to the page right now?
  *
  * Extracted from ThemeSync because the version inside the component was wrong
@@ -270,6 +234,19 @@ export function shouldSaveTheme({
  * it: the condition stops matching, so the account value does not drag them
  * back on the next render. That is what makes it safe to run on every render
  * rather than sealing after a single use.
+ *
+ * `quickOverride` is the header button's choice, and it outranks the account.
+ * That is the whole point of holding the two apart: the small light/dark
+ * button is meant to be remembered WITHOUT destroying the palette somebody
+ * chose as their default, so when it has a value the account's default is
+ * simply not re-applied on top of it.
+ *
+ * The header button's cycle deliberately includes the account's own theme,
+ * so a reader can get back to their default from the header. Landing on it
+ * stores that as an explicit choice, which is why this is a veto rather
+ * than a comparison - a reader who went back to their own palette on
+ * purpose must not have the same palette dragged over them by the
+ * mechanism that was supposed to be honouring it.
  */
 export function shouldRestoreTheme({
   isPending,
@@ -277,16 +254,19 @@ export function shouldRestoreTheme({
   storedTheme,
   currentTheme,
   applied,
+  quickOverride,
 }: {
   readonly isPending: boolean;
   readonly error: unknown;
   readonly storedTheme: unknown;
   readonly currentTheme: unknown;
   readonly applied: string | null;
+  readonly quickOverride?: unknown;
 }): boolean {
   if (isPending) return false;
   if (error) return false;
   if (!isTheme(storedTheme)) return false;
+  if (isTheme(quickOverride)) return false;
   if (applied === storedTheme) return false;
   return storedTheme !== currentTheme;
 }
