@@ -49,7 +49,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import { isLightTheme, mostSaturatedAccent, PALETTE_ACCENT_TOKENS, type ThemeTokens } from "@/lib/palette-colours";
+import { isLightTheme, mostSaturatedAccent, PALETTE_BRAND_TOKENS, type ThemeTokens } from "@/lib/palette-colours";
 
 const DEFAULT_CHARACTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$&*()-_+=/[]{};:<>.,0123456789";
 const DEFAULT_FONT =
@@ -1110,12 +1110,21 @@ function startLetterGlitch(
 /* the component                                                       */
 /* ------------------------------------------------------------------ */
 
-/** Read the palette tokens off `.nt-root`, the way every engine here does. */
+/**
+ * Read the palette tokens off `.nt-root`, the way every engine here does.
+ *
+ * PALETTE_BRAND_TOKENS rather than the full accent pool, and the distinction
+ * is load-bearing: the full pool contains the syntax-highlighting tokens, and
+ * on the light palette the most chromatic thing in it is --syn-fn at #8250df -
+ * the editor's violet. Reading that here produced a violet glitch in a header
+ * whose every other accent is maroon. See PALETTE_BRAND_TOKENS for why the
+ * tutor scene is allowed to use the wider pool and this is not.
+ */
 function readTokens(): ThemeTokens {
   const host = document.querySelector<HTMLElement>(".nt-root") ?? document.documentElement;
   const cs = getComputedStyle(host);
   const bag: Record<string, string> = { "--bg-0": cs.getPropertyValue("--bg-0").trim() };
-  for (const n of PALETTE_ACCENT_TOKENS) bag[n] = cs.getPropertyValue(n).trim();
+  for (const n of PALETTE_BRAND_TOKENS) bag[n] = cs.getPropertyValue(n).trim();
   return bag;
 }
 

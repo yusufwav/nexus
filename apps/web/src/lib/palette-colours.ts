@@ -83,6 +83,45 @@ export const PALETTE_ACCENT_TOKENS: readonly string[] = [
   "--danger",
 ];
 
+/**
+ * The brand accents alone, with no syntax colours in the pool.
+ *
+ * THE SAME QUESTION, A DIFFERENT ANSWER, AND THE DIFFERENCE MATTERS
+ * ------------------------------------------------------------------------
+ * PALETTE_ACCENT_TOKENS above is right for the tutor's Horizon Bloom and wrong
+ * for the dashboard's Letter Glitch, and the difference is not a matter of
+ * taste. That pool deliberately includes the syntax-highlighting tokens,
+ * because a full-bleed sunrise scene wants the widest possible range of
+ * colour to draw its light from and nobody looking at a horizon will notice
+ * that the blue in it came from the editor's string token.
+ *
+ * The Letter Glitch is a header the size of one strip, sitting beside a
+ * palette's own accent-coloured buttons. Picking from the syntax tokens there
+ * is not subtle - it is a different palette. Measured on the base palettes:
+ *
+ *   dark   the pool picks #8b0000, which IS --accent-a, so the bug is
+ *          invisible there and only shows up where it is least expected;
+ *   light  the pool picks #8250df at C 0.2069, beating --accent-a's 0.1641.
+ *          That is --syn-fn, the editor's function colour: a violet glitch in
+ *          a header whose every other accent is maroon.
+ *
+ * Restricting the pool to the three accents plus the gradient pair makes the
+ * two consumers agree: both now resolve to --accent-a on both base palettes,
+ * and a palette whose identity is blue will read blue in both places.
+ *
+ * The gradient pair is kept because it is the same two colours under other
+ * names -- in the base palette --grad-from is --accent-a and --grad-to is
+ * --accent-c -- so including it costs nothing and covers a palette that seeds
+ * its gradient separately from its accents.
+ */
+export const PALETTE_BRAND_TOKENS: readonly string[] = [
+  "--accent-b",
+  "--accent-c",
+  "--accent-a",
+  "--grad-from",
+  "--grad-to",
+];
+
 /** How chromatic a token has to be before it counts as one of the palette's colours. */
 export const MIN_CHROMA = 0.03;
 
@@ -290,12 +329,15 @@ export function isLightTheme(tokens: ThemeTokens): boolean {
  *     rather than its name, so a future palette cannot slip a neutral in
  *     through a token nobody remembered to exclude.
  */
-export function scoredAccents(tokens: ThemeTokens): ScoredAccent[] {
+export function scoredAccents(
+  tokens: ThemeTokens,
+  pool: readonly string[] = PALETTE_ACCENT_TOKENS,
+): ScoredAccent[] {
   const bg = parseColor(tokens["--bg-0"]) ?? { r: 0, g: 0, b: 0, a: 1 };
   const opaque = { ...bg, a: 1 };
   const out: ScoredAccent[] = [];
 
-  for (const name of PALETTE_ACCENT_TOKENS) {
+  for (const name of pool) {
     const parsed = parseColor(tokens[name]);
     if (parsed === null) continue;
     const flat = over(parsed, opaque);
@@ -314,6 +356,15 @@ export function scoredAccents(tokens: ThemeTokens): ScoredAccent[] {
  * colour for the letters to glitch into, so the flash reads as a shift in
  * intensity rather than as a two-colour animation.
  *
+ * It is called with PALETTE_BRAND_TOKENS, not the default pool. The default
+ * includes the syntax-highlighting tokens, which on the light palette put
+ * #8250df -- the editor's function colour, the most chromatic thing in the
+ * whole palette -- into a header whose buttons are all maroon. The reason the
+ * default pool has them is documented on PALETTE_ACCENT_TOKENS: a full-bleed
+ * scene wants the widest range available and nobody is reading a horizon as a
+ * colour scheme. A 180px strip beside accent-coloured buttons is the opposite
+ * case, so it does not get the default.
+ *
  * Falls back to the base palette's crimson rather than to black, because a
  * field with no glitch colour is not obviously wrong - it is simply letters
  * that flash white - and a silent fallback that blends into the surface hides
@@ -321,7 +372,7 @@ export function scoredAccents(tokens: ThemeTokens): ScoredAccent[] {
  */
 export function mostSaturatedAccent(tokens: ThemeTokens): string {
   let best: ScoredAccent | null = null;
-  for (const s of scoredAccents(tokens)) {
+  for (const s of scoredAccents(tokens, PALETTE_BRAND_TOKENS)) {
     if (best === null || s.C > best.C) best = s;
   }
   return best?.hex ?? FALLBACK.cool;

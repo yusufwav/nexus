@@ -43,7 +43,8 @@ const web = path.join(here, "..");
 
 // pathToFileURL, not a bare path: on Windows an absolute path arrives with a
 // `c:` protocol and the ESM loader rejects it as an unknown scheme.
-const { horizonPalette, relativeLuminance, parseColor, srgbToOklab, PALETTE_ACCENT_TOKENS } = await import(
+const { horizonPalette, relativeLuminance, parseColor, srgbToOklab, mostSaturatedAccent,
+        scoredAccents, PALETTE_ACCENT_TOKENS, PALETTE_BRAND_TOKENS } = await import(
   pathToFileURL(path.join(web, "src", "lib", "palette-colours.ts")).href
 );
 
@@ -153,8 +154,60 @@ const lights = rows.filter((r) => r.light).length;
 console.log("");
 console.log(`${rows.length} palettes (${lights} light, ${rows.length - lights} dark)`);
 
+/* ---------- the Letter Glitch's colour ---------- */
+//
+// A separate check because it is a separate policy, and because this one has
+// already shipped a bug that no amount of looking at the scene would have
+// caught: the glitch field was reading the SAME pool as the Horizon Bloom,
+// which deliberately includes the syntax-highlighting tokens so a full-bleed
+// sunrise has the widest range of colour to draw from. On the light palette
+// the most chromatic token in that pool is --syn-fn at #8250df - the editor's
+// violet - so the dashboard header glitched violet while every accent on the
+// page was maroon. On the dark palette --accent-a happened to win, so the bug
+// was invisible in exactly the theme nobody was testing.
+//
+// The assertion is not "the colour looks right" but "the colour came from a
+// BRAND token", which is the property that was actually broken and the one
+// that stays true when a palette is regenerated with new values.
+
+console.log("");
+console.log(`Letter Glitch colour — most saturated of ${PALETTE_BRAND_TOKENS.length} brand tokens\n`);
+console.log("  palette      glitch    brand values                          source");
+
+for (const { id, tokens: t } of palettes()) {
+  const pick = mostSaturatedAccent(t);
+  const parsed = parseColor(pick);
+
+  if (parsed === null) {
+    fail(id, `glitch colour ${pick} does not parse`);
+    continue;
+  }
+
+  // The picked colour must be one of the palette's own brand values. Compared
+  // as parsed hex so that an alpha byte or a case difference cannot smuggle a
+  // syntax colour through.
+  const brandHexes = scoredAccents(t, PALETTE_BRAND_TOKENS).map((s) => s.hex.toLowerCase());
+  if (!brandHexes.includes(pick.toLowerCase())) {
+    fail(id, `glitch colour ${pick} is not a brand token — the wider accent pool leaked in`);
+  }
+
+  // And it must not be a syntax token that merely shares a value with a brand
+  // one, which several palettes do (github assigns one hex to five tokens).
+  const wider = scoredAccents(t, PALETTE_ACCENT_TOKENS);
+  const chromatic = wider.filter((s) => s.C >= 0.03);
+  const winner = chromatic.reduce((a, b) => (b.C > a.C ? b : a));
+  if (winner.name.startsWith("--syn-") && !PALETTE_BRAND_TOKENS.includes(winner.name)) {
+    // Informational, not a failure: it is the whole reason the pools differ.
+    console.log(`  ${id.padEnd(13)} ${pick}    (wider pool would have picked ${winner.hex} from ${winner.name})`);
+  } else {
+    const from = wider.filter((s) => s.hex.toLowerCase() === pick.toLowerCase()).map((s) => s.name);
+    console.log(`  ${id.padEnd(13)} ${pick}    ${from.join(", ")}`);
+  }
+}
+
 if (failures === 0) {
   console.log(`every palette yields a distinct warm/cool pair, warm above cool, both visible`);
+  console.log(`every palette's glitch colour is drawn from its own brand tokens, never a syntax colour`);
 } else {
   console.log(`${failures} problem(s) above`);
   process.exitCode = 1;

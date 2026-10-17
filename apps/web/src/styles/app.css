@@ -1235,33 +1235,88 @@
   height: 34px;
   font-size: 0.8rem;
 }
-/* Radial vignette behind the identity text so the moving ASCII
-   field doesn't fight readability. Fades from the page background
-   colour at the centre out to transparent at the edges.
-   z-index: -1 puts it behind the name/email: the ::before is a
-   positioned box, so without a negative z-index it would paint ON
-   TOP of the non-positioned <h1>/<p> rather than under them. */
+/* THE IDENTITY BLOCK — glass, sized to the toolbar.
+   ------------------------------------------------------------
+   This used to be a radial vignette: --bg-1 fading out to transparent,
+   a soft patch of page colour under the text so the moving glyph field
+   did not fight it. It did its job and it was the right idea, but it
+   read as a smudge rather than as anything deliberate - a radial
+   gradient with no edge is a blur that never resolves into a shape, and
+   next to a row of crisp bordered buttons it looked like a rendering
+   fault. A glass pill reads as a control, which is what this is: it is
+   the one non-clickable member of the toolbar, and it should look like
+   it belongs to the same set.
+
+   SAME SIZE AS THE BUTTONS, which is the part that has to be exact.
+   Every control in .nt-dash__id-row takes its height from --nt-ctl-h:
+   the three icon squares at width AND height var(--nt-ctl-h), and the
+   text buttons at min-height var(--nt-ctl-h). This block is min-height
+   var(--nt-ctl-h) for the same reason and no other - it is what makes
+   the name and email line up with the row rather than sitting taller
+   than everything beside it. --nt-ctl-h and not --nt-icon-btn, because
+   --nt-ctl-h is the height the toolbar actually resolved to.
+
+   The line heights are pinned rather than left to the font's default
+   because min-height is a FLOOR, not a clamp: without them the block's
+   natural height is name 1.1rem plus email 0.7rem at their default
+   leading, which is about 43px against a 44px floor, and on a font with
+   taller defaults it would push past the floor and break the alignment
+   the min-height exists to protect.
+
+   --glass-tint over --glass-bg is what carries the contrast. The strip
+   behind this is the letter field at baseOpacity 0.8 - near-opaque
+   glyphs - so the tint is doing real work here, more of it than on a
+   button over a flat page.
+
+   z-index: -1 is retained and is still needed. The ::before is a
+   positioned box, and the <h1>/<p> inside are not positioned, so
+   without it the glass would paint on top of the text. */
 .nt-dash__who::before {
   content: "";
   position: absolute;
   z-index: -1;
   inset: 0;
+  border: 1px solid var(--glass-edge);
   border-radius: var(--r-lg);
   pointer-events: none;
-  background: radial-gradient(
-    ellipse at 50% 50%,
-    var(--bg-1) 0%,
-    var(--bg-1) 30%,
-    transparent 75%
-  );
+  background: var(--glass-tint);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen),
+    var(--shadow-sm);
 }
 .nt-dash__who {
   position: relative;
   min-width: 0;
-  /* The gutter the vignette bleeds into, so the gradient fades out
-     before the text block ends rather than cutting at its edge. */
-  padding: var(--sp-3) var(--sp-5);
-  margin: calc(var(--sp-3) * -1) calc(var(--sp-5) * -1);
+  /* EXACTLY --nt-ctl-h, not min-height. min-height is a floor and the
+     content overran it: the two lines at --fs-lg and --fs-xs come to
+     50.2px naturally, which measured 6.2px taller than every button in
+     the row. The buttons take their height from this same token, so this
+     one has to be a fixed height or the alignment the token exists to
+     guarantee is not actually guaranteed. justify-content: centre is what
+     keeps the two lines centred inside it when a name is long enough to
+     ellipsise onto one line. */
+  height: var(--nt-ctl-h);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  /* Horizontal padding only, and that is not a style choice. The two lines
+     want 1.1rem + 0.7rem at default leading, which measures 50.2px, and
+     --nt-ctl-h is 44px. A block with vertical padding here is content that
+     cannot fit inside itself: with justify-content: centre the overflow spills
+     out of both ends equally and the email lands on top of the name. The
+     buttons beside this are single-line, so their --sp-2 of vertical padding
+     costs them nothing; a two-line block spending a line's worth of padding
+     above and below has 28px of box for 34px of text. Centring the lines in
+     the full 44px leaves 4.75px of air above and below instead, which is
+     what the single-line buttons get anyway. */
+  padding: 0 var(--sp-4);
+  /* No negative margin, unlike the vignette this replaced. That one had
+     padding to bleed its gradient past the text and a negative margin to
+     claw the space back; the glass needs neither, because here the padding
+     is inside a visible edge rather than outside it. Carrying it over would
+     make the pill overlap its neighbours by --sp-4 on each side. */
 }
 .nt-dash__name {
   margin: 0;
