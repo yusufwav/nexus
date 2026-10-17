@@ -78,9 +78,18 @@ const MAX_WALKERS = 48;
  *                      and wide, so at the component's default 0.9 the field
  *                      reads as sparse text and the horizon of it is missing.
  *
- *   spacing: 0.5       Tighter than the default 0.6 and tighter than the
- *                      "classic" look, because at 14px on a 20vh strip the
- *                      looser pitch leaves the field reading as a word list.
+ *   fontSize: 9, spacing: 0.1
+ *                      Small, and pitched nearly closed. Both are a
+ *                      departure from the component's own defaults (14 and
+ *                      0.6) rather than a tweak of them, and the reason is
+ *                      the same: at 14px on a 20vh strip this reads as a list
+ *                      of words with a horizon behind it, where at 9px with
+ *                      almost no gutter it reads as a TEXTURE, which is what
+ *                      a header strip behind an avatar wants to be.
+ *                      It is also many more cells — a 1440x180 strip is
+ *                      roughly 215 per row here instead of 130 — and each is
+ *                      a single texel fetch, so the extra cost is real but
+ *                      not interesting.
  *
  *   smooth: false      The component's default is true, which fades a
  *                      glitching letter in and out. Off, it flickers on and
@@ -146,8 +155,8 @@ const TUNING: LetterGlitchProps = {
   baseColor: "#ffffff",
   characters: DEFAULT_CHARACTERS,
   fontFamily: DEFAULT_FONT,
-  fontSize: 14,
-  spacing: 0.5,
+  fontSize: 9,
+  spacing: 0.1,
   density: 1,
   baseOpacity: 0.8,
   glitchAmount: 0.8,

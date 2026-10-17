@@ -62,11 +62,6 @@ export default function DashboardShell({
   readonly active: string;
   readonly children: React.ReactNode;
 }): React.JSX.Element {
-  const joined = new Date(user.createdAt).toLocaleDateString("en-ZA", {
-    month: "short",
-    year: "numeric",
-  });
-
   return (
     <div className="nt-root nt-dash">
       {/* ---- The uncovered strip ----
@@ -82,9 +77,7 @@ export default function DashboardShell({
 
           <div className="nt-dash__who">
             <h1 className="nt-dash__name">{user.name}</h1>
-            <p className="nt-dash__email">
-              {user.email} · joined {joined}
-            </p>
+            <p className="nt-dash__email">{user.email}</p>
           </div>
 
             <div className="nt-dash__id-actions">

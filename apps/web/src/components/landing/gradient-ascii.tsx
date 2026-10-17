@@ -379,12 +379,48 @@ vec4 glyphAt(vec2 px) {
   float coverage = sampleGlyph(index, local, coord, focus * 1.2);
 
   float alpha = uOpacity * present * cutoff * coverage * mix(1.0, 0.35 + 0.65 * level, 0.55) * (1.0 - focus * 0.5);
-  if (uLight < 0.5) {
-    vec3 light = field.rgb * 0.55 + vec3(0.03) * field.a;
-    return vec4(light * alpha, 0.6 * field.a * alpha);
-  }
-  vec3 ink = visible * 0.8;
-  return vec4(ink * alpha, alpha);
+
+  /*
+   * THE CHARACTERS ARE WHITE. Always, in every theme, on both this field and
+   * the sign-in one.
+   *
+   * Only the COLOUR is fixed here. Everything that decides which character a
+   * cell draws, how dense it is, how bright and how large is computed above
+   * out of value and level, and none of that is touched - so the field's
+   * structure, its depth-of-field, its flicker and its scramble are all
+   * exactly what they were. What changes is that every glyph is painted the
+   * same hue instead of one sampled out of the page's palette.
+   *
+   * The two branches collapsed to one, and that is the point. The dark one
+   * multiplied the gradient's own colour by 0.55, so the letters were the
+   * page's accent; the light one took the gradient inverted into ink, so the
+   * letters were near-black on paper. One field that recolours itself per
+   * palette is thirty-two fields. One set of white letters behind a landing
+   * page is one thing in thirty-two themes.
+   *
+   * THE GRADIENT IS NOT TOUCHED. The wash behind the letters is the uField
+   * texture, whose colour is the ramp, and the ramp is still derived from the
+   * theme in themeRamp() further down this file. Only the glyphs changed.
+   *
+   * What this costs, once and plainly: on the light palettes white letters on
+   * near-white paper have almost nothing to contrast against. That was the
+   * trade when it was asked for, and it is why value is still computed from
+   * the inverted field above - the glyphs still thin out and fade where the
+   * paper is bright, so the field keeps its shape even where it has lost its
+   * contrast.
+   *
+   * The ALPHA still branches, because it always did and the reason predates
+   * this: on a dark page a glyph is dimmed by the gradient's own opacity, so a
+   * letter thins out where the wash behind it thins out, and on paper it is
+   * not. That asymmetry is what makes the two pages read as the same field at
+   * two exposures. Only the hue was unified.
+   *
+   * White is also brighter than what it replaces - the dark branch was the
+   * accent at 0.55 - so the field will read a little hotter than it did. If
+   * that is too much, uOpacity is the knob and it is one number.
+   */
+  float outAlpha = uLight < 0.5 ? (0.6 * field.a * alpha) : alpha;
+  return vec4(vec3(1.0) * outAlpha, outAlpha);
 }
 `;
 
@@ -455,6 +491,105 @@ const SHAPES: Record<string, number> = { horizon: 0, pinch: 1, rise: 2, eclipse:
 const CLICK_EFFECTS: Record<string, number> = { none: 0, wave: 1, burst: 2 };
 
 /** An sRGB triple -> XYZ, D65. */
+const srgbToXyz = (rgb: readonly [number, number, number]): [number, number, number] => [
+  0.4122214708 * rgb[0] + 0.5363325363 * rgb[1] + 0.0514459929 * rgb[2],
+  0.2119034982 * rgb[0] + 0.6806995451 * rgb[1] + 0.1073969566 * rgb[2],
+  0.0883024619 * rgb[0] + 0.2817188376 * rgb[1] + 0.6299787005 * rgb[2],
+];
+
+/**
+ * XYZ -> the triple the shader's `labToRgb` expects, i.e. the EXACT inverse
+ * of that function.
+ *
+ * This is deliberately not the obvious `toLab`. Uploading toLab() — which is
+ * what a straight port does, and what the upstream component does — does not
+ * round trip, and silently so. The two matrices are the standard CIE pair,
+ * which is written for L in 0..100, while toLab produces 0..1, so every colour
+ * is crushed toward black: #8b0000 renders as roughly #420000, and a
+ * near-paper #e8e2db as mid-grey. Upstream does not notice because its palette
+ * is hand-tuned by eye against the distortion it already contains.
+ *
+ * That tolerance is not available here. The whole point of deriving the ramp
+ * from the theme is that the field is the palette's colour, and if a theme
+ * says cream the field has to be cream — not a shade of it that nobody chose.
+ * Inverting the shader's own function is what makes it exact rather than
+ * approximately right.
+ */
+const xyzToRamp = (xyz: readonly [number, number, number]): [number, number, number] => {
+  const x = Math.cbrt(Math.max(0, xyz[0]));
+  const y = Math.cbrt(Math.max(0, xyz[1]));
+  const z = Math.cbrt(Math.max(0, xyz[2]));
+  return [
+    0.2104542553 * x + 0.793617785 * y - 0.0040720468 * z,
+    1.9779984951 * x - 2.428592205 * y + 0.4505937099 * z,
+    0.0259040371 * x + 0.7827717662 * y - 0.808675766 * z,
+  ];
+};
+
+/**
+ * Mixing happens in cube-root-linear XYZ.
+ *
+ * That is the same space the shader calls Lab: its matrix is linear, so
+ * interpolating before it is identical to interpolating after it — but
+ * staying on the XYZ side keeps this file's maths exactly invertible, which
+ * the 0..100 scale mismatch above is a good reason to insist on.
+ *
+ * And the companding is the reason to bother with a non-linear space at all:
+ * between a near-black and a saturated crimson, a straight sRGB lerp passes
+ * through mud, which is exactly the midpoint of this ramp.
+ */
+/**
+ * HSL, because lightness and saturation have to move INDEPENDENTLY here.
+ *
+ * Every earlier attempt built this ramp by interpolating two endpoint
+ * colours, and that is structurally unable to keep a hue alive: a lerp
+ * toward the page background greys the colour out, and a lerp toward the
+ * page foreground pinks it out. On the dark theme that produced exactly
+ * the wrong thing - a desaturated rose where the palette says maroon.
+ *
+ * In HSL the hue is simply carried through untouched and only L and S are
+ * touched, so "a lighter version of scarlet" stays scarlet instead of
+ * decaying into pink.
+ */
+const rgbToHsl = (rgb: readonly [number, number, number]): [number, number, number] => {
+  const max = Math.max(...rgb);
+  const min = Math.min(...rgb);
+  const l = (max + min) / 2;
+  const d = max - min;
+  if (d === 0) {
+    return [0, 0, l];
+  }
+  const s = d / (1 - Math.abs(2 * l - 1));
+  let h: number;
+  if (max === rgb[0]) {
+    h = ((rgb[1] - rgb[2]) / d) % 6;
+  } else if (max === rgb[1]) {
+    h = (rgb[2] - rgb[0]) / d + 2;
+  } else {
+    h = (rgb[0] - rgb[1]) / d + 4;
+  }
+  return [((h / 6) % 1 + 1) % 1, s, l];
+};
+
+const hslToRgb = (hsl: readonly [number, number, number]): [number, number, number] => {
+  const [h, s, l] = hsl;
+  if (s === 0) {
+    return [l, l, l];
+  }
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const channel = (t: number): number => {
+    let u = t;
+    if (u < 0) u += 1;
+    if (u > 1) u -= 1;
+    if (u < 1 / 6) return p + (q - p) * 6 * u;
+    if (u < 1 / 2) return q;
+    if (u < 2 / 3) return p + (q - p) * (2 / 3 - u) * 6;
+    return p;
+  };
+  return [channel(h + 1 / 3), channel(h), channel(h - 1 / 3)];
+};
+
 function hexToRgb(hex: string | undefined): [number, number, number] {
   const h = (hex ?? "").replace("#", "").trim();
   const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
@@ -466,50 +601,73 @@ function hexToRgb(hex: string | undefined): [number, number, number] {
 }
 
 /**
- * THE RAMP: ABSOLUTE WHITE, AT EVERY STOP
+ * THE RAMP: FOUR STOPS OF THE THEME'S OWN COLOUR
  * ------------------------------------------------------------
- * The field's characters are white now, in every theme, on both the landing
- * page and the sign-in screen. Not "the theme's lightest colour", not "white
- * adjusted for the palette" — #ffffff, unaltered.
+ * Anchored on `--accent-a`, which the palette generator documents as the
+ * palette's identity: "they stay exactly as seeded on both branches". That
+ * is the one token guaranteed to be neither diluted nor inverted for
+ * legibility, which makes it the only defensible candidate for the colour
+ * this field is supposed to be.
  *
- * That is a product decision and it is deliberately a departure from what
- * this ramp was built for. It used to be derived from `--accent-a`, which the
- * palette generator documents as the theme's identity, precisely so the field
- * would read as the theme. A field that changes colour with the theme is
- * thirty-two different fields; one that stays white is one thing that happens
- * to sit behind a landing page in any of them.
+ * `--ascii-low`/`--ascii-high` were the obvious source, since they are the
+ * ASCII field's own two ends, and they are the wrong one. On a dark theme
+ * `--ascii-high` is the palette's SECONDARY colour, and on a light theme it
+ * is that secondary already mixed 45% toward the foreground — the
+ * generator does that on purpose so accents stay legible as ink on paper,
+ * which is a different job from being a luminous glow. Reading it and then
+ * lightening it further is how the dark theme ended up a desaturated rose
+ * instead of the maroon-scarlet its palette actually specifies.
  *
- * WHY FOUR IDENTICAL STOPS AND NOT ONE
- * The shader's `tone()` indexes the ramp by `floor(tone * (uCount - 1) + 0.5)`
- * and the fourth pass samples it, so `uCount` is load-bearing even when every
- * stop holds the same colour. Four identical stops is the smallest edit that
- * cannot move a pixel of the field's STRUCTURE — density, glyph choice,
- * shape, horizon, flicker are all untouched. Only the hue is gone.
+ * FOUR STOPS, HUE CONSTANT
+ * The count matches the upstream component's default palette; the ordering is
+ * ours, because the upstream four are in no meaningful order and the shader
+ * assumes index 0 is the floor of the range and the last index is the
+ * brightest thing in the frame.
  *
- * WHAT THIS COST, STATED PLAINLY
- * On the light palettes the glyphs are white and the page is near-white, so
- * they have almost nothing to contrast against and the field very nearly
- * disappears. That is what "always white regardless of theme" means, and it
- * is not a fault introduced here — it is the request. If the field has to stay
- * legible on paper, the fix is NOT the ramp changing colour again: it is the
- * glyph pass darkening what it draws when `uLight` is set, which is a
- * different change to the one that was asked for.
+ * THE ACCENT IS THE BRIGHTEST STOP. It carries the theme's own hue,
+ * saturation and lightness, unaltered, and every other stop is the same hue
+ * with its chroma scaled down. So the most saturated colour in the ramp is
+ * provably the palette's own, and nothing can out-chroma it — that is what
+ * makes the field read as the theme rather than as a tinted approximation of
+ * it. It reaches the top of the ramp by being swapped into the last slot
+ * (see THE SWAP in themeRamp).
  *
- * The theme still decides ONE thing: `lightMode`, which picks the composite's
- * blend mode. That is a question about how the field sits on the page rather
- * than what colour it is, and it is still answered per palette.
+ * Stops come back already in the shader's space, so no colour is converted on
+ * its way to the GPU a second time.
  */
 const RAMP_STOPS = 4;
 
 /**
- * Absolute white in the shader's space.
- *
- * The ramp is uploaded in Lab, not sRGB, because the shader's `tone()`
- * interpolates there and an sRGB lerp between two stops passes through mud.
- * White is [1, 0, 0] in that space and nowhere else, so this one value is
- * the whole ramp.
+ * Where the theme's own colour sits BEFORE the swap. The swap moves it to the
+ * last slot; this constant is what names the slot being swapped out, so it is
+ * deliberately not the index the accent ends up at.
  */
-const ABSOLUTE_WHITE: [number, number, number] = [1, 0, 0];
+const ACCENT_STOP = 1;
+
+/**
+ * Saturation per stop, as a fraction of the accent's own, before the swap.
+ *
+ * The accent's own slot is exactly 1 and everything else is under it, so the
+ * most saturated stop is unique and is the accent. The highlight slot falls
+ * away hardest because at the bright end a full-chroma colour on a near-white
+ * page is a pink smear.
+ */
+const RAMP_CHROMA = [0.86, 1, 0.82, 0.46] as const;
+
+/*
+ * The three tables that define a stop must agree, or the ramp silently
+ * grows a tail. `RAMP_CHROMA[stopCount]` being undefined is the failure that
+ * matters: `sat * undefined` is NaN, HSL conversion of NaN clamps to 0, and
+ * the extra stop ships as pure white with a perfectly plausible-looking
+ * highlight — no error, no NaN on screen, and `uCount` quietly stretches the
+ * ramp across it. Asserted at module scope so it cannot be reintroduced.
+ */
+if (RAMP_CHROMA.length !== RAMP_STOPS || ACCENT_STOP !== 1) {
+  throw new Error(
+    `ramp tables disagree: RAMP_STOPS=${RAMP_STOPS} ` +
+      `RAMP_CHROMA.length=${RAMP_CHROMA.length} ACCENT_STOP=${ACCENT_STOP}`,
+  );
+}
 
 function themeRamp(): {
   stops: [number, number, number][];
@@ -517,25 +675,70 @@ function themeRamp(): {
 } {
   const host = document.querySelector<HTMLElement>(".nt-root");
   const cs = getComputedStyle(host ?? document.documentElement);
-  const bg = hexToRgb(cs.getPropertyValue("--bg-0").trim());
+  const token = (name: string): string => cs.getPropertyValue(name).trim();
+
+  const bg = hexToRgb(token("--bg-0"));
+  const accent = hexToRgb(token("--accent-a"));
+
+  const [hue, sat, lum] = rgbToHsl(accent);
 
   /*
    * HOW BRIGHT THE PAGE IS, rather than looking for a class named "light".
    *
-   * There are fifty generated palettes plus a hand-written pair, and they are
-   * not all reached by a class called light. Reading --bg-0 and asking how
-   * bright it is is the one test that is correct for all of them and needs no
-   * registry to stay in sync.
+   * There are fifty generated palettes plus a hand-written pair, and they
+   * are not all reached by a class called light. Reading --bg-0 and asking
+   * how bright it is is the one test that is correct for all of them and
+   * needs no registry to stay in sync.
    *
-   * It is not cosmetic: it picks the composite's blend mode. Additive is right
-   * for light on black and wrong on paper, where it renders the glow as a
-   * white wash and the glyphs as nothing at all.
+   * It is not cosmetic either: it picks the composite's blend mode.
+   * Additive is right for light on black and wrong on paper, where it
+   * renders the glow as a white wash and the glyphs as nothing at all.
    */
   const pageLight = 0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2];
 
-  const stops: [number, number, number][] = Array.from(
-    { length: RAMP_STOPS },
-    () => [...ABSOLUTE_WHITE] as [number, number, number],
+  /*
+   * Build the ramp as authored — darkest first, accent in slot 1, walking up
+   * to the highlight — then swap the accent with the highlight below.
+   *
+   * So slot 0 is a SCALED version of the accent rather than a fixed
+   * near-black. A fixed dark end is invisible on a dark page, which turns the
+   * ramp into a disc floating in a void: the horizon shape spends most of its
+   * area below the arch, so that is where the bottom two-thirds of the hero
+   * goes. Scaling keeps the hue present right down to the floor.
+   *
+   * The spacing is forced apart rather than merely monotonic, because a
+   * palette whose accent is already light can otherwise land two stops on the
+   * same lightness and the shader's fract() silently picks one of them. The
+   * 0.99 clamp stops that nudge walking past white and leaving HSL's range;
+   * no palette in the set currently reaches it.
+   */
+  const lightness: number[] = [lum * 0.45, lum];
+  for (let i = 2; i < RAMP_STOPS; i++) {
+    const k = (i - 1) / (RAMP_STOPS - 2);
+    lightness.push(lum + (1 - lum) * (0.38 + 0.32 * k));
+  }
+  for (let i = 2; i < lightness.length; i++) {
+    lightness[i] = Math.min(0.99, Math.max(lightness[i]!, lightness[i - 1]! + 0.06));
+  }
+
+  /*
+   * THE SWAP: the accent and the highlight trade places, slot 0 untouched.
+   *
+   * That puts the palette's own colour, at full chroma, where the field is
+   * brightest — the one end of the ramp a theme is read from — and leaves the
+   * pale tint in the mid range where it behaves as light rather than as the
+   * subject.
+   *
+   * The ramp is therefore deliberately NOT darkest-to-lightest any more: it
+   * runs dark, pale, mid, saturated. Only slot 0 is held to the old ordering.
+   */
+  const chroma = [...RAMP_CHROMA];
+  const top = RAMP_STOPS - 1;
+  [lightness[ACCENT_STOP], lightness[top]] = [lightness[top]!, lightness[ACCENT_STOP]!];
+  [chroma[ACCENT_STOP], chroma[top]] = [chroma[top]!, chroma[ACCENT_STOP]!];
+
+  const stops = lightness.map((l, i) =>
+    xyzToRamp(srgbToXyz(hslToRgb([hue, sat * chroma[i]!, l]))),
   );
 
   return { stops, lightMode: pageLight > 0.5 };
