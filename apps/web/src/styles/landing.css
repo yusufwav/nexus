@@ -229,17 +229,36 @@
   max-width: var(--nt-max-w-narrow);
   text-align: center;
 }
+/* The eyebrow is a glass pill, and it is the only text in the hero that sits
+   ON the field rather than over it. A 1px --line border reads as a drawn box
+   against characters moving underneath it; glass blurs them instead, so the
+   pill holds as an object without looking like a box laid over the top.
+
+   `text-transform: uppercase` and the wide tracking are kept because the pill
+   is small and the label is quiet by design - it is an eyebrow, not a heading.
+
+   -webkit-backdrop-filter is listed first because Safari still needs the
+   prefixed property to composite at all, and it is given a slightly larger
+   blur than a plain .nt-glass: 12px of a 14px-tall pill already blurs the
+   glyphs into flat colour, and this one has a bright rose gradient passing
+   straight through it. */
 .nt-landing__eyebrow {
   display: block;
   width: fit-content;
   margin: 0 auto var(--sp-5);
   padding: var(--sp-2) var(--sp-4);
-  border: 1px solid var(--line);
+  border: 1px solid var(--glass-edge);
   border-radius: 999px;
   font-size: var(--fs-xs);
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
   color: var(--fg);
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
+  backdrop-filter: blur(12px) saturate(1.3);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen),
+    var(--shadow-sm);
 }
 .nt-landing__title {
   margin: 0 auto;

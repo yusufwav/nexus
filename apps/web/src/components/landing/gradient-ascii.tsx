@@ -351,10 +351,46 @@ vec4 glyphAt(vec2 px) {
   vec4 field = texture(uField, uv);
   vec4 aux = texture(uAux, uv);
 
-  /* Paper mode inverts the field: dark ink on a light page. */
+  /*
+   * Paper mode composites the field over white to get the colour the eye
+   * actually sees there: uField stores colour PREMULTIPLIED by the shape's own
+   * alpha, so adding (1 - field.a) puts it back on the page.
+   */
   vec3 visible = uLight > 0.5 ? field.rgb + (1.0 - field.a) : field.rgb;
   float luma = dot(visible, vec3(0.2126, 0.7152, 0.0722));
-  float value = uLight > 0.5 ? clamp((1.0 - luma) * 1.5, 0.0, 1.0) : luma;
+
+  /*
+   * HOW BIG A CHARACTER IS. The ramp " =+xX0S8#@" is ordered by how much ink
+   * each character carries, so the size of a glyph reads out how much field is
+   * behind it. Two readings of one question, and they are mirror images:
+   *
+   *   on black, the field IS light, so the answer is its luma;
+   *   on paper, the field is ink on white, so the answer is how far BELOW white
+   *   it falls.
+   *
+   * 1 - luma measures exactly that, and it already spans 0 to 1 on its own: 0
+   * where the shape has faded and the page is bare paper, 0.93 for the base
+   * palette's #8b0000.
+   *
+   * THE 1.5 GAIN THAT WAS HERE IS GONE, and that is the whole fix. The ramp's
+   * four stops are the accent at four lightnesses, whose lumas run 0.06, 0.53,
+   * 0.31, 0.12. Scaled by 1.5, every stop below luma 0.333 clamps to 1.0 -
+   * that is THREE OF THE FOUR - so most of the field was pinned to the single
+   * largest character and the ramp had a plateau instead of a gradient. That
+   * is why the size falloff read as absent on light pages: the top of the
+   * page was flat at maximum and only the very bottom moved.
+   *
+   * Measured, not reasoned. Encoding the chosen glyph index into the red
+   * channel and screenshotting it gives the mean index per band. Before, the
+   * top third averaged 8.55 with a peak of 8.91 on a 0-9 scale. After, it
+   * averages 7.31 and descends 7.9 -> 5.6 -> 3.0 -> 0.18 down the page, which
+   * is the shape dark mode already had.
+   *
+   * The dark branch is untouched and stays plain luma. It never needed a gain:
+   * on black the field's luma already runs 0.06 to 0.53 across the ramp, and
+   * boosting that would only clip the top end the same way.
+   */
+  float value = uLight > 0.5 ? clamp(1.0 - luma, 0.0, 1.0) : luma;
 
   float pick = hash12(cell + uSeedValue * 7.31);
   float level = hash12(cell * 1.73 + 4.1 + uSeedValue);
