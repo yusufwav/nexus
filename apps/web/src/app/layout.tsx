@@ -9,6 +9,7 @@ import "../styles/tokens.css";
 import "../styles/app.css";
 import Providers from "@/components/providers";
 import PwaRegistration from "@/components/pwa-registration";
+import FontGuard from "@/components/font-guard";
 
 /* The landing page is built out of code rather than described in prose,
    so it needs the mono face as its body font and a serif for the
@@ -90,6 +91,11 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} ${playfair.variable} antialiased`}>
         <PwaRegistration />
+
+        {/* Says so out loud when the webfonts did not load, which is a
+            failure next/font handles by silently swapping in a system
+            face. See the component for why it checks the way it does. */}
+        <FontGuard />
 
         {/* The app shell (header + fixed-height grid) lives in the (app)
             route group, so the landing page at / can run full-bleed. */}
