@@ -55,8 +55,47 @@ export const providerKeys = pgTable(
      * Provider slug, e.g. "openrouter". An allowlist in code, never a
      * free string: this value selects the code that talks to the
      * provider, so an unknown value must not reach a URL builder.
+     *
+     * EXCEPT FOR `kind = 'custom'`, where the slug is a server-minted
+     * opaque token (`custom_<random>`) rather than a name from the
+     * reader. See the `kind` column for why that matters — the short
+     * version is that the name a reader types for their provider is
+     * display-only and never becomes part of a URL, a slug, or a log
+     * line.
      */
     provider: text("provider").notNull(),
+    /**
+     * Built-in, or one the reader pointed at themselves.
+     *
+     * The allowlist in `apps/web/src/lib/providers.ts` covers
+     * `builtin`. `custom` rows carry `base_url` and are validated by
+     * `apps/web/src/lib/custom-provider-url.ts` — https only, no
+     * credentials in the URL, and every address the host resolves to
+     * must be globally routable.
+     *
+     * Adding this column rather than widening the allowlist is the
+     * point: a built-in row still cannot name a host from the database,
+     * and the custom case is scoped to the reader who created it.
+     */
+    kind: text("kind").notNull().default("builtin"),
+    /**
+     * The reader's own name for a custom provider. Display only.
+     *
+     * NEVER used to build a URL, derive a slug, or pick a code path.
+     * The slug is server-generated precisely so that a name a reader
+     * typed — which is arbitrary text, possibly 60 characters of it —
+     * cannot end up in a request the server makes.
+     */
+    name: text("name").notNull().default(""),
+    /**
+     * Where a `kind = 'custom'` row's requests go. Null for built-ins,
+     * whose base URL comes from the in-code allowlist.
+     *
+     * Nullable rather than defaulted to "" so that "has a base URL" is
+     * answerable with a plain `IS NOT NULL` and a row can never carry an
+     * empty string that a URL builder would happily accept.
+     */
+    baseUrl: text("base_url"),
     /**
      * The reader's name for it. Display only.
      */

@@ -287,6 +287,51 @@ function shortDate(iso: string): string {
   });
 }
 
+/**
+ * Everything this message will actually show, as one string.
+ *
+ * An assistant message exists the moment a turn is submitted, before a
+ * single token has arrived, so "this message has content" is a separate
+ * question from "this message is in the list". See `TutorRow` below for
+ * what the difference is worth.
+ */
+function messageText(message: UIMessage<TutorMetadata>): string {
+  return (message.parts ?? [])
+    .filter((part): part is { type: "text"; text: string } => part.type === "text")
+    .map((part) => part.text)
+    .join("");
+}
+
+/**
+ * ONE MESSAGE, AND WHETHER IT HAS ANYTHING TO SHOW YET.
+ *
+ * `pending` is the whole of the fix for the two-boxes glitch. The SDK
+ * appends the assistant message synchronously inside `sendMessage`,
+ * before the request is made, so for the entire wait for a first token
+ * the transcript holds a message that renders as an empty glass bubble.
+ * The component used to render a SEPARATE "thinking" row beneath the
+ * list, which produced:
+ *
+ *   thinking      [ empty bubble ]
+ *   thinking      [ empty bubble ] [ thinking ]
+ *
+ * and then, on success, the empty bubble filled in and the thinking row
+ * vanished - or on failure the empty bubble stayed empty forever and
+ * the error arrived in the second box. Which meant the reader saw an
+ * empty bubble for the entire duration of a turn, in every state, and
+ * could not tell whether the answer was coming.
+ *
+ * `pending` says "this message exists but has nothing to show", and the
+ * status indicator is rendered INSIDE that message's own row. One
+ * bubble, always, which is the only version of this that reads as one
+ * conversation rather than as two.
+ */
+interface TutorRow {
+  readonly message: UIMessage<TutorMetadata>;
+  readonly text: string;
+  readonly pending: boolean;
+}
+
 export default function AiTutor({ name }: { readonly name: string }): React.JSX.Element {
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -839,6 +884,30 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
     // `clearError` is safe to call when there is no error.
     setStalled(false);
     clearError();
+    /*
+     * THE HISTORY PANE CLOSES WHEN A TURN STARTS.
+     *
+     * It used to stay open, and the reported symptom was that sending a
+     * message "left the chat history thing open but minimised the AI
+     * tutor section". Those are two separate parts of the layout
+     * reacting to one event, and only one of them was wired up:
+     *
+     *   · the header collapses on `hasMessages` changing, which fires
+     *     the moment the question is appended;
+     *   · `.nt-ai__pane` is a SIBLING of the header, not a child, so
+     *     nothing that happens to the header touches it.
+     *
+     * The result was a page whose header had shrunk to a single
+     * collapsed button while a full-width list of past conversations sat
+     * underneath it, pushing the transcript down and leaving the reader
+     * looking at a panel they had just started a conversation past.
+     *
+     * Sending is the explicit "I am done browsing, I am asking
+     * something" action, so it closes the pane outright. Opening the
+     * history to open a thread already closed it; this is the same
+     * decision applied to the other direction.
+     */
+    setPaneOpen(false);
     // The message is persisted by the effect below as soon as it lands
     // in `messages`, which is the first render after this call — not
     // when a reply comes back.
@@ -873,6 +942,32 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
   };
 
   const hasMessages = messages.length > 0;
+
+  /*
+    THE TRANSCRIPT, NORMALISED ONCE.
+
+    `pending` is computed from `isSending` rather than from whether the
+    text is empty on its own, because an empty assistant message is
+    genuinely empty for two different reasons and only one of them is
+    "the model is working":
+
+      · the turn is in flight and nothing has arrived yet - show the
+        status, inside this row;
+      · the turn ended and produced nothing at all - a provider that
+        answered with an empty body. There is no bubble to show and no
+        status to show, so the row renders as nothing, which is honest.
+
+    Deriving it from emptiness alone would put a spinner on a message
+    that had already failed and would keep it spinning forever.
+  */
+  const rows: readonly TutorRow[] = messages.map((message) => {
+    const text = messageText(message);
+    return {
+      message,
+      text,
+      pending: message.role !== "user" && text.length === 0 && isSending,
+    };
+  });
 
   /*
    * THE HEADER, ONCE THE CONVERSATION HAS STARTED
@@ -1020,8 +1115,11 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
               pick={picker.pick}
               onPick={picker.setPick}
               models={picker.models}
+              custom={picker.custom}
               hasKey={picker.hasKey}
               disabled={isSending}
+              favourites={picker.favourites}
+              onToggleFavourite={picker.toggleFavourite}
             />
             {tutorNoticeText ? (
               // role="status" so a screen reader announces it when it
@@ -1125,40 +1223,68 @@ function toUiMessages(rows: ReadonlyArray<StoredMessage>): UIMessage<TutorMetada
             </div>
           ) : (
             <ol className="nt-ai__thread-list">
-              {messages.map((m) => {
+              {rows.map(({ message: m, text, pending }) => {
                 const isUser = m.role === "user";
+                /*
+                  NO BUBBLE AT ALL, NOT AN EMPTY ONE.
+
+                  An assistant message that exists and has nothing to show —
+                  a turn that ended without a token, or one the provider
+                  answered with an empty body — used to render as a bare
+                  "tutor" label above nothing, or as an empty glass bubble.
+                  Both are worse than absent: the reader sees a turn that
+                  appears to have been answered by silence, next to the
+                  error that actually explains it.
+
+                  The whole `<li>` goes, label included. A user message can
+                  never take this path — it is written complete before it is
+                  appended — so the condition is on the role rather than on
+                  emptiness alone.
+                */
+                if (!pending && !isUser && text.length === 0) {
+                  return null;
+                }
                 return (
                   <li
                     key={m.id}
                     className={`nt-ai__msg${isUser ? " nt-ai__msg--me" : ""}`}
                   >
                     <div className="nt-ai__who">{isUser ? "you" : "tutor"}</div>
-                    <div className="nt-ai__bubble nt-glass">
-                      {m.parts?.map((part, i) =>
-                        part.type === "text" ? (
-                          <Streamdown
-                            key={i}
-                            isAnimating={status === "streaming" && !isUser}
-                            plugins={isUser ? undefined : TUTOR_PLUGINS}
-                          >
-                            {part.text}
-                          </Streamdown>
-                        ) : null,
-                      )}
-                    </div>
+                    {pending ? (
+                      /*
+                        THE ONE STATUS BUBBLE, INSIDE THE ROW THAT OWNS
+                        THE ANSWER.
+
+                        `aria-live` because the whole reason this row exists
+                        is that the answer is not here yet, and a
+                        screen-reader user has no other way to hear that the
+                        turn started and is still running.
+                      */
+                      <div
+                        className="nt-ai__bubble nt-glass nt-ai__thinking"
+                        role="status"
+                      >
+                        <Loader2Icon className="nt-ai__spin" aria-hidden="true" />
+                        <span>thinking</span>
+                      </div>
+                    ) : text.length === 0 ? null : (
+                      <div className="nt-ai__bubble nt-glass">
+                        {m.parts?.map((part, i) =>
+                          part.type === "text" ? (
+                            <Streamdown
+                              key={i}
+                              isAnimating={status === "streaming" && !isUser}
+                              plugins={isUser ? undefined : TUTOR_PLUGINS}
+                            >
+                              {part.text}
+                            </Streamdown>
+                          ) : null,
+                        )}
+                      </div>
+                    )}
                   </li>
                 );
               })}
-
-              {isSending && (
-                <li className="nt-ai__msg">
-                  <div className="nt-ai__who">tutor</div>
-                  <div className="nt-ai__bubble nt-glass nt-ai__thinking">
-                    <Loader2Icon className="nt-ai__spin" aria-hidden="true" />
-                    <span>thinking</span>
-                  </div>
-                </li>
-              )}
 
               {(error || stalled) && (
                 <li className="nt-ai__msg">

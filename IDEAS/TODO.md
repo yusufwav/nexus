@@ -3,7 +3,310 @@
 Everything in this file is unfinished, stubbed, or known-wrong. Check items
 off as they get built. New gaps go at the bottom of their section.
 
-Last updated: 12 October 2026.
+Last updated: 18 October 2026.
+
+---
+
+# ROUND OF WORK — 18 October 2026
+
+A UI and BYOK pass. Broken into segments so each can be done, verified and
+landed on its own. Segments 1–8 are **this turn**. Segments 9 and 10 are
+**deliberately not in scope this turn** — they are the two structural items and
+they deserve their own plan, not a footnote.
+
+## Status
+
+| # | Segment | State |
+| --- | --- | --- |
+| 1 | Landing marquee spacing | [x] |
+| 2 | Dashboard hover on every button | [x] |
+| 3 | Dashboard mobile tiles 2-up + uniform type scale | [x] |
+| 4 | Provider section: delete-icon centring | [x] |
+| 5 | Provider section: custom routing | [x] |
+| 6 | Modules page: drop the `~/` link | [x] |
+| 7 | AI tutor: header nav removed | [x] |
+| 8 | AI tutor: thinking-box, history pane, model search | [x] |
+| 9 | User menu: add `/practice` | [x] |
+| 10 | Favourited models in the picker | [x] |
+| 11 | **Refined button system** — *not this turn* | [ ] |
+| 12 | **Animation pass** — *not this turn* | [ ] |
+
+### What has to be run before this works anywhere
+
+- [x] **`packages/db/scripts/create-custom-provider-tables.mjs`** (or
+      `neon-setup-8-custom-providers.sql`) adds `provider_keys.kind`,
+      `.name`, `.base_url`, the two CHECK constraints, and the whole
+      `provider_models` table with its RLS policy and its grant.
+      **The local development database already has this applied.** Any
+      other database — staging, production — does not, and saving a
+      credential there returns a bare 500 until it is.
+
+---
+
+## Segment 1 — landing page marquee spacing
+
+- [x] **The scrolling AI usecase tags have no gap between them.**
+      `.nt-marquee__track` in `apps/web/src/styles/landing.css` is a bare flex
+      row and `.nt-tag` carries padding but no margin, so adjacent pills touch
+      and the track reads as one long dashed rule rather than as a list of
+      use cases.
+- [x] **Fixed with a trailing margin per tag, not `gap`.** The loop is
+      `translateX(-50%)` over a track that contains two identical copies, and
+      the shift has to land exactly on the seam. With `gap` there are `2N - 1`
+      gaps on a track whose half-width is `sum(items) + (N - 0.5) * gap`, so
+      the seam sits half a gap away from where the second copy begins and the
+      loop visibly jumps once per revolution. A margin on every tag including
+      the last gives `sum(items) + 2N * margin`, whose half is exactly the
+      first pixel of the second copy. The arithmetic is the reason, not taste.
+- [x] Narrowed from the default so the pills still read as a dense band and do
+      not turn into a sparse, slow row.
+
+## Segment 2 — every dashboard button gets the working hover
+
+- [x] **`.nt-tile--soon` suppresses the hover outright.** `app.css` carries
+      `.nt-tile--soon:hover { transform: none; border-color: var(--line); … }`
+      and `:not-allowed`, so seven of the eight tiles on `/dashboard` are dead
+      to the pointer while the eighth — "Study partner history", which has an
+      `href` and renders as an `<a>` — carries the full treatment. Seven tiles
+      look broken next to one that works.
+- [x] Removed the suppression. Every tile now takes the same
+      `translateY(--hover-lift)` / `--hover-edge` / `--hover-fill` /
+      `--hover-glow` treatment as the working one, and `cursor` is a pointer
+      rather than `not-allowed`.
+- [x] **The tiles stay `disabled` and stay inert.** The hover is an affordance
+      about the surface, not a claim that the feature exists. The "placeholders"
+      badge and each tile's own `concept ·` line still say what is and is not
+      built, and nothing was wired up that was not already wired up.
+- [x] Audited the other dashboard controls (`nt-btn`, the tab bar, `nt-drow`,
+      the feed, the settings controls, the practice module cards) for the same
+      gap and closed the ones that had it.
+
+## Segment 3 — mobile dashboard tiles, two per row
+
+- [x] **One tile per row on a phone.** `.nt-tiles` is
+      `repeat(auto-fill, minmax(260px, 1fr))`, so a 375–430px viewport gets one
+      column and each card spans the full width.
+- [x] Two columns below the mobile breakpoint, with the column floor reduced so
+      two fit rather than one overflowing.
+- [x] **Type scale reduced by 1px, uniformly, across the whole dashboard.**
+      Two cards side by side is half the width for the same content, and the
+      tile's own `description` and `concept` lines are what get squeezed. Done
+      once, at the dashboard scope, by overriding the font-size tokens rather
+      than by patching individual rules — so every dashboard page shifts
+      together and a rule added tomorrow inherits the reduced scale instead of
+      reverting one piece of it.
+- [x] Padded down in step, and the tap target kept at or above 44px so
+      two-across does not become hard to hit.
+
+## Segment 4 — provider section, delete icon centring
+
+- [x] **The delete button's glyph is not centred in its own box.**
+      `.nt-keys__del` sets `width/height: 2rem` and `display: inline-flex` with
+      centring, but the button also carries `.nt-btn`, whose `::before`
+      (`content: "$ "`) is a flex item ahead of the icon — so the glyph is
+      pushed right of centre. `.nt-btn--icon` already solves this with
+      `::before { content: none }`; `.nt-keys__del` was simply never given the
+      class, so the fix is to apply it rather than to re-derive it.
+- [x] Verified the icon box, not just the button box, is centred, and that the
+      glyph keeps its own hit target.
+
+## Segment 5 — custom routing (the big one)
+
+The reader names their own OpenAI-compatible endpoint, pulls its free models,
+adds any the pull misses, and routes the tutor through it.
+
+- [x] **The allowlist is deliberately being widened, and that is a real trade.**
+      `lib/providers.ts` exists so a stored `provider` cannot point the server
+      at an arbitrary host. Custom routing removes that guarantee for user
+      rows. What replaces it is stated rather than assumed, below.
+- [x] **`custom-provider-url.ts` — validation, server-side only.** https only;
+      no credentials in the URL; no query or fragment; host must not be
+      `localhost`/`.local`/`.internal` or any other suffix that cannot be
+      public; **every** A and AAAA record must be a global unicast address —
+      loopback, private, CGNAT, link-local, unique-local, multicast, reserved
+      and unspecified are all refused, and *one* bad record fails the whole
+      host rather than being averaged away; IPv6 is checked with the embedded
+      IPv4 forms (`::ffff:127.0.0.1`) included, because that is the spelling
+      that defeats a naive check.
+- [x] **Documented honestly: DNS is checked at save time, so a rebind between
+      the check and the call is still possible.** The mitigation is layered
+      rather than claimed as absolute — the resolved address set is re-checked
+      on the call path, redirects are refused rather than followed, and a
+      custom provider can only ever carry *its own reader's* credential.
+- [x] **Schema.** `provider_keys` gains `kind`, `name`, `base_url`; a new
+      `provider_models` table holds the per-provider model catalogue. DDL in
+      `packages/db/scripts/` (since `db:push` is still broken — see Database and
+      tooling), RLS in `create-rls-policies.mjs` and both `neon-setup-*.sql`,
+      grants in `create-app-role.mjs` / `neon-setup-5-app-role.sql`, and both
+      audit scripts updated so the new table is actually checked.
+- [x] **The provider slug for a custom row is server-generated** (`custom_<n>`),
+      so the name the reader typed is display-only and never reaches a URL, a
+      log, or a provider. The existing (user, provider) uniqueness index and the
+      existing delete route both keep working unchanged.
+- [x] **Pull free models** hits `{baseUrl}/models` with the reader's own
+      credential, keeps ids ending in `:free`, and upserts. It reports what it
+      kept rather than silently replacing the list, so a provider that renamed
+      its free tier is visible rather than discovered.
+- [x] **Add a custom model** by id, for the ones the pull cannot see — which is
+      every self-hosted endpoint, and any provider whose free tier is priced at
+      zero without carrying the suffix.
+- [x] **Server-side re-validation before the call.** A crafted request naming a
+      model that is not in that reader's catalogue is refused with a stated
+      reason, exactly as a paid OpenRouter slug is. The client cannot widen the
+      set.
+- [x] Custom models appear in the tutor's dropdown, grouped under the
+      provider's name — see Segment 10.
+
+## Segment 6 — modules page
+
+- [x] **Drop the `~/` link from `/modules`.** It is a second route to the
+      landing page in a row that already has the `nexus_` mark doing exactly
+      that, one item above it.
+
+## Segment 7 — AI tutor header
+
+- [x] **Delete the `~/`, `~/modules`, `~/dashboard`, `~/practice` and sparkles
+      buttons.** `components/header.tsx` is shared by `/ai` and `/practice`, so
+      all five come out of both. The header keeps the `nexus_` mark, the user
+      menu and the theme toggle.
+- [x] **The AI tutor button moves into the actions group** beside the user menu
+      and the theme toggle, with the same glass-morphed container the other
+      icon buttons use. It is hidden on `/ai` itself, where it would be a link
+      to the page you are on.
+
+## Segment 8 — AI tutor behaviour
+
+- [x] **Two boxes instead of one while thinking.** `useChat` appends the
+      assistant message on submit, before any text exists, and the component
+      rendered a *separate* `thinking` bubble beneath the list — so the empty
+      bubble was the answer's slot and the second bubble was the status. On
+      success the first filled and the second vanished; on failure the first
+      stayed empty forever and the error landed in the second. Fixed by
+      rendering the status **in** the pending slot and rendering nothing for a
+      message with no text, so there is exactly one bubble in every state.
+- [x] **Sending with the history pane open collapsed the header and left the
+      pane hanging.** The pane is a sibling of the header, so collapsing the
+      header did not touch it. Sending now closes it outright.
+- [x] **Search box in the model dropdown.** Added to `CenteredSelect` as an
+      opt-in, since the feedback form shares the component and has five
+      options. Filtering is on label, hint and group; the keyboard contract
+      (arrows, Home/End, Enter, Escape, `aria-activedescendant`) is preserved
+      over the filtered set.
+
+## Segment 9 — user menu
+
+- [x] **`/practice` is reachable from nowhere.** It is in `DASH_ACTIONS` only as
+      a route, has no tab, and is not in the menu. Added to `UserMenu` with its
+      own icon, which is the menu every surface already reaches.
+
+## Segment 10 — favourited models
+
+Raised during this pass, after the first list was written.
+
+- [x] **Star a model from the picker; starred models sort to the top**, shown as
+      `model · provider` so two starred entries from different providers can
+      both be identified at a glance.
+- [x] Stored per browser in `localStorage` next to the existing model
+      preference, wrapped in try/catch like it — a preference is never worth
+      breaking the chat over.
+- [x] Stars survive a provider being deleted and come back when it returns.
+
+---
+
+# SEGMENT 11 — refined buttons (NOT this turn)
+
+Not started, and deliberately so: a change to the site's primary control
+should not ride along inside a bug-fix pass. Needs its own plan, its own
+review, and eyes on every surface at once.
+
+- [ ] **Inventory first.** Every control the product renders, listed by family:
+      `.nt-btn` (+ `--ghost` / `--icon`), `.nt-tile`, `.nt-drow`, `.nt-ai__tool`,
+      `.nt-ai__starter`, `.nt-ai__send`, `.nt-sel__btn`, `.nt-keyboard__*`,
+      `.nt-menu__ico`, the practice option buttons, the module rows, the
+      dropdown-menu items from `@Main/ui`. One list, before one line changes.
+- [ ] **Decide the families.** How many buttons are there, and which of those
+      are genuinely distinct controls rather than the same control at two
+      sizes? "Refined" is not a spec — a scale is.
+- [ ] **One implementation, not forty call sites.** The terminal aesthetic
+      (`"$ "` prompt, mono face, glass shell, `--hover-grow`) is carried by a
+      pseudo-element and a class today, which means every variant restates it.
+      Decide whether it moves into a component with real props.
+- [ ] **States.** Default, hover, focus-visible, active, disabled, loading,
+      destructive. Two of those are currently done well and four are
+      improvised per call site.
+- [ ] **Tap targets.** 44px minimum, enforced rather than remembered. The
+      icon buttons are `--nt-icon-btn` (2.25rem) and there is at least one
+      2rem square delete control.
+- [ ] **Reduced motion.** `--dur-hover` is 520ms and several transitions ride
+      it. Honour `prefers-reduced-motion` across the whole control set, not
+      only where someone remembered.
+- [ ] **Light mode.** The hover tokens were hand-picked per palette
+      (`audit-key-colours.mjs` covers contrast, not interaction), so no
+      control has been looked at in light mode on hover.
+
+# SEGMENT 12 — animation pass (NOT this turn)
+
+Same reasoning as Segment 11, and it is the larger of the two: motion that is
+not designed is indistinguishable from jank.
+
+- [ ] **What already animates, and what should.** The ASCII/horizon fields, the
+      caret, the scroll reveal, the marquee, the hero morph, the collapse. Set
+      the rule first: what earns motion is a change of state the reader caused,
+  or a change of state they need to notice.
+- [ ] **Everything that currently snaps.** Page transitions, tab changes,
+      menu open/close, dropdown entry, toast entry, list insert, tile hover
+      (present), skeleton→content swap, error appearance.
+- [ ] **Durations and easings from tokens.** `--dur-fast` / `--dur-hover` /
+      `--dur-slow` exist; confirm the set is coherent, that nothing exceeds
+      ~300ms for a response to a tap, and that a state change the reader caused
+      is never slower than a state change they did not.
+- [ ] **`prefers-reduced-motion` everywhere, not per-component.** The field
+      honours it, the reveal honours it, and at least three other transitions
+      do not.
+- [ ] **No layout-shifting animation, and nothing that animates on load that
+      delays the first read of the page.**
+- [ ] **Sequencing.** Entry staggers on lists are the most likely to be done
+      badly and the first thing to cut if they are.
+
+---
+
+### What verification actually found
+
+Not by reading the code. Each of these looked correct, passed `tsc`, and
+passed a markup assertion; each was caught by running the thing.
+
+- [x] **The model search field rendered READ-ONLY.** `value={query}` with
+      no `onChange` — React renders a controlled field with no handler as
+      read-only, and says so in development. The box took focus, showed
+      the right placeholder, looked perfect, and refused every keystroke.
+- [x] **Two React keys collided the moment anything was starred.** A
+      starred model is listed twice on purpose — once under "favourites",
+      once in its provider's own section — and both rows carried the same
+      `value`, which was the React key. `SelectOption.rowKey` now
+      separates the two; `value` stays the identity of the CHOICE.
+- [x] **Every load of /ai and /practice threw a hydration mismatch.** The
+      server has no session, so it rendered the "sign in" link; the first
+      client render had the session and rendered the user menu instead.
+      Pre-existing, and it lived in the header this round rewrote — which
+      now waits for `isPending` instead of branching around `UserMenu`'s
+      own pending state.
+- [x] **The custom-provider POST schema required `provider`, which a
+      custom request has no value for**, because the server mints the slug.
+      Every save came back "Malformed request." before any of the real
+      validation ran, so the message named neither the kind nor the
+      address.
+- [x] **The new models route origin-checked its GET.** A GET has nothing
+      to forge — `/api/keys` GET already argues that at length — and the
+      sub-route was quietly the only read under `/api/keys` that a script
+      or a monitor could not call. `checkOrigin` is a parameter now, so
+      each method has to choose.
+- [x] **Two bugs in the address validator**, both caught by
+      `apps/web/scripts/test-custom-provider-url.ts` (~150 assertions):
+      `new URL().hostname` keeps its brackets for IPv6, so `[::1]` slipped
+      past every range check and fell through to the bare-hostname rule;
+      and the range table listed three addresses in both the blocked and
+      the allowed set, which is how `172.15.255.255` and `100.63.255.255`
+      came to be asserted both ways at once.
 
 ---
 
@@ -381,6 +684,16 @@ Not retrieval; the turn itself.
 
 ## Auth gaps
 
+- [ ] **`/practice` is not in the proxy's `PREFIXES`.** `apps/web/src/proxy.ts`
+      lists `/dashboard` and `/ai` and the file argues that matching by
+      prefix is the whole point — "a new route under /dashboard or /ai is
+      covered the moment it exists, without anyone remembering to opt in".
+      `/practice` moved into the `(app)` group after that list was written
+      and never went into it. The page still calls `requireSession()` so it
+      is not open; the belt is simply missing a pair of braces, which is
+      exactly the failure the proxy exists to prevent. One line, not done
+      here because nothing in this round touched the proxy and an
+      unrequested change to an auth boundary should be its own commit.
 - [ ] **Social auth is not implemented.** The Google and GitHub buttons on
       `/login` are `disabled` placeholders. Adding it means a Better Auth
       social plugin plus OAuth credentials.
@@ -399,6 +712,16 @@ Not retrieval; the turn itself.
       clean checkout with no schema changes, so it is an environment problem,
       not a schema problem. The tables are written and typecheck; they have
       not been pushed to a database.
+- [ ] **`neon-setup-5-app-role.sql` is behind `create-app-role.mjs`.** The
+      two privilege matrices are supposed to agree, and `check-grants.mjs`
+      only compares the script against its own list — so the SQL file can
+      drift from both without anything noticing. It already has: it never
+      gained the grants for `read_usage` or for `practice_questions` /
+      `practice_attempts`, so a database built by running the Neon parts in
+      order has no privilege on any of them. `provider_models` was added to
+      both because this round touched them; the other three were not, since
+      nothing here exercised them. Worth a line each, and a check that
+      reads the SQL rather than only the JS.
 - [ ] **`next build` fails the same way**, on the same libuv assertion.
       `next dev` is unaffected. Nothing in this app has been verified through
       a production build.

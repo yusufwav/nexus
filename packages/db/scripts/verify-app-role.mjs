@@ -37,7 +37,7 @@ const eq = (label, actual, expected) => {
   else bad(`${label}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
 };
 
-const RLS_TABLES = ["provider_keys", "purchases", "chat_threads", "chat_messages"];
+const RLS_TABLES = ["provider_keys", "provider_models", "purchases", "chat_threads", "chat_messages"];
 
 async function asReader(reader, fn) {
   const c = new Client({ connectionString: url });

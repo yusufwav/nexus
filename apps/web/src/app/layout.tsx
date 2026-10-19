@@ -56,28 +56,37 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         {/*
-          The scroll-reveal effects hide content with opacity: 0 until
-          JS drives them, which meant a slow — or never — hydration left
-          the page blank. This opts in to hiding only when the browser
-          can run the reveal. It executes before first paint, so there
-          is no flash; and the timer guarantees the page becomes visible
-          again even if React never hydrates at all, which is what a
-          cold load on a LAN address or a phone would otherwise hit.
+          THE REVEAL GATE IS CSS-ONLY NOW.
+
+          The gate used to be a <script> that added `.js-reveal` to <html>
+          before first paint, gating the hide of [data-reveal] content.
+          React 19 refuses to render a <script> as a component child and
+          warns on every load, and the two supported next/script forms in
+          this version of Next do not actually land a blocking script in
+          <head> — one is serialised into the RSC flight payload (too
+          late) and the other becomes a preload link (also too late). So
+          the gate could not stay a script.
+
+          It is now entirely in landing.css and app.css. [data-reveal]
+          starts at low opacity and carries a three-second failsafe
+          animation that forces it to full opacity. The failsafe is
+          scoped to `html:not([data-reveal-ready])`, so it is dead as
+          soon as ScrollReveal mounts and reports in; on a failed
+          hydration nothing ever reports in, so it fires and the page is
+          visible but un-animated instead of blank. No script, no class
+          to coordinate, no console warning, and the hide is in effect
+          from the very first frame because the rule lives in the
+          stylesheet that is already in <head>.
+
+          This does NOT mean the reveals are unconditional. Content
+          stays dim until its block scrolls into view, which is the
+          whole point of the effect. The failsafe is only the
+          failure path.
+
+          The exact selector shapes live in landing.css and app.css,
+          and they are load-bearing in a way that is easy to undo by
+          accident — read the note there before touching them.
         */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              'document.documentElement.classList.add("js-reveal");' +
-              // If React never hydrates, nothing will ever remove
-              // .js-reveal, so the reveal styles would hide the page for
-              // good. The marker below is set by ScrollReveal on mount;
-              // its absence means hydration failed, and hiding must be
-              // undone. Runs inline and before first paint, so there is
-              // no flash of visible content on a healthy load.
-              'setTimeout(function(){if(!document.documentElement.dataset.revealReady)' +
-              '{document.documentElement.classList.remove("js-reveal")}},3000)',
-          }}
-        />
       </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} ${playfair.variable} antialiased`}>
         <PwaRegistration />

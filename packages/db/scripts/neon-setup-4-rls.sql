@@ -42,10 +42,34 @@ CREATE OR REPLACE FUNCTION app_reader_id() RETURNS text LANGUAGE sql STABLE AS $
 -- A credential per reader. The WITH CHECK half is what stops a caller that
 -- somehow passed another reader's id from writing a row for them: the insert
 -- is rejected rather than stored.
+--
+-- This table now also carries a reader's own endpoints (kind/name/base_url),
+-- so it decides where the server is willing to make requests. The shape is
+-- unchanged; what it protects is bigger.
 ALTER TABLE "provider_keys" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "provider_keys" FORCE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS provider_keys_reader ON "provider_keys";
 CREATE POLICY provider_keys_reader ON "provider_keys"
+  FOR ALL TO public
+  USING      (user_id = app_reader_id())
+  WITH CHECK (user_id = app_reader_id());
+
+
+-- ---- provider_models --------------------------------------------------------
+-- The catalogue a reader built for their own custom provider, and the table the
+-- tutor's `hasProviderModel` check reads before it will call anything. A row
+-- names a model id and a provider slug, so a reader who could read another
+-- reader's catalogue could get their own model id onto another reader's
+-- provider - which is the one thing custom routing must not allow.
+--
+-- Same shape as provider_keys, and the WITH CHECK half matters for the same
+-- reason. The `provider` column has no foreign key on purpose (a built-in
+-- provider's models live in OpenRouter's catalogue, not here), so this policy
+-- is the only thing separating "my provider" from "somebody else's".
+ALTER TABLE "provider_models" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "provider_models" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS provider_models_reader ON "provider_models";
+CREATE POLICY provider_models_reader ON "provider_models"
   FOR ALL TO public
   USING      (user_id = app_reader_id())
   WITH CHECK (user_id = app_reader_id());

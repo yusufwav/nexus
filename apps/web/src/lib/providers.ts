@@ -38,6 +38,53 @@ export function isProviderSlug(value: unknown): value is ProviderSlug {
 }
 
 /* ============================================================
+   CUSTOM PROVIDERS
+   ============================================================
+
+   Everything above this line is the allowlist, and its whole purpose is
+   that nothing from the database chooses a destination. Custom routing
+   deliberately relaxes that — for the reader's OWN rows, and behind
+   `lib/custom-provider-url.ts`, which validates the address. What
+   follows is the small amount of machinery needed to keep the two kinds
+   apart without ever confusing them.
+
+   WHY THE SLUG IS SERVER-MINTED AND NOT THE READER'S NAME
+   ------------------------------------------------------------
+   The reader types a name for their provider ("my laptop", "the uni
+   box"). That name goes in `provider_keys.name` and nowhere else. The
+   `provider` column holds `custom_<24 hex>` instead.
+
+   This is not tidiness. The slug is used as a URL path segment
+   (`DELETE /api/keys/<provider>`), it is compared against, and it ends
+   up in log lines. A reader-supplied string in that position is a
+   request path that contains arbitrary text, and the one thing that is
+   guaranteed about it is that somebody will eventually type a `/` into
+   it. Minting it server-side means the slug has a known grammar that
+   can be validated with one regular expression, and the name can be as
+   long and as odd as the reader likes.
+   ============================================================ */
+
+const CUSTOM_SLUG = /^custom_[0-9a-f]{24}$/;
+
+/** Is this slug one this server minted for a custom provider? */
+export function isCustomProviderSlug(value: unknown): boolean {
+  return typeof value === "string" && CUSTOM_SLUG.test(value);
+}
+
+/** A fresh slug. Opaque, lowercase, and validated by CUSTOM_SLUG. */
+export function customProviderSlug(): string {
+  const bytes = new Uint8Array(12);
+  globalThis.crypto.getRandomValues(bytes);
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `custom_${hex}`;
+}
+
+/** A provider slug this server is willing to route to. */
+export function isKnownProviderSlug(value: unknown): value is ProviderSlug | string {
+  return isProviderSlug(value) || isCustomProviderSlug(value);
+}
+
+/* ============================================================
    THE FREE MODEL CATALOGUE
    ============================================================
 
@@ -220,4 +267,45 @@ export function isAllowedModel(modelId: unknown): modelId is string {
   if (modelId === DEFAULT_OPENROUTER_MODEL) return true;
   const list = cache?.models ?? FALLBACK_FREE_MODELS;
   return list.includes(modelId);
+}
+
+/* ============================================================
+   THE FREE-TIER SUFFIX
+   ============================================================
+
+   `isAllowedByPolicy` above filters the OpenRouter catalogue on PRICING,
+   because OpenRouter publishes pricing and "is it free" is a fact about
+   the model rather than about its name.
+
+   A custom endpoint has no such field. `{baseUrl}/models` is an
+   OpenAI-shaped list of ids and nothing else — there is no price, no
+   capability block, no tool-support declaration. So for a reader's own
+   endpoint the only honest signal available is the one everybody in
+   this ecosystem already uses, which is the `:free` suffix on the id.
+
+   `isFreeModelId` exists as a named function rather than as an
+   `.endsWith(":free")` at the one call site, for two reasons: it is the
+   entire definition of "free" for the custom path and is going to be
+   asked about in review, and the case-folding matters because ids come
+   back from other providers in whatever case they please.
+   ============================================================ */
+export function isFreeModelId(modelId: string): boolean {
+  return modelId.trim().toLowerCase().endsWith(":free");
+}
+
+/**
+ * Human-friendly name for a model id from a reader's own endpoint.
+ *
+ * Same treatment as `labelFor`, minus the vendor strip: a custom
+ * endpoint's ids are frequently bare (`qwen3:8b`, `llama-3.1-8b-instruct`)
+ * with no `vendor/` prefix at all, so `split("/").pop()` would throw away
+ * nothing on those and everything on the ones that do have one — and a
+ * self-hosted reader choosing between `qwen3:8b` and `qwen3:32b` needs to
+ * see the difference, which the vendor prefix does not carry.
+ */
+export function labelForCustomModel(id: string): string {
+  return id
+    .replace(/:free$/, "")
+    .replace(/-it$/, " (instruct)")
+    .replace(/-/g, " ");
 }

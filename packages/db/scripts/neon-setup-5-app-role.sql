@@ -48,6 +48,11 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON "provider_keys" TO nexus_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON "chat_threads" TO nexus_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON "chat_messages" TO nexus_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON "ai_usage" TO nexus_app;
+-- The per-reader model catalogue behind custom routing. The reader builds
+-- it - the `:free` pull inserts, adding a model by hand inserts, removing
+-- one deletes, a refresh replaces the free rows - so it is read/write.
+-- Scope is the RLS policy in part 4: user_id = app_reader_id().
+GRANT SELECT, INSERT, UPDATE, DELETE ON "provider_models" TO nexus_app;
 
 
 -- ---- read only --------------------------------------------------------------
@@ -82,7 +87,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON "rateLimit" TO nexus_app;
 SELECT rolname, rolsuper, rolbypassrls, rolcreatedb, rolcreaterole
   FROM pg_roles WHERE rolname = 'nexus_app';
 
--- Expected: provider_keys, purchases, chat_threads, chat_messages = true/true
+-- Expected: provider_keys, provider_models, purchases, chat_threads, chat_messages = true/true
 SELECT c.relname AS table_name, c.relrowsecurity AS rls, c.relforcerowsecurity AS forced
   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
  WHERE n.nspname = 'public' AND c.relkind = 'r'

@@ -425,6 +425,26 @@
   transform: translateX(20px);
   background: var(--accent-b);
 }
+/*
+   THE SAME HOVER, EITHER WAY ROUND.
+
+   This was the last control on the dashboard with no pointer state at
+   all: pressing the edge of a switch changed nothing at all, so the only
+   feedback that it was a control came from the knob moving after the
+   press had already landed. It is off and on identically, which means
+   the highlight cannot depend on the current value.
+
+   Border and glow only - a switch does not lift. It translates, and the
+   knob has 20px of travel already spent on its own transition.
+*/
+.nt-root .nt-switch:hover:not(:disabled) {
+  border-color: var(--hover-edge);
+  box-shadow: var(--hover-glow);
+}
+.nt-root .nt-switch:focus-visible {
+  outline: 2px solid var(--accent-b);
+  outline-offset: 2px;
+}
 .nt-root .nt-switch:disabled {
   cursor: not-allowed;
   opacity: 0.45;
@@ -1512,14 +1532,48 @@
   background-color: var(--hover-fill);
   box-shadow: var(--hover-glow);
 }
+
+/*
+   A TILE WITHOUT AN href IS STILL A TILE.
+
+   `.nt-tile--soon` used to switch the hover OFF — `transform: none`, the
+   plain border, no glow, and `cursor: not-allowed`. The intent was to
+   mark the unbuilt tiles as not-yet-there. What it actually did was
+   make seven of the eight cards on /dashboard dead to the pointer while
+   the eighth — "Study partner history", the only one with an `href`,
+   which renders as an `<a>` — carried the full treatment. One card
+   working and seven not reads as seven broken cards, not as seven
+   plans, and nobody is going to believe the distinction is deliberate
+   when it looks exactly like a rendering fault.
+
+   So the surface treatment is now uniform. It says "this is a card on
+   this page", which is true of all eight and was the actual job of the
+   hover.
+
+   WHAT DID NOT CHANGE, and is the part that matters:
+
+     · the tiles are still `disabled` and still do nothing;
+     · `cursor` is a pointer rather than `not-allowed`, because the card
+       IS a target — just one whose feature is not written yet, and the
+       old value was a lie about the affordance;
+     · the `placeholders` badge and each card's own `concept ·` line
+       still say exactly what is and is not built.
+
+   A hover is a claim about the surface. It is not a claim that the
+   feature exists, and nothing here makes it one.
+*/
 .nt-tile--soon {
-  cursor: not-allowed;
+  cursor: pointer;
 }
-.nt-tile--soon:hover {
-  transform: none;
-  border-color: var(--line);
-  background-color: var(--panel);
-  box-shadow: none;
+/* Keyboard parity: a tile reachable by Tab gets the same treatment a
+   mouse gives it, or the affordance is sighted-only. */
+.nt-tile:focus-visible {
+  outline: 2px solid var(--accent-b);
+  outline-offset: 2px;
+  transform: translateY(var(--hover-lift));
+  border-color: var(--hover-edge);
+  background-color: var(--hover-fill);
+  box-shadow: var(--hover-glow);
 }
 .nt-tile__glyph {
   font-size: 1.2rem;
@@ -1764,38 +1818,21 @@
   color: var(--accent-b);
   animation: nt-blink var(--dur-caret) step-end infinite;
 }
-.nt-head__links {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-5);
-  margin-right: auto;
-  margin-left: var(--sp-6);
-}
-.nt-head__link {
-  color: var(--fg-dim);
-  text-decoration: none;
-  letter-spacing: var(--tracking);
-  transition: color var(--dur-fast) var(--ease-out);
-}
-.nt-head__link:hover {
-  color: var(--accent-b);
-}
-.nt-head__link--on {
-  color: var(--fg);
-}
-/* The tutor, drawn as the spark the AI page's own heading uses. Sized
-   and centred so it sits on the same optical line as the neighbouring
-   paths instead of shifting them along. */
-.nt-head__link--icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding-block: 0.15em;
-}
-.nt-head__link--icon svg {
-  width: 1.05em;
-  height: 1.05em;
-}
+/*
+   THE PATH NAV IS GONE.
+
+   `.nt-head__links`, `.nt-head__link`, `.nt-head__link--on` and
+   `.nt-head__link--icon` all came out with the markup that used them,
+   along with the `@media (max-width: 760px)` rule that hid them. Five
+   destinations, four of them a row of path-shaped labels, on the two
+   pages whose whole subject is a conversation and a question.
+
+   `margin-left: auto` moved from the deleted `.nt-head__links` onto
+   `.nt-head__actions` below. It is what pushed the controls to the right
+   edge; with the nav gone the actions group is the only other child, so
+   without it the wordmark and the controls would sit shoulder to
+   shoulder.
+*/
 
 /* A button whose only content is a glyph. Squares the hit area up so
    an icon does not present a smaller target than the text buttons
@@ -1823,15 +1860,26 @@
   width: 1.05rem;
   height: 1.05rem;
 }
+
+/*
+   THE HEADER'S RIGHT-HAND GROUP: tutor, identity, theme.
+
+   One row, one gap, three controls - and the tutor is a square among
+   squares rather than a path among paths.
+
+   No size rule here on purpose. `nt-btn--icon` already sizes it to
+   `--nt-icon-btn`, which is the same token the theme toggle and the
+   user-menu trigger use in this row, so the three line up by
+   construction. `--nt-ctl-h` was tried and removed: it is the
+   dashboard toolbar's height (2.75rem against 2.25rem here), and using
+   it here made the tutor stand 8px taller than the two controls it sits
+   between.
+*/
 .nt-head__actions {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-}
-@media (max-width: 760px) {
-  .nt-head__links {
-    display: none;
-  }
+  margin-left: auto;
 }
 
 /* A dropdown that still looks like it belongs to the product. The
@@ -1861,14 +1909,19 @@
    on one element beats both without !important. */
 .nt-menu__bar.nt-menu__bar {
   /* Overrides the primitive's w-(--anchor-width), which would otherwise
-     stretch the bar to the full viewport. Sized to its contents instead,
-     with a floor so it does not pinch shut on a small screen and a cap
-     so six icons never sprawl across a wide monitor. */
+     stretch the bar to the full viewport. Sized to its contents instead.
+     The cap is a wrap rather than a clamp: with /practice added the bar
+     is eight destinations, and at 36px a square plus a gap that is
+     ~380px of icons - which overflows a 375px phone by a few pixels, and
+     an icon row that silently loses its last item behind the edge is
+     worse than one that wraps onto a second line. */
   width: auto;
   max-width: calc(100vw - var(--sp-4));
   display: flex;
   flex-direction: row;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
   /* The anchor is a zero-height rect at the very top, so the bar's top
@@ -1888,10 +1941,10 @@
   /* The primitive sets `overflow-x-hidden overflow-y-auto` on the popup so
      a long menu can scroll inside its own bounds. That clips the
      per-item tooltips, which hang below the bar and were being cut off
-     at the bar's own edge. Safe to drop here precisely because this menu
-     is six fixed items in one row: it is never taller than its content
-     and so never needs to scroll. Doubled class again, to beat those
-     single-class utilities. */
+     at the bar's own edge. Safe to drop here because the bar wraps
+     instead of growing past its cap: it is never taller than one or two
+     rows of icons, so it never needs to scroll. Doubled class again, to
+     beat those single-class utilities. */
   overflow: visible;
   transform-origin: top center;
   /* Overrides the primitive's own data-open:animate-in / fade-in-0 /
@@ -2128,28 +2181,91 @@
   white-space: nowrap;
   color: var(--fg-muted);
 }
-.nt-keys__del {
+/*
+   THE DELETE BUTTON ON A CREDENTIAL ROW.
+
+   Written as `.nt-keys__del.nt-keys__del` rather than `.nt-keys__del`
+   for the same reason `.nt-btn--icon.nt-btn--icon` and
+   `.nt-menu__bar.nt-menu__bar` are written doubled in this file: the
+   element also carries `.nt-btn`, which is a single class in
+   landing.css. `app.css` is imported by the root layout and
+   `landing.css` by each page that needs it, so which of two equal
+   single-class rules wins is decided by bundle order rather than by
+   anything in either file. Doubling the class settles it on
+   specificity and needs no `!important`.
+
+   What that was actually losing:
+
+     · `padding: 0` against `.nt-btn`'s `var(--sp-3) var(--sp-5)`, so a
+       2rem box was carrying 48px of horizontal padding;
+     · `border: 0` and `background: transparent`, so the delete control
+       was wearing the full glass button shell;
+     · and the centring itself. `.nt-btn` is `display: inline-block` and
+       `.nt-keys__del` overrides it to `inline-flex` - but the padding it
+       was losing pushed the glyph out of optical centre, so the trash
+       icon sat low and left of the middle of its own button.
+
+   `::before { content: none }` is the same belt-and-braces the icon
+   buttons use: `.nt-btn::before` is the `"$ "` shell prompt, a real
+   flex item ahead of the glyph. `.nt-btn--ghost::before` already
+   neutralises it to `content: ""`, and an empty flex item measures zero
+   - so this is not what was shifting the icon, it is here so that
+   dropping `--ghost` from this button can never silently reintroduce
+   a two-character prompt inside a 2rem square.
+*/
+.nt-keys__del.nt-keys__del {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
   width: 2rem;
   height: 2rem;
+  min-height: 0;
   padding: 0;
   border: 0;
+  border-radius: var(--r-sm);
   background: transparent;
   /* Was --fg-dim: 3.84:1 dark / 3.44:1 light. A destructive control is
      the last thing that should be hard to see. */
   color: var(--fg-muted);
   cursor: pointer;
-  transition: color var(--dur-fast) var(--ease-out);
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+.nt-keys__del.nt-keys__del::before {
+  content: none;
 }
 .nt-keys__del svg {
+  display: block;
   width: 0.95rem;
   height: 0.95rem;
 }
 .nt-keys__del:hover:not(:disabled) {
   color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 52%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+/* A 2rem square is 32px against a 44px recommendation, and a delete
+   control is the last thing on the row a finger should have to hunt
+   for. The hit area is grown with a pseudo-element rather than the box,
+   so the glyph does not move and the row does not grow. */
+.nt-keys__del::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+.nt-keys__del {
+  position: relative;
+}
+.nt-keys__del:focus-visible {
+  outline: 2px solid var(--accent-b);
+  outline-offset: 2px;
+}
+.nt-keys__del:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 .nt-keys__form {
   display: flex;
@@ -2208,6 +2324,192 @@
 .nt-keys__note--bad {
   color: var(--danger);
 }
+.nt-keys__note code {
+  font-family: inherit;
+  color: var(--accent-b);
+}
+
+/* ============================================================
+   CUSTOM ROUTING
+   ------------------------------------------------------------
+   Its own block rather than a "custom" entry in the provider
+   dropdown, because it is three fields and a second step while the
+   built-in form is a three-column row. Sharing the row gave a 390px
+   phone about eleven characters per field.
+   ============================================================ */
+.nt-keys__custom {
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.nt-keys__customhead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+/*
+  The toggle beside it is a `.nt-btn`, which is `display: inline-block`
+  with no width of its own. As a flex item it got squeezed by the
+  paragraph beside it and wrapped "add a provider" onto two lines with
+  the icon alone on the first — which reads as a tall empty box rather
+  than as a button. `flex: 0 0 auto` plus `nowrap` says "this one is
+  sized by its label", and the label is the thing that has to stay on
+  one line.
+*/
+.nt-keys__customhead > .nt-btn {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: var(--sp-2);
+  white-space: nowrap;
+}
+.nt-keys__customhead > .nt-btn svg {
+  width: 0.85rem;
+  height: 0.85rem;
+}
+.nt-keys__customtitle {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--fg);
+}
+.nt-keys__customlead {
+  margin: var(--sp-1) 0 0;
+  max-width: 40rem;
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  color: var(--fg-dim);
+}
+.nt-keys__field--wide {
+  flex: 2 1 22rem;
+}
+.nt-keys__small {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.nt-keys__small svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+.nt-keys__providertools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+.nt-keys__addmodel {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.nt-keys__addmodel input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-1);
+  color: var(--fg);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-xs);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.nt-keys__addmodel input::placeholder {
+  color: var(--fg-dim);
+}
+.nt-keys__addmodel input:hover {
+  border-color: var(--hover-edge);
+}
+.nt-keys__addmodel input:focus-visible {
+  outline: none;
+  border-color: var(--accent-b);
+}
+
+/* One saved custom provider: its credential row, its two actions, and the
+   catalogue it has accumulated. */
+.nt-keys__provider-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel);
+}
+/* A catalogue row is the model's name over its id, because on a custom
+   endpoint the id is the only thing guaranteed unique - two of them are
+   frequently called the same friendly thing. */
+.nt-keys__models {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.nt-keys__modelrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+.nt-keys__modelrow:hover {
+  border-color: var(--hover-edge);
+  background: var(--hover-fill);
+}
+/* The chosen model is marked by its edge and its tint rather than by a
+   radio dot, which would have meant a third control in a row that is
+   already a control plus a delete. */
+.nt-keys__modelrow.is-on {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+}
+.nt-keys__modelpick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: var(--sp-2) var(--sp-3);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.nt-keys__modelname {
+  font-size: var(--fs-xs);
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-keys__modelid {
+  font-size: 0.62rem;
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nt-keys__modelrow.is-on .nt-keys__modelid {
+  color: var(--accent-b);
+}
 
 /* ============================================================
    MOTION
@@ -2215,7 +2517,7 @@
    rather than fading in as one slab. The keyframes themselves are
    defined in landing.css and shared.
 
-   THE HIDE IS GATED ON .js-reveal, and that gate is the whole point.
+   THE HIDE IS GATED, and the gate is the whole point.
    It used to be an unconditional `.nt-dash [data-reveal] { opacity: 0 }`,
    so the dashboard had a hide with no guaranteed reveal:
 
@@ -2230,14 +2532,28 @@
 
    So every dashboard route rendered its heading and then nothing, for
    good. Two changes fix it: ScrollReveal is mounted in
-   dashboard-shell.tsx so the reveal actually runs, and this hide now
-   shares landing's .js-reveal gate, so a genuine hydration failure
-   degrades to "content visible but un-animated" rather than "page
-   blank". .nt-root.nt-dash is a single element, so the compound
-   selector also outranks landing.css's rule at equal class count.
+   dashboard-shell.tsx so the reveal actually runs, and this hide shares
+   landing's gate, so a genuine hydration failure degrades to "content
+   visible but un-animated" rather than "page blank".
+
+   The gate is now CSS rather than a class set by a script in
+   layout.tsx, and the shape of the rules matters: the failsafe and the
+   reveal are separated by `:not(.is-in)` so they can never both match
+   one element. An earlier version cancelled the failsafe with a plain
+   `html[data-reveal-ready] ... { animation: none }` rule instead, and
+   that rule outranked the reveal, so no dashboard block ever animated
+   in. Read the note in landing.css before changing these selectors.
+   .nt-root.nt-dash is a single element, so the compound selector also
+   outranks landing.css's rule at equal class count.
    ============================================================ */
-.js-reveal .nt-root.nt-dash [data-reveal] {
+.nt-root.nt-dash [data-reveal] {
   opacity: 0;
+}
+html:not([data-reveal-ready]) .nt-root.nt-dash [data-reveal]:not(.is-in) {
+  animation: nt-rv-failsafe 3s steps(1) forwards;
+}
+.nt-root.nt-dash [data-reveal].is-in {
+  animation: nt-rv-fade-up 620ms var(--ease-out) forwards;
 }
 .nt-dash .nt-rv-rise,
 .nt-dash .nt-rv-wipe,
@@ -2251,6 +2567,11 @@
 }
 .nt-dash .nt-rv-line {
   opacity: 0;
+}
+/* Same mutually-exclusive shape as the block rules above, scoped through
+   the parent block because `.is-in` lands on the block, not the line. */
+html:not([data-reveal-ready]) .nt-root.nt-dash [data-reveal]:not(.is-in) .nt-rv-line {
+  animation: nt-rv-failsafe 3s steps(1) forwards;
 }
 .nt-dash .is-in .nt-rv-line {
   animation: nt-rv-line-in 520ms var(--ease-out) forwards;
@@ -3386,6 +3707,105 @@
   outline: 2px solid var(--accent-line);
   outline-offset: 2px;
 }
+
+/* The filter field, and the listbox it filters.
+   The panel is an ordinary flex column: title, field, list, key hints.
+   The listbox is its own element rather than the panel, so a text field
+   is never a child of `role="listbox"` - see the note in
+   centered-select.tsx for what that does to the announced item count.
+   It owns the scroll, which is why it needs `min-height: 0` here: a
+   flex child defaults to `min-height: auto` and refuses to shrink below
+   its content, so without it the panel would grow to the full list
+   instead of the list scrolling inside it. */
+.nt-sel__listbox {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+.nt-sel__listbox:focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+}
+.nt-sel__searchwrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--sp-3);
+}
+.nt-sel__search {
+  width: 100%;
+  padding: var(--sp-2) var(--sp-5) var(--sp-2) var(--sp-6);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--bg-1);
+  color: var(--fg);
+  font-family: var(--nt-font-mono);
+  font-size: var(--fs-xs);
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+.nt-sel__search::placeholder {
+  color: var(--fg-dim);
+}
+.nt-sel__search:hover {
+  border-color: var(--hover-edge);
+}
+.nt-sel__search:focus-visible {
+  outline: none;
+  border-color: var(--accent-b);
+  background: var(--panel);
+}
+.nt-sel__searchicon {
+  position: absolute;
+  left: var(--sp-3);
+  width: 0.8rem;
+  height: 0.8rem;
+  color: var(--fg-dim);
+  pointer-events: none;
+}
+.nt-sel__searchclear {
+  position: absolute;
+  right: var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+.nt-sel__searchclear svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+.nt-sel__searchclear:hover {
+  color: var(--fg);
+  background: var(--surface-bar);
+}
+/* Shown when a filter matches nothing. Says what was searched for, so an
+   empty list reads as "no results for this" rather than as a broken
+   control that failed to load. */
+.nt-sel__none {
+  margin: 0;
+  padding: var(--sp-5) var(--sp-3);
+  text-align: center;
+  font-size: var(--fs-xs);
+  color: var(--fg-dim);
+}
+.nt-sel__none b {
+  color: var(--accent-b);
+  font-weight: 400;
+  word-break: break-all;
+}
 .nt-sel__title {
   margin: 0 0 var(--sp-3);
   font-size: var(--fs-xs);
@@ -3463,6 +3883,10 @@
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+  /* Takes the space between the star and the tick. Without it the label
+     sizes to its own content, the `text-overflow: ellipsis` below never
+     engages, and a long slug on a narrow phone runs under the star. */
+  flex: 1;
   min-width: 0;
 }
 .nt-sel__opt-label {
@@ -3482,6 +3906,53 @@
   height: 0.8rem;
   flex: 0 0 auto;
   color: var(--accent-b);
+}
+/* Occupies its slot without being drawn — see the comment in
+   centered-select.tsx. `visibility`, not `display`, so the box is still
+   measured. */
+.nt-sel__tick--off {
+  visibility: hidden;
+}
+/* The favourite star on a model row.
+   Off, it is dim; on, it is filled and takes the accent. Neither state
+   changes the row's size - `flex: 0 0 auto` on a fixed box - because a
+   list that reflows every time a star is pressed is a list that makes
+   you re-find the row you were looking at. */
+.nt-sel__star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition:
+    color var(--dur-fast) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+.nt-sel__star svg {
+  width: 0.8rem;
+  height: 0.8rem;
+}
+.nt-sel__star:hover {
+  color: var(--accent-b);
+  background: var(--surface-bar);
+}
+.nt-sel__star.is-on {
+  color: var(--accent-b);
+}
+.nt-sel__star.is-on svg {
+  fill: currentColor;
+}
+.nt-sel__star:focus-visible {
+  outline: 2px solid var(--accent-b);
+  outline-offset: 1px;
 }
 .nt-sel__keys {
   margin: var(--sp-3) 0 0;
@@ -3714,6 +4185,85 @@
   }
   .nt-keys__row {
     flex-wrap: wrap;
+  }
+
+  /* ============================================================
+     DASHBOARD TILES - TWO ACROSS
+     ============================================================
+     `.nt-tiles` was `repeat(auto-fill, minmax(260px, 1fr))`. 260px is
+     right on a monitor and wrong on a phone: at 375-430px the whole row
+     is narrower than 260px, `auto-fill` fits exactly one column, and
+     each of the eight cards spans the entire viewport width. Eight
+     full-width cards is a very long page for a list of things that
+     cannot be done yet, and each card is short enough that one per row
+     wastes the thing a phone has plenty of - vertical comparison.
+
+     Two columns, and the floor comes down with it: a `minmax()` floor
+     above the available width still yields one column, so
+     `repeat(2, minmax(0, 1fr))` states the intent directly and cannot
+     silently fall back to the thing being replaced. */
+  .nt-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--sp-2);
+  }
+  .nt-tile {
+    padding: var(--sp-3);
+    gap: var(--sp-1);
+  }
+  /* The glyph is the one thing in the card that does not read a text
+     token, so it is taken down by hand to match. */
+  .nt-tile__glyph {
+    font-size: 1rem;
+  }
+  /* The rule above the concept line was a full `--sp-3` of air, which at
+     this size is a whole line of the card's own type for a hairline. */
+  .nt-tile__concept {
+    padding-top: var(--sp-2);
+  }
+
+  /* ============================================================
+     THE UNIFORM 1px STEP DOWN - DONE TO THE TOKENS, NOT THE RULES
+     ============================================================
+     Two cards across is half the width for the same content, and the
+     lines that actually suffer are the card's own `description` and
+     `concept` copy - both `--fs-xs`, both set in the mono face, which
+     is the widest face on the site. At 0.7rem in a ~130px measure that
+     is about fifteen characters a line, which is not a reading
+     experience.
+
+     Reduced by exactly 1px on every step, and reduced ON THE TOKENS
+     rather than on individual rules. Two consequences, both the point:
+
+       - it is uniform. Declaring these on `.nt-dash` shifts the tab
+         bar, the stat tiles, the page head, the settings rows, the
+         BYOK form and the activity feed together. Patching five rules
+         by hand would leave the sixth at the old size, and the page
+         would look edited rather than scaled.
+
+       - it survives. A dashboard rule written next year reads
+         `var(--fs-xs)` and inherits the reduced step for free. A rule
+         written with a literal `0.7rem` would not have.
+
+     Only on the dashboard, and only at this width: the landing page
+     and the module pages are compositions at their own widths and were
+     not part of the ask.
+
+     `--fs-h1` is deliberately untouched. It is the reader's name in the
+     identity strip and it is `clamp()`-driven off the viewport, so at
+     this width it is already at its floor. */
+  .nt-dash {
+    --fs-xs: calc(0.7rem - 1px);
+    --fs-sm: calc(0.8rem - 1px);
+    --fs-body: calc(1rem - 1px);
+    --fs-lg: calc(1.1rem - 1px);
+    --fs-h2: clamp(1.5rem - 1px, 3vw, 2.2rem - 1px);
+  }
+
+  /* The console's own gutters, halved alongside the tiles. At 390px the
+     body was spending 48px of 390 on padding, which is more than the
+     gap between two tiles twice over. */
+  .nt-dash__body {
+    padding: var(--sp-4) var(--sp-3);
   }
 }
 

@@ -102,6 +102,13 @@ const GRANTS = [
   // matrices agree, which is the only thing that caught this at all — and
   // only if someone ran it.
   { table: "read_usage", mode: "READ WRITE" },
+  // The per-reader model catalogue behind custom routing. READ WRITE
+  // because the reader builds it: the `:free` pull inserts, adding a model
+  // by hand inserts, removing one deletes, and a refresh replaces the
+  // free rows. READ ONLY would break the feature at its first button, and
+  // the wrong fix for that is to relax the row filter rather than this
+  // privilege — the RLS policy already scopes it to app_reader_id().
+  { table: "provider_models", mode: "READ WRITE" },
   // Better Auth owns these and needs full DML.
   { table: "user", mode: "READ WRITE" },
   { table: "session", mode: "READ WRITE" },

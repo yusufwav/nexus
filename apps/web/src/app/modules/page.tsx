@@ -59,12 +59,16 @@ export default async function ModulesPage(): Promise<React.JSX.Element> {
         </Link>
         <div className="nt-nav__links">
           {/* No ~/modules here. This IS the catalogue, and that link
-              pointed at `/#modules` on the landing page — sending a
+              pointed at `/#modules` on the landing page - sending a
               reader off this page, to a shorter, less complete list of
-              the same modules, to arrive back where they started. */}
-          <Link className="nt-nav__link" href="/">
-            ~/
-          </Link>
+              the same modules, to arrive back where they started.
+
+              No ~/ either. The wordmark one item to the left is the
+              same link with the same destination, and a nav that offers
+              a destination twice is a nav where the reader has to work
+              out which one is the real one. Where a path would sit -
+              the middle of the row, between the mark and the identity
+              controls - is now empty, which reads as deliberate. */}
           {user ? (
             <>
               {/* The tutor is an app feature rather than a public page,

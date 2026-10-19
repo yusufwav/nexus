@@ -13,6 +13,7 @@ import {
   CompassIcon,
   HomeIcon,
   LayoutDashboardIcon,
+  ListChecksIcon,
   LogOutIcon,
   ReceiptIcon,
   SettingsIcon,
@@ -22,6 +23,7 @@ import {
 import { useMemo } from "react";
 
 import { useIsNarrow } from "@/lib/use-is-narrow";
+import { useHasMounted } from "@/lib/use-has-mounted";
 
 import { authClient } from "@/lib/auth-client";
 import useSignOut from "@/lib/use-sign-out";
@@ -133,10 +135,31 @@ export default function UserMenu(props: {
   // Above the early returns below: a hook after a conditional return is
   // a rules-of-hooks violation, and the count of hooks has to stay
   // stable across the pending / signed-out / signed-in renders.
+  const mounted = useHasMounted();
   const anchor = useMemo(topEdgeAnchor, []);
   const signOut = useSignOut();
 
-  if (isPending) {
+  /*
+    THE MOUNT GATE IS THE FIX, AND `isPending` ALONE IS NOT.
+
+    `isPending` reads an EXTERNAL STORE, and an external store can change
+    while React is still hydrating — which is exactly what happened on
+    /ai. The session atom starts pending on both sides, the fetch is
+    scheduled in a `setTimeout(0)` on mount, and /ai takes longer than
+    one round trip to a local server to hydrate. The fetch landed
+    mid-walk, this branch flipped, and React reported a hydration
+    mismatch and rebuilt the whole client tree.
+
+    /practice is this same component over a much smaller tree and was
+    clean, and so were /, /modules and /dashboard. That is not a reason
+    to leave them: it is the reason the bug reads as "it happens
+    sometimes, on the chat page".
+
+    Both states render the same element, so the correction lands without
+    a flicker — there is one placeholder before and after, and only the
+    destination changes.
+  */
+  if (!mounted || isPending) {
     return <span className="nt-menu__btn">···</span>;
   }
 
@@ -251,6 +274,25 @@ export default function UserMenu(props: {
             data-label="Browse catalogue"
           >
             <CompassIcon aria-hidden="true" />
+          </DropdownMenuItem>
+          {/*
+            Practice sits beside the tutor and directly after the
+            catalogue rather than among the account links, because it is
+            neither of them: it is the third study destination, the one
+            a reader opens when they do not know what to ask.
+
+            It was unreachable from here, which is the same shape of gap
+            as the tutor's absence from every nav before it had an icon:
+            the route existed, the menu existed, and nothing joined them.
+            A feature only reachable by typing it is one nobody opens.
+          */}
+          <DropdownMenuItem
+            render={<Link href="/practice" />}
+            className="nt-menu__ico"
+            aria-label="Practice"
+            data-label="Practice"
+          >
+            <ListChecksIcon aria-hidden="true" />
           </DropdownMenuItem>
           <DropdownMenuItem
             render={<Link href="/ai" />}

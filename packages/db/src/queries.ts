@@ -7,6 +7,7 @@ import { modules, purchases } from "./schema/modules";
 import { noteChunks, noteTopics } from "./schema/notes";
 import { practiceAttempts, practiceQuestions } from "./schema/practice";
 import { providerKeys } from "./schema/provider-keys";
+import { providerModels } from "./schema/provider-models";
 
 /**
  * READS
@@ -88,6 +89,20 @@ export async function listPurchases(db: Database, userId: string) {
 export type ProviderKeySummary = {
   readonly id: string;
   readonly provider: string;
+  readonly kind: string;
+  /**
+   * The reader's own name for a custom provider. Display only — see the
+   * column comment in schema/provider-keys.ts for why it is not a
+   * routing input.
+   */
+  readonly name: string;
+  /**
+   * Where a custom provider's requests go. Not a secret — the reader
+   * typed it and needs to recognise it — but it IS the string that
+   * decides where the server makes requests, so it is only ever the
+   * row's own.
+   */
+  readonly baseUrl: string | null;
   readonly label: string;
   readonly lastFour: string;
   readonly modelId: string;
@@ -104,6 +119,9 @@ export async function listProviderKeys(
       .select({
         id: providerKeys.id,
         provider: providerKeys.provider,
+        kind: providerKeys.kind,
+        name: providerKeys.name,
+        baseUrl: providerKeys.baseUrl,
         label: providerKeys.label,
         lastFour: providerKeys.lastFour,
         modelId: providerKeys.modelId,
@@ -127,6 +145,9 @@ export async function upsertProviderKey(
     readonly id: string;
     readonly userId: string;
     readonly provider: string;
+    readonly kind: "builtin" | "custom";
+    readonly name: string;
+    readonly baseUrl: string | null;
     readonly label: string;
     readonly encryptedKey: string;
     readonly lastFour: string;
@@ -143,6 +164,9 @@ export async function upsertProviderKey(
       .onConflictDoUpdate({
         target: [providerKeys.userId, providerKeys.provider],
         set: {
+          kind: key.kind,
+          name: key.name,
+          baseUrl: key.baseUrl,
           label: key.label,
           encryptedKey: key.encryptedKey,
           lastFour: key.lastFour,
@@ -162,7 +186,13 @@ export async function getProviderKey(
   db: Database,
   userId: string,
   provider: string,
-): Promise<{ readonly encryptedKey: string; readonly modelId: string } | null> {
+): Promise<{
+  readonly encryptedKey: string;
+  readonly modelId: string;
+  readonly kind: string;
+  readonly name: string;
+  readonly baseUrl: string | null;
+} | null> {
   // The ONLY query in the codebase that returns ciphertext. It runs as the
   // reader, so RLS is a second barrier in front of the one function whose
   // result is a credential.
@@ -171,6 +201,9 @@ export async function getProviderKey(
       .select({
         encryptedKey: providerKeys.encryptedKey,
         modelId: providerKeys.modelId,
+        kind: providerKeys.kind,
+        name: providerKeys.name,
+        baseUrl: providerKeys.baseUrl,
       })
       .from(providerKeys)
       .where(and(eq(providerKeys.userId, userId), eq(providerKeys.provider, provider)))
@@ -191,6 +224,229 @@ export async function deleteProviderKey(
       .where(and(eq(providerKeys.userId, userId), eq(providerKeys.provider, provider)))
       .returning({ id: providerKeys.id });
     return rows.length > 0;
+  });
+}
+
+/* ============================================================
+   PROVIDER MODELS — the catalogue a reader built for a custom provider
+   ============================================================
+   Scoped on `user_id` for the same reason everything else here is: a
+   provider slug is reader-supplied on a custom row, so it is not a
+   lookup key on its own.
+   ============================================================ */
+
+export type ProviderModelSummary = {
+  readonly provider: string;
+  readonly modelId: string;
+  readonly source: string;
+};
+
+/**
+ * One provider's catalogue, or every provider's when `provider` is
+ * omitted.
+ *
+ * Ordered by id so the picker renders the same list in the same order on
+ * every load — a catalogue that reshuffles between two openings of the
+ * same dropdown makes two favourites impossible to compare.
+ */
+export async function listProviderModels(
+  db: Database,
+  userId: string,
+  provider?: string,
+): Promise<ReadonlyArray<ProviderModelSummary>> {
+  return withReader(db, userId, (tx) =>
+    tx
+      .select({
+        provider: providerModels.provider,
+        modelId: providerModels.modelId,
+        source: providerModels.source,
+      })
+      .from(providerModels)
+      .where(
+        provider === undefined
+          ? eq(providerModels.userId, userId)
+          : and(eq(providerModels.userId, userId), eq(providerModels.provider, provider)),
+      )
+      .orderBy(asc(providerModels.modelId)),
+  );
+}
+
+/**
+ * Point a credential at a different model on the same provider.
+ *
+ * Separate from `upsertProviderKey` on purpose: rotating the default
+ * model should not require re-sending the API key, and the UI has no
+ * reason to hold a credential it is not changing. Only `model_id` is
+ * touched, and the caller is expected to have checked
+ * `hasProviderModel` first — this function does not, because the
+ * catalogue is the caller's decision and the tutor route re-checks it
+ * independently anyway.
+ */
+export async function setProviderKeyModel(
+  db: Database,
+  userId: string,
+  provider: string,
+  modelId: string,
+): Promise<boolean> {
+  const rows = await withReader(db, userId, async (tx) =>
+    tx
+      .update(providerKeys)
+      .set({ modelId, updatedAt: new Date() })
+      .where(and(eq(providerKeys.userId, userId), eq(providerKeys.provider, provider)))
+      .returning({ id: providerKeys.id }),
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Is this model actually on this provider for this reader?
+ *
+ * The check the tutor route makes before it is willing to call anything.
+ * It exists because `modelId` arrives in a request body, and a body is
+ * a suggestion rather than an instruction — without this, a crafted id
+ * would reach any path on a host the reader named.
+ */
+export async function hasProviderModel(
+  db: Database,
+  userId: string,
+  provider: string,
+  modelId: string,
+): Promise<boolean> {
+  const rows = await withReader(db, userId, (tx) =>
+    tx
+      .select({ id: providerModels.id })
+      .from(providerModels)
+      .where(
+        and(
+          eq(providerModels.userId, userId),
+          eq(providerModels.provider, provider),
+          eq(providerModels.modelId, modelId),
+        ),
+      )
+      .limit(1),
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Add one model to a provider's catalogue, or return false when it is
+ * already there.
+ *
+ * `onConflictDoNothing` rather than an update: re-typing a model that is
+ * already known is a no-op, and it must NOT change its source. Typing a
+ * free model by hand that the pull already found should not demote it to
+ * 'custom' and make it survive the next refresh.
+ */
+export async function addProviderModel(
+  db: Database,
+  model: {
+    readonly id: string;
+    readonly userId: string;
+    readonly provider: string;
+    readonly modelId: string;
+    readonly source: "free" | "custom";
+  },
+): Promise<boolean> {
+  const inserted = await withReader(db, model.userId, (tx) =>
+    tx
+      .insert(providerModels)
+      .values(model)
+      .onConflictDoNothing()
+      .returning({ id: providerModels.id }),
+  );
+  return inserted.length > 0;
+}
+
+/**
+ * Replace every `source = 'free'` model on a provider with what the
+ * `:free` pull just returned.
+ *
+ * A REPLACE, not a merge. The point of pulling is to learn what the
+ * provider currently offers for free, and a merge can only ever add —
+ * so a model the provider has retired would sit in the catalogue
+ * forever, still selectable, failing at call time with a 404 that reads
+ * like an outage. Rows with `source = 'custom'` are untouched, because
+ * those are the ones a refresh cannot see and must not destroy.
+ *
+ * The delete and the insert run in one transaction, so a failure
+ * halfway cannot leave the reader with neither the old catalogue nor the
+ * new one.
+ */
+export async function replaceFreeProviderModels(
+  db: Database,
+  userId: string,
+  provider: string,
+  models: ReadonlyArray<string>,
+): Promise<void> {
+  await withReader(db, userId, async (tx) => {
+    await tx
+      .delete(providerModels)
+      .where(
+        and(
+          eq(providerModels.userId, userId),
+          eq(providerModels.provider, provider),
+          eq(providerModels.source, "free"),
+        ),
+      );
+    if (models.length === 0) {
+      return;
+    }
+    await tx
+      .insert(providerModels)
+      .values(
+        models.map((modelId) => ({
+          id: crypto.randomUUID(),
+          userId,
+          provider,
+          modelId,
+          source: "free" as const,
+        })),
+      )
+      .onConflictDoNothing();
+  });
+}
+
+/** Remove one hand-added model. False when it was not there. */
+export async function deleteProviderModel(
+  db: Database,
+  userId: string,
+  provider: string,
+  modelId: string,
+): Promise<boolean> {
+  const rows = await withReader(db, userId, async (tx) =>
+    tx
+      .delete(providerModels)
+      .where(
+        and(
+          eq(providerModels.userId, userId),
+          eq(providerModels.provider, provider),
+          eq(providerModels.modelId, modelId),
+        ),
+      )
+      .returning({ id: providerModels.id }),
+  );
+  return rows.length > 0;
+}
+
+/**
+ * Drop every model belonging to a provider.
+ *
+ * Called when the credential itself is deleted. Without it, deleting a
+ * custom provider would leave its catalogue behind — and a later row
+ * that happened to reuse the slug would inherit models this reader had
+ * approved for a host that is no longer the one they named.
+ */
+export async function deleteProviderModels(
+  db: Database,
+  userId: string,
+  provider: string,
+): Promise<number> {
+  return withReader(db, userId, async (tx) => {
+    const rows = await tx
+      .delete(providerModels)
+      .where(and(eq(providerModels.userId, userId), eq(providerModels.provider, provider)))
+      .returning({ id: providerModels.id });
+    return rows.length;
   });
 }
 

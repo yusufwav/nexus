@@ -898,8 +898,28 @@
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
 }
+/*
+   THE GAP BETWEEN TAGS IS A TRAILING MARGIN, NOT `gap` ON THE TRACK.
+
+   The track holds two identical copies of the list and the keyframe
+   shifts it by exactly -50%, so the half-width has to land on the seam or
+   the loop jumps once per revolution. With `gap: g` on `2N` items the
+   track is `sum(items) + (2N - 1) * g` wide, so half of it is
+   `sum(items) + (N - 0.5) * g` — while the second copy actually begins
+   at `sum(items) + N * g`. Half a gap off, forever.
+
+   A margin on every tag INCLUDING the last gives
+   `sum(items) + 2N * m`, whose half is exactly the first pixel of the
+   second copy. The seam is then the seam, and the loop is invisible —
+   which is the entire job of this rule.
+
+   The amount is a third of the pill's own horizontal padding on each
+   side, so the tags read as a dense continuous band rather than as a
+   sparse list of separate pills.
+*/
 .nt-tag {
   padding: var(--sp-2) var(--sp-4);
+  margin-right: var(--sp-2);
   border: 1px solid var(--line);
   border-radius: 999px;
   font-size: var(--fs-xs);
@@ -1283,22 +1303,49 @@
      rise — staggered lines lift into place
      scan — a scanline passes, then the block settles
    ============================================================ */
-/* Content is visible by default. Hiding is opt-in and only applied
-   once JS has confirmed it can drive the reveal — the inline script
-   in layout.tsx sets .js-reveal. Without this, a slow or blocked
-   hydration left every block stuck at opacity 0 with no way back. */
-.js-reveal .nt-root [data-reveal] {
+/* Content starts dim. The reveal is driven by ScrollReveal, which adds
+   `.is-in` and runs the entrance animation.
+
+   THE FAILSAFE IS THE POINT, and it is the replacement for the old
+   `.js-reveal` script. On a healthy load ScrollReveal mounts within
+   milliseconds and sets `data-reveal-ready` on <html>, which is what
+   stops the failsafe from ever running; content then stays dim until
+   `.is-in` arrives. On a failed hydration nothing ever sets that
+   marker, so the failsafe runs to completion after three seconds and
+   forces every [data-reveal] block to full opacity — "visible but
+   un-animated" instead of "blank, forever".
+
+   The failsafe uses `steps(1)` so it holds 0.01 for the full three
+   seconds and jumps to 1 only at the end, rather than fading.
+
+   WHY `:not(.is-in)` MATTERS HERE, AND WHY IT IS NOT OPTIMISM:
+
+   An earlier version cancelled the failsafe with a separate
+   `html[data-reveal-ready] ... { animation: none }` rule. That rule is
+   specificity (0,3,1) and the reveal rule is (0,3,0), so `animation:
+   none` won — every block stayed at opacity 0.01 forever and the page
+   rendered as an empty shell. Two `animation` declarations on one
+   element is a specificity race, and it was lost.
+
+   `:not(.is-in)` removes the race instead of winning it: the failsafe
+   and the reveal are mutually exclusive by construction, because an
+   element cannot be both `.is-in` and `:not(.is-in)`. Whichever rule
+   matches is the only one that matches, so no ordering or specificity
+   arithmetic can break it. Do not "simplify" this back into two
+   competing rules. */
+.nt-root [data-reveal] {
   opacity: 0.01;
 }
-
-/* Shared entrance: everything fades up as it arrives. Every effect
-   is gated on .is-in — without it the animations would fire at
-   load and be over long before you scroll to the element. */
-.js-reveal .nt-rv-wipe,
-.js-reveal .nt-rv-rise,
-.js-reveal .nt-rv-scan {
-  animation: none;
+html:not([data-reveal-ready]) .nt-root [data-reveal]:not(.is-in) {
+  animation: nt-rv-failsafe 3s steps(1) forwards;
 }
+.nt-root [data-reveal].is-in {
+  animation: nt-rv-fade-up 620ms var(--ease-out) forwards;
+}
+
+/* Shared entrance: everything fades up as it arrives. Gated on .is-in
+   so the animations do not fire at load and finish before you scroll
+   to the element. */
 .nt-rv-wipe.is-in,
 .nt-rv-rise.is-in,
 .nt-rv-scan.is-in {
@@ -1309,10 +1356,28 @@
   to   { opacity: 1; transform: none; }
 }
 
+/* Failsafe for a hydration that never happens: hold 0.01 for three
+   seconds, then jump to full opacity. `steps(1)` keeps it at 0.01 for
+   the whole duration and flips to 1 only at the end. Scoped to
+   `:not([data-reveal-ready])` so it is dead on a healthy load. */
+@keyframes nt-rv-failsafe {
+  0%   { opacity: 0.01; }
+  100% { opacity: 1; }
+}
+
 /* Children fade in on a stagger, so a block resolves line by line
-   rather than all at once. */
-.js-reveal .nt-rv-line {
+   rather than all at once.
+
+   The failsafe here is scoped through the parent block's `:not(.is-in)`
+   for the same reason as the block rule above: a line is revealed by
+   its PARENT gaining `.is-in`, so the line selector has to test the
+   parent, and testing it this way keeps the failsafe and the staggered
+   entrance mutually exclusive. */
+.nt-rv-line {
   opacity: 0.01;
+}
+html:not([data-reveal-ready]) .nt-root [data-reveal]:not(.is-in) .nt-rv-line {
+  animation: nt-rv-failsafe 3s steps(1) forwards;
 }
 .is-in .nt-rv-line {
   animation: nt-rv-line-in 520ms var(--ease-out) forwards;

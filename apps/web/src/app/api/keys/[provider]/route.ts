@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import * as q from "@Main/db/queries";
 import { db } from "@/services";
 
-import { isProviderSlug } from "@/lib/providers";
+import { isCustomProviderSlug, isProviderSlug } from "@/lib/providers";
 import { requireUser } from "@/lib/require-user";
 
 /**
@@ -15,6 +15,20 @@ import { requireUser } from "@/lib/require-user";
  * history does: "not yours" and "does not exist" must be
  * indistinguishable, or this endpoint becomes an oracle for which keys
  * exist.
+ *
+ * BOTH KINDS OF SLUG ARE ACCEPTED, and neither is used to build anything.
+ * `isProviderSlug` covers the allowlist and `isCustomProviderSlug` covers
+ * the server-minted `custom_<hex>` values; together they are the set of
+ * strings this route will act on, which is the same set `resolveTutorModel`
+ * will act on. A third branch — "anything that matches a row" — would put
+ * the deletion decision back in the database, which is the thing the
+ * allowlist was built to stop.
+ *
+ * A CUSTOM PROVIDER'S MODEL LIST GOES WITH IT, in the same request. Left
+ * behind, the rows outlive the credential that gave them meaning: a
+ * provider deleted and later re-added at the same address would start
+ * with models the reader had approved for a row that no longer exists,
+ * and nothing in the interface would say so.
  */
 export async function DELETE(
   req: Request,
@@ -30,7 +44,7 @@ export async function DELETE(
   }
 
   const { provider } = await ctx.params;
-  if (!isProviderSlug(provider)) {
+  if (!isProviderSlug(provider) && !isCustomProviderSlug(provider)) {
     return NextResponse.json({ error: "No such key." }, { status: 404 });
   }
 
@@ -38,6 +52,9 @@ export async function DELETE(
     const removed = await q.deleteProviderKey(db, user.id, provider);
     if (!removed) {
       return NextResponse.json({ error: "No such key." }, { status: 404 });
+    }
+    if (isCustomProviderSlug(provider)) {
+      await q.deleteProviderModels(db, user.id, provider);
     }
     return NextResponse.json({ ok: true });
   } catch (err) {

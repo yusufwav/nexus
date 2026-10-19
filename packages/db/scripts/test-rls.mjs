@@ -66,7 +66,12 @@ async function asReader(client, reader, fn) {
   }
 }
 
-const TABLES = ["provider_keys", "purchases", "chat_threads", "chat_messages"];
+// provider_models is here because it decides something: `hasProviderModel`
+// is the check that decides whether the server will call a model at all, so
+// a reader who could see another's catalogue could put their own model id on
+// a provider that is not theirs. Same policy shape as provider_keys and the
+// same consequence for getting it wrong.
+const TABLES = ["provider_keys", "provider_models", "purchases", "chat_threads", "chat_messages"];
 
 try {
   await admin.connect();
@@ -126,6 +131,10 @@ try {
     thread: `rls-thread-${stamp}`,
     msg: `rls-msg-${stamp}`,
     pur: `rls-pur-${stamp}`,
+    // provider_models has a plain text primary key and no unique index on
+    // (user_id, provider), so unlike provider_keys its id IS free to be
+    // ours and the fixture can be deleted by id like the chat ones.
+    model: `rls-model-${stamp}`,
   };
   // provider_keys carries UNIQUE (user_id, provider), so a fixture there
   // cannot own its id: the insert collides with whatever credential the
@@ -156,12 +165,21 @@ try {
      select $1,$2,m.id,0,'paid',now(),now() from modules m where m.code='MATT101'`,
     [ids.pur, a.id],
   );
+  // The catalogue row `hasProviderModel` would match. It is planted for A
+  // alone, so "B cannot see it" is the property, and B naming A's provider
+  // slug gets the same answer as B naming nothing.
+  await admin.query(
+    `insert into provider_models (id,"user_id",provider,model_id,source,created_at)
+     values ($1,$2,$3,'rls-probe-model','custom',now())`,
+    [ids.model, a.id, `custom_rls${stamp}`],
+  );
 
   const cleanup = async () => {
     const gone = [
       ["chat_messages", (await admin.query(`delete from chat_messages where id = $1`, [ids.msg])).rowCount],
       ["chat_threads", (await admin.query(`delete from chat_threads where id = $1`, [ids.thread])).rowCount],
       ["provider_keys", (await admin.query(`delete from provider_keys where label = $1`, [LABEL])).rowCount],
+      ["provider_models", (await admin.query(`delete from provider_models where id = $1`, [ids.model])).rowCount],
       ["purchases", (await admin.query(`delete from purchases where id = $1`, [ids.pur])).rowCount],
     ];
     for (const [t, n] of gone) {
@@ -225,7 +243,7 @@ try {
     const n = await asReader(probe, b.id, async () => {
       const res = await probe.query(
         `select count(*)::int n from "${t}" where id = any($1::text[])`,
-        [[ids.thread, ids.msg, ids.pur, `rls-${stamp}`]],
+        [[ids.thread, ids.msg, ids.pur, ids.model, `rls-${stamp}`]],
       );
       return res.rows[0].n;
     });
@@ -250,6 +268,26 @@ try {
       bad("B could delete A's credential");
     } catch {
       ok("B cannot delete A's credential — USING rejects it");
+    }
+    try {
+      await probe.query(`delete from provider_models where "user_id" = $1`, [a.id]);
+      bad("B could delete A's model catalogue");
+    } catch {
+      ok("B cannot delete A's model catalogue — USING rejects it");
+    }
+    try {
+      // The insertion the tutor's own check exists to prevent: B putting a
+      // model id of their own onto a provider slug that is A's. Rejected by
+      // WITH CHECK, and named here because it is the specific thing
+      // custom routing could get wrong.
+      await probe.query(
+        `insert into provider_models (id,"user_id",provider,model_id,source,created_at)
+         values ($1,$2,$3,'bobs-model-on-alices-provider','custom',now())`,
+        [`rls-forged-model-${stamp}`, a.id, `custom_rls${stamp}`],
+      );
+      bad("B could add a model to A's provider — WITH CHECK not enforced");
+    } catch {
+      ok("B cannot add a model to A's provider — WITH CHECK rejects it");
     }
   });
 

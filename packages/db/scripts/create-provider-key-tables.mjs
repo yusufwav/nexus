@@ -11,8 +11,16 @@
  * plaintext credential. If you find yourself adding one, the answer is
  * to stop.
  *
+ * THIS FILE CREATES THE ORIGINAL EIGHT COLUMNS. Custom routing added
+ * `kind`, `name` and `base_url` plus the whole `provider_models` table,
+ * and those live in create-custom-provider-tables.mjs - run it after this
+ * one. They are split rather than folded in so that a reader whose
+ * database predates the feature can apply them without recreating
+ * anything, which is the only situation they are useful in.
+ *
  * Run from packages/db:
  *   node scripts/create-provider-key-tables.mjs
+ *   node scripts/create-custom-provider-tables.mjs
  */
 import { Client } from "pg";
 

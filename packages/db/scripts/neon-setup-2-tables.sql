@@ -54,6 +54,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS "purchases_user_module_idx"
 -- encrypted_key is AES-256-GCM ciphertext (apps/web/src/lib/key-crypto.ts).
 -- A dump of this table is not a credential dump: the sealing key lives in the
 -- environment, never in the database.
+--
+-- kind / name / base_url are what custom routing adds; part 8 creates them
+-- on an existing database. They are declared here too, with the same
+-- defaults, so a database built from this file in one pass matches the
+-- drizzle schema and part 8's ALTERs land as no-ops.
 CREATE TABLE IF NOT EXISTS "provider_keys" (
   "id"            text PRIMARY KEY NOT NULL,
   "user_id"       text NOT NULL REFERENCES "user"("id") ON DELETE cascade,
@@ -62,6 +67,15 @@ CREATE TABLE IF NOT EXISTS "provider_keys" (
   "encrypted_key" text NOT NULL,
   "last_four"     text NOT NULL,
   "model_id"      text NOT NULL,
+  -- 'builtin' rows take their base URL from the allowlist in code; 'custom'
+  -- rows carry one the reader named, validated by
+  -- apps/web/src/lib/custom-provider-url.ts before it was ever stored.
+  "kind"          text NOT NULL DEFAULT 'builtin',
+  -- The reader's own name for a custom provider. Display only. The slug in
+  -- `provider` is minted by the server precisely so this text is never used
+  -- as an identifier.
+  "name"          text NOT NULL DEFAULT '',
+  "base_url"      text,
   "created_at"    timestamp DEFAULT now() NOT NULL,
   "updated_at"    timestamp DEFAULT now() NOT NULL
 );

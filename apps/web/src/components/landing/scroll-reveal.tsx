@@ -35,6 +35,7 @@ export default function ScrollReveal(): React.JSX.Element | null {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (!("IntersectionObserver" in window) || reduced) {
       items.forEach((el) => el.classList.add("is-in"));
+    document.documentElement.dataset["revealReady"] = "1";
       return;
     }
 
@@ -76,14 +77,16 @@ export default function ScrollReveal(): React.JSX.Element | null {
     items.forEach((el) => io.observe(el));
 
     /*
-     * Signal that JS is alive and driving the reveal, so the inline
-     * script in layout.tsx leaves .js-reveal in place. That class is
-     * what keeps [data-reveal] and .nt-rv-line at their dimmed resting
-     * opacity, so removing it mid-session is what made the text jump to
-     * full opacity and then replay its fade on every scroll pass.
+     * Signal that JS is alive and driving the reveal. The stylesheet
+     * uses this marker as the gate: while it is absent, a failsafe
+     * animation forces [data-reveal] content to full opacity after three
+     * seconds, so a hydration that never happens degrades to "visible
+     * but un-animated" instead of "blank, forever". Once this marker is
+     * present the failsafe is cancelled and content stays at its dimmed
+     * resting opacity until ScrollReveal adds `.is-in`.
      *
-     * The marker MUST go on <html>, which is where the inline script
-     * looks for it — not on .nt-root.
+     * The marker MUST go on <html>, which is where the stylesheet looks
+     * for it — not on .nt-root.
      */
     document.documentElement.dataset["revealReady"] = "1";
 

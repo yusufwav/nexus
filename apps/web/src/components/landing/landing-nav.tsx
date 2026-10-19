@@ -5,6 +5,7 @@ import { SparklesIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { authClient } from "@/lib/auth-client";
+import { useHasMounted } from "@/lib/use-has-mounted";
 
 import ThemeToggle from "@/components/theme-toggle";
 import UserMenu from "@/components/user-menu";
@@ -25,6 +26,20 @@ const LINKS = [
 export default function LandingNav(): React.JSX.Element {
   const [stuck, setStuck] = useState(false);
   const { data: session } = authClient.useSession();
+  /*
+    The same rule as UserMenu, and for the same reason: `session` reads
+    an EXTERNAL STORE, and a store that resolves while React is still
+    hydrating turns this branch into a hydration mismatch on whichever
+    page is big enough for the fetch to land mid-walk.
+
+    It has not bitten here, because the landing page is one of the
+    smallest client trees in the app. "Has not bitten" is not "cannot",
+    and this nav is the first thing every returning visitor sees — the
+    worst possible place for React to throw a subtree away and rebuild
+    it.
+  */
+  const mounted = useHasMounted();
+  const signedIn = mounted && Boolean(session?.user);
 
   useEffect(() => {
     const onScroll = (): void => setStuck(window.scrollY > 24);
@@ -44,7 +59,7 @@ export default function LandingNav(): React.JSX.Element {
             {label}
           </a>
         ))}
-        {session?.user ? (
+        {signedIn ? (
           <>
             {/* The tutor was reachable only by typing /ai — nothing in
                 the product linked to it. It is an app feature rather

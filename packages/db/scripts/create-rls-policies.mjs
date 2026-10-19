@@ -121,6 +121,26 @@ const STATEMENTS = [
      USING      (user_id = app_reader_id())
      WITH CHECK (user_id = app_reader_id())`,
 
+  // ---- provider_models -----------------------------------------------
+  // The catalogue a reader built for their own custom provider, and the
+  // table the tutor's `hasProviderModel` check reads. Identical shape to
+  // provider_keys, and it has to be: the row names a model id and a
+  // provider slug, so a reader who could read another reader's catalogue
+  // could get their own model id onto another reader's provider, which is
+  // the one thing this feature must not allow.
+  //
+  // The slug column has no foreign key to provider_keys on purpose - a
+  // built-in provider's models live in OpenRouter's catalogue, not here -
+  // so this policy is the only thing standing between "my provider" and
+  // "somebody else's provider".
+  `ALTER TABLE "provider_models" ENABLE ROW LEVEL SECURITY`,
+  `ALTER TABLE "provider_models" FORCE ROW LEVEL SECURITY`,
+  `DROP POLICY IF EXISTS provider_models_reader ON "provider_models"`,
+  `CREATE POLICY provider_models_reader ON "provider_models"
+     FOR ALL TO public
+     USING      (user_id = app_reader_id())
+     WITH CHECK (user_id = app_reader_id())`,
+
   // ---- purchases -----------------------------------------------------
   `ALTER TABLE "purchases" ENABLE ROW LEVEL SECURITY`,
   `ALTER TABLE "purchases" FORCE ROW LEVEL SECURITY`,
@@ -243,7 +263,7 @@ try {
     `select c.relname, c.relrowsecurity, c.relforcerowsecurity
        from pg_class c join pg_namespace n on n.oid = c.relnamespace
       where n.nspname = 'public'
-        and c.relname in ('provider_keys','purchases','chat_threads','chat_messages',
+        and c.relname in ('provider_keys','provider_models','purchases','chat_threads','chat_messages',
                           'note_chunks','note_topics','modules')
       order by c.relname`,
   );

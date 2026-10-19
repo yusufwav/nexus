@@ -63,6 +63,7 @@ const EXPECTED = [
   { table: "chat_messages", mode: "READ WRITE" },
   { table: "ai_usage", mode: "READ WRITE" },
   { table: "read_usage", mode: "READ WRITE" },
+  { table: "provider_models", mode: "READ WRITE" },
   { table: "user", mode: "READ WRITE" },
   { table: "session", mode: "READ WRITE" },
   { table: "account", mode: "READ WRITE" },
