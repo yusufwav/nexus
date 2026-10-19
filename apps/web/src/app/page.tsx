@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import AiMarquee from "@/components/landing/ai-marquee";
 import ChatPartner, { type ChatMessage } from "@/components/landing/chat-partner";
 import GradientAscii from "@/components/landing/gradient-ascii";
+import Grainient from "@/components/landing/grainient";
 import LandingNav from "@/components/landing/landing-nav";
 import MissionSection from "@/components/landing/mission-section";
 import ModuleList, { type ModuleEntry } from "@/components/landing/module-list";
@@ -200,6 +201,16 @@ const REVIEWS_LEAD =
 export default function Landing(): React.JSX.Element {
   return (
     <div className="nt-root">
+      {/*
+        THE GRAINIENT.
+
+        A fixed layer behind everything, so it follows you down the page
+        rather than scrolling past. The landing hero is opaque and covers
+        it, which is how "nothing of the background shows on the landing"
+        is achieved - the field is not switched off there, it is simply
+        behind something you cannot see through.
+      */}
+      <Grainient />
       <div className="nt-grid-bg" aria-hidden="true" />
 
       <LandingNav />
@@ -261,7 +272,7 @@ export default function Landing(): React.JSX.Element {
         <ReviewsList title={REVIEWS_TITLE} lead={REVIEWS_LEAD} reviews={REVIEWS} />
       </main>
 
-      <footer className="nt-footer">
+      <footer className="nt-footer nt-footer--glass">
         built by a first year CS student at NMU · if something is wrong, tell me
       </footer>
     </div>

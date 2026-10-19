@@ -19,6 +19,27 @@
   min-height: 100vh;
   min-height: 100svh;
   background: var(--bg-0);
+  /*
+    THIS IS A STACKING CONTEXT, AND IT NEEDS TO BE.
+
+    The page's own background layers - the grid, and the grainient - are
+    `position: fixed` with `z-index: -1`, which puts them behind this
+    element's content. But this element has an OPAQUE BACKGROUND, and
+    without a stacking context of its own that background is painted by
+    the ROOT stacking context at the same step as the content - so it
+    covered the layers entirely.
+
+    Which is what happened: the grid was never painted. A flat row of
+    pixels where a grid line should be, on every page, for as long as
+    the grid has existed. Nothing was wrong with the grid; it was
+    painted over.
+
+    `isolation: isolate` makes this element its own stacking context.
+    Its background paints first, the negative-z layers paint on top of
+    it, and the content paints over them. The layers are now where
+    they were always meant to be.
+  */
+  isolation: isolate;
   color: var(--fg);
   font-family: var(--nt-font-mono);
   font-size: var(--fs-body);
@@ -166,6 +187,19 @@
   padding: var(--sp-8) var(--sp-5);
   overflow: hidden;
   isolation: isolate;
+  /*
+    THE HERO IS OPAQUE, and that is the whole of "the background is not
+    shown on the landing".
+
+    The grainient is a fixed layer behind everything, so without this the
+    ASCII field would have a river of colour running behind it, and the
+    brief is that nothing of the background shows on this screen at all.
+
+    The colour is the PAGE's background rather than `--bg-0`, because the
+    scrim on the terminal hero below has to be the same colour or the
+    handover from this hero to that one shows a seam.
+  */
+  background: var(--background);
 }
 
 /* Both canvas layers sit behind the copy. z-index 0 keeps the
@@ -491,16 +525,33 @@
   position: relative;
   padding: var(--sp-8) 0;
 }
-/* Fade the top edge in so the landing hands off smoothly. */
+/*
+  Fade the top edge in so the landing hands off smoothly.
+
+  This scrim does the second half of the grainient's arrival. It used to
+  fade the hero's own top edge into the page, which it still does - but now
+  the thing behind it is a colour field rather than the page, so the scrim
+  has to be taller and has to be the PAGE's colour, matching the opaque
+  hero above it exactly. Without that match there is a visible band where
+  one hero ends and the next begins.
+
+  The grainient therefore fades in over the top of this section, which is
+  the readme terminal, and is at full strength below it.
+*/
 .nt-hero::before {
   content: "";
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 140px;
+  height: 46%;
   pointer-events: none;
-  background: linear-gradient(to bottom, var(--bg-0), transparent);
+  background: linear-gradient(to bottom, var(--background) 0%, transparent 100%);
+  z-index: 0;
+}
+.nt-hero > * {
+  position: relative;
+  z-index: 1;
 }
 .nt-term {
   width: 100%;
@@ -1294,6 +1345,35 @@
   letter-spacing: var(--tracking);
 }
 
+/*
+  THE FOOTER OVER THE GRAINIENT.
+
+  It is a glass panel now, because a solid one would hide the background it
+  is sitting on - and the background is the point of the band it is in.
+
+  It uses `--glass-console` rather than `--glass-bg`, which is nearly
+  invisible, because the console glass is opaque enough to give the text a
+  surface to sit on. That matters here in a way it does not on the other
+  glass in the page: this strip is over a colour field, and the field's dark
+  end is DARK in both themes, so muted body text on a near-transparent panel
+  was unreadable either way. The console glass is a real surface in both, and
+  the text keeps the theme's own foreground colour on top of it.
+
+  The padding is cut roughly in half from the plain footer above. The
+  background fills the band and the footer is only the strip at the bottom
+  of it, so a deep footer would eat a third of the picture to hold one line
+  of small type.
+*/
+.nt-footer--glass {
+  width: 100%;
+  padding-block: var(--sp-3);
+  border-top-color: var(--line-soft);
+  background: var(--glass-console);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.25);
+  color: var(--fg-muted);
+}
+
 /* ============================================================
    REVEAL
    The page is a terminal, so content arrives the way a terminal
@@ -1460,4 +1540,63 @@ html:not([data-reveal-ready]) .nt-root [data-reveal]:not(.is-in) .nt-rv-line {
     filter: none;
     animation: none;
   }
+}
+
+/* ============================================================
+   THE GRAINIENT
+   ------------------------------------------------------------
+   The flowing background behind everything below the hero. The
+   field is a WebGL canvas, so the layer is a fixed full-screen
+   box with a canvas in it and nothing else.
+
+   IT IS A FIXED LAYER, NOT A SCROLLING ONE, and the reason is in
+   the brief: the background follows you down the page instead of
+   scrolling past. The landing hero is the exception, and it is
+   handled by the hero being opaque - see .nt-landing below.
+
+   z-index -1 puts it in the same slot as the grid, BEHIND the
+   content and above the canvas background. The grid is drawn
+   after it, so the grid lines sit on top of the colour rather
+   than under it.
+   ============================================================ */
+
+.nt-grain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.nt-grain__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/*
+  THE VEIL.
+
+  The gradient's own bright end is a problem for a page of text. On a dark
+  theme the foreground is near-white, and the ramp ends in cream, so the
+  light end of the gradient and the light text land on the same pixels and
+  neither can be read. The same thing happens in reverse on a light theme,
+  where the gradient's dark end swallows the dark text.
+
+  So the field is seen THROUGH the page's own colour rather than on top of
+  it. It stays a rich, moving, warm background, and the text keeps its
+  contrast, because the veil is the page's own background colour and the
+  text is the page's own foreground colour.
+
+  The strength is a compromise: enough to keep small muted text readable
+  over the brightest part of the flow, not so much that the field is just
+  a tint.
+*/
+.nt-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--background) 78%, transparent);
 }
