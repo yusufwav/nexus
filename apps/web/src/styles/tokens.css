@@ -27,10 +27,6 @@
   --accent-b: #fdd3aeff;
   --accent-c: #6b0024ff;
 
-  /* The grainient's veil. A dark page needs a thick one: adding black
-     to a colour makes a shade, and a shade reads as rich. */
-  --grain-veil: 78%;
-
   /* Syntax palette — borrowed from the brand colours so highlighted
      code still reads as the same product. */
   --syn-key: #ff7b72;
@@ -46,8 +42,6 @@
   --panel: rgba(255, 255, 255, 0.025);
   --accent-line: rgba(255, 208, 222, 0.27);
   --accent-soft: rgba(139, 0, 0, 0.34);
-  --grid-line: rgba(255, 255, 255, 0.06);
-  --grid-size: 32px;
 
   /* Signal colours, derived from the accents so semantic states never
      introduce a hue that is foreign to the palette. */
@@ -344,11 +338,6 @@
   --accent-b: #7a2e12;
   --accent-c: #5c001f;
 
-  /* A light page needs a much thinner veil than a dark one.
-     Adding cream to a colour makes a TINT, and a tint reads as faded,
-     where adding black makes a shade and a shade reads as rich. */
-  --grain-veil: 58%;
-
   /* Syntax — a light-background family. The dark set is pastel and
      washes out against white; these are all >=4.5:1. */
   --syn-key: #cf222e;
@@ -364,7 +353,6 @@
   --panel: rgba(26, 22, 20, 0.035);
   --accent-line: rgba(139, 0, 0, 0.3);
   --accent-soft: rgba(139, 0, 0, 0.1);
-  --grid-line: rgba(26, 22, 20, 0.055);
 
   --ok: #1a7f37;
   --warn: #9a6700;

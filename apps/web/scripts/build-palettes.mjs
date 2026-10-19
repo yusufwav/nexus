@@ -183,7 +183,7 @@ function isBright(bg) {
  * only three:
  *
  *   1. Alphas over the foreground.
- *      --line, --panel, --grid-line and friends are `rgba(fg, a)`. On a dark
+ *      --line, --panel and friends are `rgba(fg, a)`. On a dark
  *      page that is a white hairline; on a bright one it is a dark hairline,
  *      which is exactly what each wants. Same rule, correct both ways - these
  *      are untouched by the branch.
@@ -411,7 +411,7 @@ function derive(p) {
     "--line": rgba(fg, 0.11),
     "--line-soft": rgba(fg, 0.055),
     "--panel": rgba(fg, 0.035),
-    "--grid-line": rgba(fg, 0.05),
+
 
     "--shadow-console": `0 -20px 60px -30px ${hex(...shadowInk)}`,
     "--shadow-lg": `0 30px 80px -40px ${hex(...shadowInk)}`,
@@ -456,22 +456,6 @@ function derive(p) {
     "--glass-sheen": rgba(fg, 0.05),
     "--glass-tint": rgba(fg, 0.3),
     "--glass-tint-hover": rgba(bg1Out, 0.72),
-
-    /*
-     * THE GRAINIENT'S VEIL.
-     *
-     * The field behind the landing page is seen through a wash of the page's
-     * own background colour, so that the text over it keeps its contrast.
-     * How much wash depends on whether the page is bright.
-     *
-     * Adding black to a colour makes a shade, and a shade looks rich. Adding
-     * cream makes a tint, and a tint looks faded. So the same wash that makes
-     * a dark theme's field glow makes a light theme's field look grey - and a
-     * light theme needs a much thinner veil to read as the same amount of
-     * colour. These two numbers are the ones that put the two themes on the
-     * same footing.
-     */
-    "--grain-veil": bright ? "58%" : "78%",
 
     "--glow-accent": rgba(glowInk, 0.16 * glowAlphaScale),
     "--glow-accent-a": rgba(bright ? inkPrimary : primary, 0.26 * glowAlphaScale),

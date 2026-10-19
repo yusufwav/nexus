@@ -50,8 +50,7 @@ export default async function ModulesPage(): Promise<React.JSX.Element> {
     <div className="nt-root">
       {/* Fixed ambient layer, same as the landing page. */}
       <div className="nt-ambient-bg" aria-hidden="true" />
-      <div className="nt-grid-bg" aria-hidden="true" />
-      <ScrollReveal />
+        <ScrollReveal />
 
       <nav className="nt-nav" aria-label="Main">
         <Link className="nt-nav__mark" href="/">

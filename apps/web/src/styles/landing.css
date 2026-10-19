@@ -22,7 +22,7 @@
   /*
     THIS IS A STACKING CONTEXT, AND IT NEEDS TO BE.
 
-    The page's own background layers - the grid, and the grainient - are
+    The page's own background layer - the pixel blast - is
     `position: fixed` with `z-index: -1`, which puts them behind this
     element's content. But this element has an OPAQUE BACKGROUND, and
     without a stacking context of its own that background is painted by
@@ -74,20 +74,6 @@
   }
 }
 
-/* The grid. Static and fixed, like a terminal backdrop, fading out
-   toward the bottom so it never fights body copy. */
-.nt-grid-bg {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image:
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-  background-size: var(--grid-size) var(--grid-size);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 80%);
-  mask-image: linear-gradient(to bottom, #000 0%, #000 45%, transparent 80%);
-}
 
 /* ============================================================
    LAYOUT
@@ -191,7 +177,7 @@
     THE HERO IS OPAQUE, and that is the whole of "the background is not
     shown on the landing".
 
-    The grainient is a fixed layer behind everything, so without this the
+  The pixel blast is a fixed layer behind everything, so without this the
     ASCII field would have a river of colour running behind it, and the
     brief is that nothing of the background shows on this screen at all.
 
@@ -528,14 +514,14 @@
 /*
   Fade the top edge in so the landing hands off smoothly.
 
-  This scrim does the second half of the grainient's arrival. It used to
+  This scrim does the second half of the background's arrival. It used to
   fade the hero's own top edge into the page, which it still does - but now
   the thing behind it is a colour field rather than the page, so the scrim
   has to be taller and has to be the PAGE's colour, matching the opaque
   hero above it exactly. Without that match there is a visible band where
   one hero ends and the next begins.
 
-  The grainient therefore fades in over the top of this section, which is
+  The field therefore fades in over the top of this section, which is
   the readme terminal, and is at full strength below it.
 */
 .nt-hero::before {
@@ -1346,7 +1332,7 @@
 }
 
 /*
-  THE FOOTER OVER THE GRAINIENT.
+  THE FOOTER OVER THE BACKGROUND.
 
   It is a glass panel now, because a solid one would hide the background it
   is sitting on - and the background is the point of the band it is in.
@@ -1543,24 +1529,29 @@ html:not([data-reveal-ready]) .nt-root [data-reveal]:not(.is-in) .nt-rv-line {
 }
 
 /* ============================================================
-   THE GRAINIENT
+   THE PIXEL BLAST
    ------------------------------------------------------------
-   The flowing background behind everything below the hero. The
-   field is a WebGL canvas, so the layer is a fixed full-screen
-   box with a canvas in it and nothing else.
+   A field of cells that drift, glow and breathe, behind everything
+   below the hero.
 
-   IT IS A FIXED LAYER, NOT A SCROLLING ONE, and the reason is in
-   the brief: the background follows you down the page instead of
-   scrolling past. The landing hero is the exception, and it is
-   handled by the hero being opaque - see .nt-landing below.
+   The field is a WebGL canvas, so the layer is a fixed full-screen
+   box with a canvas in it and nothing else. The canvas is
+   TRANSPARENT - the pixels are drawn on it and the page's own
+   background shows through everywhere else - so the field is a
+   scattering of points rather than a wash, and the text over it
+   keeps its contrast with no veil at all.
 
-   z-index -1 puts it in the same slot as the grid, BEHIND the
-   content and above the canvas background. The grid is drawn
-   after it, so the grid lines sit on top of the colour rather
-   than under it.
+   z-index -1 puts it in the slot the grid used to be in: behind the
+   content and above the page's own background. The .nt-root
+   stacking context is what makes that possible - without it, the
+   page's opaque background is painted over the layer and the field
+   never appears.
+
+   The hero is opaque, so the field is not on it at all, which is
+   the same rule the ASCII field has always followed.
    ============================================================ */
 
-.nt-grain {
+.nt-pixel {
   position: fixed;
   inset: 0;
   z-index: -1;
@@ -1568,43 +1559,10 @@ html:not([data-reveal-ready]) .nt-root [data-reveal]:not(.is-in) .nt-rv-line {
   overflow: hidden;
 }
 
-.nt-grain__canvas {
+.nt-pixel__canvas {
   position: absolute;
   inset: 0;
   display: block;
   width: 100%;
   height: 100%;
-}
-
-/*
-  THE VEIL.
-
-  The gradient's own bright end is a problem for a page of text. On a dark
-  theme the foreground is near-white, and the ramp ends in cream, so the
-  light end of the gradient and the light text land on the same pixels and
-  neither can be read. The same thing happens in reverse on a light theme,
-  where the gradient's dark end swallows the dark text.
-
-  So the field is seen THROUGH the page's own colour rather than on top of
-  it. It stays a rich, moving, warm background, and the text keeps its
-  contrast, because the veil is the page's own background colour and the
-  text is the page's own foreground colour.
-
-  THE STRENGTH IS PER THEME, and it has to be.
-
-  Adding black to a colour makes a SHADE, and a shade looks rich. Adding
-  cream makes a TINT, and a tint looks washed. So the same strength that
-  makes a dark theme's field glow makes a light theme's field look faded
-  and grey, and the light theme needs a much thinner veil to read as the
-  same amount of colour.
-
-  The value lives in the palette generator, because it depends on whether
-  the theme is bright - which the generator already knows - and on the two
-  hand-written themes in tokens.css.
-*/
-.nt-grain::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: color-mix(in srgb, var(--bg-0) var(--grain-veil, 78%), transparent);
 }

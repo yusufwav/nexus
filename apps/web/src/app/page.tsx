@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import AiMarquee from "@/components/landing/ai-marquee";
 import ChatPartner, { type ChatMessage } from "@/components/landing/chat-partner";
 import GradientAscii from "@/components/landing/gradient-ascii";
-import Grainient from "@/components/landing/grainient";
+import PixelBlast from "@/components/landing/pixel-blast";
 import LandingNav from "@/components/landing/landing-nav";
 import MissionSection from "@/components/landing/mission-section";
 import ModuleList, { type ModuleEntry } from "@/components/landing/module-list";
@@ -202,7 +202,7 @@ export default function Landing(): React.JSX.Element {
   return (
     <div className="nt-root">
       {/*
-        THE GRAINIENT.
+        THE PIXEL BLAST.
 
         A fixed layer behind everything, so it follows you down the page
         rather than scrolling past. The landing hero is opaque and covers
@@ -210,8 +210,7 @@ export default function Landing(): React.JSX.Element {
         is achieved - the field is not switched off there, it is simply
         behind something you cannot see through.
       */}
-      <Grainient />
-      <div className="nt-grid-bg" aria-hidden="true" />
+      <PixelBlast />
 
       <LandingNav />
       <ScrollReveal />
