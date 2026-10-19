@@ -435,6 +435,7 @@ function themeRamp(): { colors: string[]; lightMode: boolean } {
   const accentA = hexToRgb(token("--accent-a") || "#8b0000");
   const accentB = hexToRgb(token("--accent-b") || "#fdd3ae");
   const accentC = hexToRgb(token("--accent-c") || "#6b0024");
+  const fg = hexToRgb(token("--fg") || "#f2f4f7");
 
   // HOW BRIGHT THE PAGE IS, rather than looking for a class named "light".
   // There are fifty generated palettes plus a hand-written pair, and they are
@@ -462,22 +463,39 @@ function themeRamp(): { colors: string[]; lightMode: boolean } {
   /*
     A LIGHT PAGE.
 
-    The walk runs DOWN, from the paper to the deep hue, and every stop stays
-    light enough for dark text to sit on it. The targets are the PRE-lift
-    lightnesses: react-bits' lightMode lifts each tint by 20% of the way to
-    white on its way into the ramp, and the finished gradient therefore ends
-    up a little paler than these numbers.
+    THE ACCENTS AT FULL STRENGTH. Their own lightness, their own
+    saturation, nothing mixed toward the paper and nothing lifted.
 
-    The tints are handed over DARKEST FIRST, because the mechanism takes
-    them in reverse.
+    This is the second half of a correction. The first version of this
+    ramp raised the lightness of every accent to walk evenly from the paper
+    down to the deep end - and that is exactly how you dim a colour. HSL
+    saturation and perceptual chroma are not the same thing: a deep red at
+    100% HSL saturation and 26% lightness is a vivid red, and the same hue
+    at 86% lightness is a pale pink with half the chroma. Raising the
+    lightness to spread the ramp is the same mistake wearing a different
+    hat.
+
+    On top of that, react-bits' own `lightMode` flag lifts each tint 20% of
+    the way to white AND scales its chroma by 0.8, and it takes the tints
+    in REVERSE when it builds the ramp. So feeding it a natural ramp
+    produces a gradient that runs dark-light-dark-light. Which is why the
+    ramp is built here and the flag is not set: the colours are the theme's
+    own, at their own strength, in a deliberate order, and the page's own
+    colour does the fading.
+
+    The order is the same one the dark ramp walks - the deep hue, the
+    identity accent, then the pale one - so the two themes are recognisably
+    the same palette, just lightened by the page rather than by the ramp.
   */
-  const targets = [0.4, 0.525, 0.65, 0.775];
   return {
     colors: [
       toHex(bg),
-      ...hues.map((hue, i) => toHex(atLightness(hue, targets[i]))),
+      toHex(accentC),
+      toHex(accentA),
+      toHex(accentB),
+      toHex(fg),
     ],
-    lightMode: true,
+    lightMode: false,
   };
 }
 

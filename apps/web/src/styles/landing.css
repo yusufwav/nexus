@@ -199,7 +199,7 @@
     scrim on the terminal hero below has to be the same colour or the
     handover from this hero to that one shows a seam.
   */
-  background: var(--background);
+  background: var(--bg-0);
 }
 
 /* Both canvas layers sit behind the copy. z-index 0 keeps the
@@ -546,7 +546,7 @@
   right: 0;
   height: 46%;
   pointer-events: none;
-  background: linear-gradient(to bottom, var(--background) 0%, transparent 100%);
+  background: linear-gradient(to bottom, var(--bg-0) 0%, transparent 100%);
   z-index: 0;
 }
 .nt-hero > * {
@@ -1590,13 +1590,21 @@ html:not([data-reveal-ready]) .nt-root [data-reveal]:not(.is-in) .nt-rv-line {
   contrast, because the veil is the page's own background colour and the
   text is the page's own foreground colour.
 
-  The strength is a compromise: enough to keep small muted text readable
-  over the brightest part of the flow, not so much that the field is just
-  a tint.
+  THE STRENGTH IS PER THEME, and it has to be.
+
+  Adding black to a colour makes a SHADE, and a shade looks rich. Adding
+  cream makes a TINT, and a tint looks washed. So the same strength that
+  makes a dark theme's field glow makes a light theme's field look faded
+  and grey, and the light theme needs a much thinner veil to read as the
+  same amount of colour.
+
+  The value lives in the palette generator, because it depends on whether
+  the theme is bright - which the generator already knows - and on the two
+  hand-written themes in tokens.css.
 */
 .nt-grain::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, var(--background) 78%, transparent);
+  background: color-mix(in srgb, var(--bg-0) var(--grain-veil, 78%), transparent);
 }
