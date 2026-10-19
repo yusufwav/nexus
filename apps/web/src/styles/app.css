@@ -2189,11 +2189,16 @@
 .nt-keys {
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  /* No gap. Every block carries its own padding and is separated by a rule,
+     the way .nt-drow does it on the other settings groups. A gap here
+     PLUS padding would leave the rules floating in the space between two
+     blocks instead of touching them. */
+  gap: 0;
 }
 .nt-keys__lead {
   margin: 0;
   max-width: 46rem;
+  padding: var(--sp-4) var(--sp-5);
   font-size: var(--fs-xs);
   line-height: var(--lh-body);
   color: var(--fg-muted);
@@ -2207,10 +2212,11 @@
 .nt-keys__list {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: var(--sp-3) var(--sp-5);
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
+  border-top: 1px solid var(--line-soft);
 }
 .nt-keys__row {
   display: flex;
@@ -2332,6 +2338,8 @@
   flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  border-top: 1px solid var(--line-soft);
 }
 .nt-keys__field {
   display: flex;
@@ -2398,12 +2406,22 @@
    phone about eleven characters per field.
    ============================================================ */
 .nt-keys__custom {
-  margin-top: var(--sp-3);
-  padding-top: var(--sp-4);
+  /* Inset like everything else in the group, and separated from the block
+     above by a rule rather than by a margin — a margin leaves a gap the
+     rule does not cross, which reads as two boxes with space between them
+     instead of one panel with sections. */
+  padding: var(--sp-4) var(--sp-5);
   border-top: 1px solid var(--line-soft);
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
+}
+/* The custom provider's own form lives inside .nt-keys__custom, which is
+   already inset and already separated. Inheriting the form's own padding
+   and top rule here would inset it twice and draw a second rule. */
+.nt-keys__form--custom {
+  padding: 0;
+  border-top: 0;
 }
 .nt-keys__customhead {
   display: flex;
