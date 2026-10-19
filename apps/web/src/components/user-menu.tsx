@@ -9,15 +9,11 @@ import {
 } from "@Main/ui/components/dropdown-menu";
 import Link from "next/link";
 import {
-  BookOpenIcon,
   CompassIcon,
   HomeIcon,
   LayoutDashboardIcon,
   ListChecksIcon,
   LogOutIcon,
-  ReceiptIcon,
-  SettingsIcon,
-  SparklesIcon,
   UserRoundIcon,
 } from "lucide-react";
 import { useMemo } from "react";
@@ -86,6 +82,21 @@ function topEdgeAnchor() {
  * It signs the user out as well, because on the landing page it is the
  * only header there is: without this, being signed in on `/` meant there
  * was nowhere to sign out from.
+ *
+ * FOUR DESTINATIONS, AND THAT IS THE WHOLE POINT.
+ *
+ * The bar is a bar only while it fits on one line. Eight of them did
+ * not: 8 icons at 36px plus their gaps is ~316px, a 375px phone has
+ * 359px of room, and the overflow made the bar wrap into three rows —
+ * which is a column, which is the shape this menu was rebuilt to stop
+ * being, reached by the opposite route.
+ *
+ * So the bar carries only what is not reachable another way. The tutor
+ * is in every header. My modules, Purchases and Settings are dashboard
+ * pages, and the dashboard reaches all three. What is left — Home,
+ * Dashboard, Browse catalogue, Practice — fits on one line on every
+ * phone worth designing for, and each one is a place the reader could
+ * not otherwise get to from here.
  */
 export default function UserMenu(props: {
   /**
@@ -243,30 +254,25 @@ export default function UserMenu(props: {
           >
             <LayoutDashboardIcon aria-hidden="true" />
           </DropdownMenuItem>
-          <DropdownMenuItem
-            render={<Link href="/dashboard/modules" />}
-            className="nt-menu__ico"
-            aria-label="My modules"
-            data-label="My modules"
-          >
-            <BookOpenIcon aria-hidden="true" />
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            render={<Link href="/dashboard/purchases" />}
-            className="nt-menu__ico"
-            aria-label="Purchases"
-            data-label="Purchases"
-          >
-            <ReceiptIcon aria-hidden="true" />
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            render={<Link href="/dashboard/settings" />}
-            className="nt-menu__ico"
-            aria-label="Settings"
-            data-label="Settings"
-          >
-            <SettingsIcon aria-hidden="true" />
-          </DropdownMenuItem>
+          {/*
+            MY MODULES, PURCHASES AND SETTINGS ARE GONE FROM HERE.
+
+            They are all dashboard pages, and the dashboard reaches all
+            three. Listing them again in the menu was a second path to the
+            same three places, and it was the reason the bar was three rows
+            tall on a phone: eight destinations could not fit across a 375px
+            screen, so the bar wrapped into three lines and covered a third
+            of the viewport with icons that led nowhere new.
+
+            The tutor is gone for the same reason from the other end — it
+            is in every header already (header.tsx and landing-nav.tsx both
+            link to /ai), so a second copy in the menu was the same path
+            twice.
+
+            Four destinations left: Home, Dashboard, Browse catalogue,
+            Practice. That is one row on a phone with room to spare, which
+            is the whole point of the bar being a bar.
+          */}
           <DropdownMenuItem
             render={<Link href="/modules" />}
             className="nt-menu__ico"
@@ -276,10 +282,10 @@ export default function UserMenu(props: {
             <CompassIcon aria-hidden="true" />
           </DropdownMenuItem>
           {/*
-            Practice sits beside the tutor and directly after the
-            catalogue rather than among the account links, because it is
-            neither of them: it is the third study destination, the one
-            a reader opens when they do not know what to ask.
+            Practice sits beside the catalogue rather than among the
+            account links, because it is neither of them: it is the third
+            study destination, the one a reader opens when they do not know
+            what to ask.
 
             It was unreachable from here, which is the same shape of gap
             as the tutor's absence from every nav before it had an icon:
@@ -293,14 +299,6 @@ export default function UserMenu(props: {
             data-label="Practice"
           >
             <ListChecksIcon aria-hidden="true" />
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            render={<Link href="/ai" />}
-            className="nt-menu__ico"
-            aria-label="AI tutor"
-            data-label="AI tutor"
-          >
-            <SparklesIcon aria-hidden="true" />
           </DropdownMenuItem>
         </DropdownMenuGroup>
 

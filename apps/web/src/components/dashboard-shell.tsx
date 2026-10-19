@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SparklesIcon } from "lucide-react";
 
 import ScrollReveal from "@/components/landing/scroll-reveal";
 import LetterGlitch from "@/components/letter-glitch";
@@ -114,6 +115,30 @@ export default function DashboardShell({
                   in the identity row, because inside that row it sat on
                   the console's border and read as clutter. */}
               <div className="nt-dash__float">
+                {/*
+                  THE TUTOR GETS A BUTTON OF ITS OWN HERE, AND IT IS NOT
+                  REDUNDANT.
+
+                  On a phone the inline row above is hidden, so DASH_ACTIONS
+                  — Home, the tutor, Browse modules — comes with it. The
+                  UserMenu that replaces the row carries Home and Browse
+                  catalogue, but NOT the tutor, because the tutor lives in
+                  the site header and the dashboard is the one signed-in
+                  surface with no site header.
+
+                  So on a phone the dashboard would have no way to the tutor
+                  at all. It gets a button of its own, which is the same
+                  destination the desktop row reaches, presented the way
+                  that row presents it.
+                */}
+                <Link
+                  className="nt-btn nt-btn--ghost nt-btn--icon"
+                  href="/ai"
+                  aria-label="AI tutor"
+                  title="AI tutor"
+                >
+                  <SparklesIcon aria-hidden="true" />
+                </Link>
                 <UserMenu anchorToTrigger />
               </div>
             </div>

@@ -1910,11 +1910,12 @@
 .nt-menu__bar.nt-menu__bar {
   /* Overrides the primitive's w-(--anchor-width), which would otherwise
      stretch the bar to the full viewport. Sized to its contents instead.
-     The cap is a wrap rather than a clamp: with /practice added the bar
-     is eight destinations, and at 36px a square plus a gap that is
-     ~380px of icons - which overflows a 375px phone by a few pixels, and
-     an icon row that silently loses its last item behind the edge is
-     worse than one that wraps onto a second line. */
+     The cap is a wrap rather than a clamp: the bar is four destinations
+     (Home, Dashboard, Browse catalogue, Practice) plus the avatar and
+     sign-out, which is ~300px of content — over a 375px phone's 359px of
+     room, so it has to be allowed to wrap on the very narrowest screens
+     rather than overflow. Below 640px the gaps tighten and the wrap is
+     switched off, which is what buys the headroom. */
   width: auto;
   max-width: calc(100vw - var(--sp-4));
   display: flex;
@@ -2067,6 +2068,65 @@
 .nt-menu__ico:hover::after,
 .nt-menu__ico:focus-visible::after {
   opacity: 1;
+}
+
+/* ============================================================
+   THE USER MENU ON A PHONE
+   ------------------------------------------------------------
+   It was three rows tall — three times the height it should have
+   been — and the cause was arithmetic, not styling.
+
+   Eight destinations at 36px each, plus their gaps, is ~316px of
+   icons. A 375px phone has 359px of room once the bar's own padding
+   and its two dividers are subtracted. So the bar wrapped, and a bar
+   that wraps is a column again — the exact shape this menu was
+   rebuilt to avoid, reached by a different road.
+
+   Two changes, and only the second one is cosmetic:
+
+   1. FOUR DESTINATIONS, NOT EIGHT. The tutor is in every header
+      already, and My modules, Purchases and Settings are all
+      dashboard pages the dashboard reaches. Removing them removed
+      the overflow rather than hiding it, which is the only kind of
+      fix that survives the next destination someone adds.
+
+   2. Tighter gaps and padding below 640px, and `nowrap` on the bar
+      and on each rail, so a narrow screen can never split a group
+      across two lines. The icons stay at their full 36px: shrinking
+      them to buy room would trade a visible problem for a smaller
+      tap target, which is the wrong trade on a touch screen.
+
+   The arithmetic that has to fit, on the narrowest phone worth
+   designing for (320px):
+
+     avatar 34 + rule 5 + rail 150 + rule 5 + signout 36 = 230
+     + 4 gaps at 6px  =  24
+     + padding 20     =  20
+     ----------------------------
+     total 274px, against 304px of available width
+
+   Thirty pixels of headroom, and the bar cannot wrap.
+   ============================================================ */
+@media (max-width: 640px) {
+  .nt-menu__bar.nt-menu__bar {
+    gap: 6px;
+    padding: 6px 10px;
+    /* Never wrap. The bar is one row or it is broken. */
+    flex-wrap: nowrap;
+  }
+  .nt-menu__rail {
+    gap: 2px;
+    flex-wrap: nowrap;
+  }
+  .nt-menu__rule {
+    margin-inline: 2px;
+  }
+  /* A touch has no hover, so the label was unreachable on a phone
+     even though it was on screen in the DOM. `:active` gives a tap
+     the same flash of label that a hover gives a pointer. */
+  .nt-menu__ico:active::after {
+    opacity: 1;
+  }
 }
 
 .nt-menu__btn {
@@ -3506,7 +3566,12 @@ html:not([data-reveal-ready]) .nt-root.nt-dash [data-reveal]:not(.is-in) .nt-rv-
 @media (max-width: 640px) {
   .nt-dash__float {
     --nt-z-float: 60;
-    display: block;
+    /* A row, not a block: the tutor's own button sits beside the user
+       menu's trigger, and as a block they would stack and push the
+       second one down under the first. */
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
     position: fixed;
     top: calc(var(--sp-3) + env(safe-area-inset-top, 0px));
     right: calc(var(--sp-3) + env(safe-area-inset-right, 0px));
