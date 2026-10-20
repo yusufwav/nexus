@@ -288,7 +288,7 @@ const PixelBlast = ({
         to stay readable. These two numbers are what make the two themes
         carry the same weight of texture.
       */
-      layer?.style.setProperty("--nt-pixel-dim", light ? "0.6" : "0.2");
+      layer?.style.setProperty("--nt-pixel-dim", light ? "0.475" : "0.2");
       setTheme({ color: inkBase, accentColor: ink, lightMode: light });
     };
     read();
