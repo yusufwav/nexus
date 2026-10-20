@@ -200,7 +200,11 @@ const PixelBlast = ({
     reached by a class called light. This is the same test the ASCII field
     uses.
   */
-  const [theme, setTheme] = useState({ color: "#ffffff", accentColor: "#ffffff", lightMode: false });
+  const [theme, setTheme] = useState({
+    color: "#ffffff",
+    accentColor: "#ffffff",
+    lightMode: false,
+  });
   useEffect(() => {
     const read = (): void => {
       const host = document.querySelector<HTMLElement>(".nt-root");
@@ -223,21 +227,53 @@ const PixelBlast = ({
       // The foreground, exactly. The dimming happens on the LAYER, in the
       // stylesheet, where it can dim the whole field at once.
       /*
-        THE INK.
+        THE TWO COLOURS, AND WHY THEY ARE TWO.
 
-        White on a dark theme. On a LIGHT theme, the palette's own darkest
-        accent rather than plain black - so the field carries the theme's
-        identity instead of being a generic grey, and the default light
-        theme's field is its dark red.
+        PixelBlast has a colour and an accent colour, and they are not
+        the same thing. The colour is the BASE of a cell; the accent is
+        the HOT CORE of a bright one, and the shader mixes between them
+        as the cell's value rises. A field where both are the same colour
+        is flat - every cell is one shade, and the shape of the pattern
+        has to come from the density alone.
 
-        The accent the palettes seed is the one that reads on paper. In a
-        light theme that is the primary, which is why the default light
-        theme's is #8b0000 and not a washed brown.
+        react-bits' own mono preset makes the two different, and it
+        INVERTS them between the themes:
+
+            mono, dark :  base #71717A (mid)  core #F4F4F5 (near white)
+            mono, light:  base #A1A1AA (light) core #18181B (near black)
+
+        So the base is always a MID tone, and the core is always the
+        extreme of the page's direction: near-white on a dark page, and
+        near-black on a light one.
+
+        Here the core is the theme's own dark accent on a light page -
+        the default light theme's field is its #8b0000 red, deepened -
+        and plain white on a dark page. The base is the core, pulled
+        back toward the page.
+
+        And the DIM is the layer's opacity, not the colour: the shader
+        pushes a hot cell toward white on its own
+        ("lit = mix(color, vec3(1.0), 0.45 * hot)"), so the colour is
+        the FLOOR of a cell and not its ceiling. Dimming the colour
+        would barely touch the brightest ones. Dimming the layer dims
+        the cells, the core and the glow between them, together.
       */
-      const accent = read3("--accent-a");
-      const ink = light
-        ? "#" + accent.map((v) => v.toString(16).padStart(2, "0")).join("")
-        : "#ffffff";
+      const mix = (a: number[], b: number[], t: number): number[] =>
+        a.map((v, i) => v + (b[i] - v) * t);
+      const hex = (c: number[]): string =>
+        "#" + c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+
+      // DARK PAGE: the core is white, the base is a mid grey. Unchanged.
+      //
+      // LIGHT PAGE: the base is BLACK - not a grey, not a tint, black - and
+      // the hot core is the palette's DARKEST colour, which the palette
+      // generator derives and emits as --accent-ink. That is the deepest of
+      // the three accents, not the identity one, because it is the one that
+      // holds up on paper.
+      const core = light ? read3("--accent-ink") : [255, 255, 255];
+      const base = light ? [0, 0, 0] : mix(core, bg, 0.5);
+      const ink = hex(core);
+      const inkBase = hex(base);
       /*
         THE DIM, AND IT IS NOT THE SAME NUMBER IN BOTH THEMES.
 
@@ -252,8 +288,8 @@ const PixelBlast = ({
         to stay readable. These two numbers are what make the two themes
         carry the same weight of texture.
       */
-      layer?.style.setProperty("--nt-pixel-dim", light ? "0.425" : "0.2");
-      setTheme({ color: ink, accentColor: ink, lightMode: light });
+      layer?.style.setProperty("--nt-pixel-dim", light ? "0.6" : "0.2");
+      setTheme({ color: inkBase, accentColor: ink, lightMode: light });
     };
     read();
     const observer = new MutationObserver(read);

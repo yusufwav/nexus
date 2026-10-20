@@ -22,6 +22,7 @@
   --accent-a: #1d4ed8;
   --accent-b: #b45309;
   --accent-c: #d8491d;
+  --accent-ink: #1d4ed8;
   --accent-dot: rgba(29, 78, 216, 0.8);
   --accent-line: rgba(108, 53, 12, 0.28);
   --accent-soft: rgba(108, 53, 12, 0.08);
@@ -98,6 +99,7 @@
   --accent-a: #0f766e;
   --accent-b: #9d174d;
   --accent-c: #760f4b;
+  --accent-ink: #760f4b;
   --accent-dot: rgba(15, 118, 110, 0.8);
   --accent-line: rgba(98, 23, 51, 0.28);
   --accent-soft: rgba(98, 23, 51, 0.08);
@@ -174,6 +176,7 @@
   --accent-a: #0369a1;
   --accent-b: #7c3aed;
   --accent-c: #a1031a;
+  --accent-ink: #a1031a;
   --accent-dot: rgba(3, 105, 161, 0.8);
   --accent-line: rgba(77, 44, 144, 0.28);
   --accent-soft: rgba(77, 44, 144, 0.08);
@@ -250,6 +253,7 @@
   --accent-a: #1e40af;
   --accent-b: #0891b2;
   --accent-c: #af441e;
+  --accent-ink: #1e40af;
   --accent-dot: rgba(30, 64, 175, 0.8);
   --accent-line: rgba(12, 91, 112, 0.28);
   --accent-soft: rgba(12, 91, 112, 0.08);
@@ -326,6 +330,7 @@
   --accent-a: #a16207;
   --accent-b: #15803d;
   --accent-c: #0793a1;
+  --accent-ink: #15803d;
   --accent-dot: rgba(161, 98, 7, 0.8);
   --accent-line: rgba(24, 81, 37, 0.28);
   --accent-soft: rgba(24, 81, 37, 0.08);
@@ -402,6 +407,7 @@
   --accent-a: #047857;
   --accent-b: #0e7490;
   --accent-c: #78045f;
+  --accent-ink: #78045f;
   --accent-dot: rgba(4, 120, 87, 0.8);
   --accent-line: rgba(14, 78, 90, 0.28);
   --accent-soft: rgba(14, 78, 90, 0.08);
@@ -478,6 +484,7 @@
   --accent-a: #be185d;
   --accent-b: #6d28d9;
   --accent-c: #18be26;
+  --accent-ink: #6d28d9;
   --accent-dot: rgba(190, 24, 93, 0.8);
   --accent-line: rgba(73, 31, 131, 0.28);
   --accent-soft: rgba(73, 31, 131, 0.08);
@@ -554,6 +561,7 @@
   --accent-a: #1d4ed8;
   --accent-b: #c2410c;
   --accent-c: #d8491d;
+  --accent-ink: #1d4ed8;
   --accent-dot: rgba(29, 78, 216, 0.8);
   --accent-line: rgba(113, 46, 21, 0.28);
   --accent-soft: rgba(113, 46, 21, 0.08);
@@ -630,6 +638,7 @@
   --accent-a: #4d7c0f;
   --accent-b: #9333ea;
   --accent-c: #0f167c;
+  --accent-ink: #0f167c;
   --accent-dot: rgba(77, 124, 15, 0.8);
   --accent-line: rgba(89, 37, 133, 0.28);
   --accent-soft: rgba(89, 37, 133, 0.08);
@@ -706,6 +715,7 @@
   --accent-a: #92400e;
   --accent-b: #1e40af;
   --accent-c: #0e9282;
+  --accent-ink: #1e40af;
   --accent-dot: rgba(146, 64, 14, 0.8);
   --accent-line: rgba(27, 44, 102, 0.28);
   --accent-soft: rgba(27, 44, 102, 0.08);
@@ -782,6 +792,7 @@
   --accent-a: #7c6cff;
   --accent-b: #22d3ee;
   --accent-c: #ffc56c;
+  --accent-ink: #7c6cff;
   --accent-dot: rgba(124, 108, 255, 0.8);
   --accent-line: rgba(34, 211, 238, 0.28);
   --accent-soft: rgba(34, 211, 238, 0.08);
@@ -858,6 +869,7 @@
   --accent-a: #ff4d6d;
   --accent-b: #ffd166;
   --accent-c: #4dff86;
+  --accent-ink: #ff4d6d;
   --accent-dot: rgba(255, 77, 109, 0.8);
   --accent-line: rgba(255, 209, 102, 0.28);
   --accent-soft: rgba(255, 209, 102, 0.08);
@@ -934,6 +946,7 @@
   --accent-a: #8b5cf6;
   --accent-b: #2dd4bf;
   --accent-c: #f6d85c;
+  --accent-ink: #8b5cf6;
   --accent-dot: rgba(139, 92, 246, 0.8);
   --accent-line: rgba(45, 212, 191, 0.28);
   --accent-soft: rgba(45, 212, 191, 0.08);
@@ -1010,6 +1023,7 @@
   --accent-a: #38bdf8;
   --accent-b: #a3e635;
   --accent-c: #f8385d;
+  --accent-ink: #f8385d;
   --accent-dot: rgba(56, 189, 248, 0.8);
   --accent-line: rgba(163, 230, 53, 0.28);
   --accent-soft: rgba(163, 230, 53, 0.08);
@@ -1086,6 +1100,7 @@
   --accent-a: #818cf8;
   --accent-b: #f472b6;
   --accent-c: #f8b181;
+  --accent-ink: #818cf8;
   --accent-dot: rgba(129, 140, 248, 0.8);
   --accent-line: rgba(244, 114, 182, 0.28);
   --accent-soft: rgba(244, 114, 182, 0.08);
@@ -1162,6 +1177,7 @@
   --accent-a: #f97316;
   --accent-b: #fbbf24;
   --accent-c: #16f9e5;
+  --accent-ink: #f97316;
   --accent-dot: rgba(249, 115, 22, 0.8);
   --accent-line: rgba(251, 191, 36, 0.28);
   --accent-soft: rgba(251, 191, 36, 0.08);
@@ -1238,6 +1254,7 @@
   --accent-a: #94a3b8;
   --accent-b: #2dd4bf;
   --accent-c: #b89794;
+  --accent-ink: #b89794;
   --accent-dot: rgba(148, 163, 184, 0.8);
   --accent-line: rgba(45, 212, 191, 0.28);
   --accent-soft: rgba(45, 212, 191, 0.08);
@@ -1314,6 +1331,7 @@
   --accent-a: #d97706;
   --accent-b: #65a30d;
   --accent-c: #06d2d9;
+  --accent-ink: #d97706;
   --accent-dot: rgba(217, 119, 6, 0.8);
   --accent-line: rgba(101, 163, 13, 0.28);
   --accent-soft: rgba(101, 163, 13, 0.08);
@@ -1390,6 +1408,7 @@
   --accent-a: #a78bfa;
   --accent-b: #34d399;
   --accent-c: #fade8b;
+  --accent-ink: #a78bfa;
   --accent-dot: rgba(167, 139, 250, 0.8);
   --accent-line: rgba(52, 211, 153, 0.28);
   --accent-soft: rgba(52, 211, 153, 0.08);
@@ -1466,6 +1485,7 @@
   --accent-a: #60a5fa;
   --accent-b: #fbbf24;
   --accent-c: #fa6860;
+  --accent-ink: #fa6860;
   --accent-dot: rgba(96, 165, 250, 0.8);
   --accent-line: rgba(251, 191, 36, 0.28);
   --accent-soft: rgba(251, 191, 36, 0.08);
@@ -1542,6 +1562,7 @@
   --accent-a: #fabd2f;
   --accent-b: #b8bb26;
   --accent-c: #2fd2fa;
+  --accent-ink: #b8bb26;
   --accent-dot: rgba(250, 189, 47, 0.8);
   --accent-line: rgba(184, 187, 38, 0.28);
   --accent-soft: rgba(184, 187, 38, 0.08);
@@ -1618,6 +1639,7 @@
   --accent-a: #bd93f9;
   --accent-b: #50fa7b;
   --accent-c: #f9f093;
+  --accent-ink: #bd93f9;
   --accent-dot: rgba(189, 147, 249, 0.8);
   --accent-line: rgba(80, 250, 123, 0.28);
   --accent-soft: rgba(80, 250, 123, 0.08);
@@ -1694,6 +1716,7 @@
   --accent-a: #88c0d0;
   --accent-b: #81a1c1;
   --accent-c: #d0889c;
+  --accent-ink: #d0889c;
   --accent-dot: rgba(136, 192, 208, 0.8);
   --accent-line: rgba(129, 161, 193, 0.28);
   --accent-soft: rgba(129, 161, 193, 0.08);
@@ -1770,6 +1793,7 @@
   --accent-a: #268bd2;
   --accent-b: #b58900;
   --accent-c: #d22635;
+  --accent-ink: #d22635;
   --accent-dot: rgba(38, 139, 210, 0.8);
   --accent-line: rgba(181, 137, 0, 0.28);
   --accent-soft: rgba(181, 137, 0, 0.08);
@@ -1846,6 +1870,7 @@
   --accent-a: #cba6f7;
   --accent-b: #89b4fa;
   --accent-c: #f7f3a6;
+  --accent-ink: #89b4fa;
   --accent-dot: rgba(203, 166, 247, 0.8);
   --accent-line: rgba(137, 180, 250, 0.28);
   --accent-soft: rgba(137, 180, 250, 0.08);
@@ -1922,6 +1947,7 @@
   --accent-a: #7aa2f7;
   --accent-b: #f7768e;
   --accent-c: #f7907a;
+  --accent-ink: #f7768e;
   --accent-dot: rgba(122, 162, 247, 0.8);
   --accent-line: rgba(247, 118, 142, 0.28);
   --accent-soft: rgba(247, 118, 142, 0.08);
@@ -1998,6 +2024,7 @@
   --accent-a: #f92672;
   --accent-b: #a6e22e;
   --accent-c: #26f944;
+  --accent-ink: #f92672;
   --accent-dot: rgba(249, 38, 114, 0.8);
   --accent-line: rgba(166, 226, 46, 0.28);
   --accent-soft: rgba(166, 226, 46, 0.08);
@@ -2074,6 +2101,7 @@
   --accent-a: #61afef;
   --accent-b: #e06c75;
   --accent-c: #ef6168;
+  --accent-ink: #e06c75;
   --accent-dot: rgba(97, 175, 239, 0.8);
   --accent-line: rgba(224, 108, 117, 0.28);
   --accent-soft: rgba(224, 108, 117, 0.08);
@@ -2150,6 +2178,7 @@
   --accent-a: #a7c080;
   --accent-b: #dbbc7f;
   --accent-c: #8087c0;
+  --accent-ink: #8087c0;
   --accent-dot: rgba(167, 192, 128, 0.8);
   --accent-line: rgba(219, 188, 127, 0.28);
   --accent-soft: rgba(219, 188, 127, 0.08);
@@ -2226,6 +2255,7 @@
   --accent-a: #ebbcba;
   --accent-b: #f6c177;
   --accent-c: #baebd4;
+  --accent-ink: #ebbcba;
   --accent-dot: rgba(235, 188, 186, 0.8);
   --accent-line: rgba(246, 193, 119, 0.28);
   --accent-soft: rgba(246, 193, 119, 0.08);
@@ -2302,6 +2332,7 @@
   --accent-a: #82aaff;
   --accent-b: #ecc48d;
   --accent-c: #ff9882;
+  --accent-ink: #82aaff;
   --accent-dot: rgba(130, 170, 255, 0.8);
   --accent-line: rgba(236, 196, 141, 0.28);
   --accent-soft: rgba(236, 196, 141, 0.08);
@@ -2378,6 +2409,7 @@
   --accent-a: #e46876;
   --accent-b: #938aa9;
   --accent-c: #68e498;
+  --accent-ink: #938aa9;
   --accent-dot: rgba(228, 104, 118, 0.8);
   --accent-line: rgba(147, 138, 169, 0.28);
   --accent-soft: rgba(147, 138, 169, 0.08);
@@ -2454,6 +2486,7 @@
   --accent-a: #ffb454;
   --accent-b: #39bae6;
   --accent-c: #54f4ff;
+  --accent-ink: #39bae6;
   --accent-dot: rgba(255, 180, 84, 0.8);
   --accent-line: rgba(57, 186, 230, 0.28);
   --accent-soft: rgba(57, 186, 230, 0.08);
@@ -2530,6 +2563,7 @@
   --accent-a: #dfaf8f;
   --accent-b: #93e0e3;
   --accent-c: #8fdfd7;
+  --accent-ink: #dfaf8f;
   --accent-dot: rgba(223, 175, 143, 0.8);
   --accent-line: rgba(147, 224, 227, 0.28);
   --accent-soft: rgba(147, 224, 227, 0.08);
@@ -2606,6 +2640,7 @@
   --accent-a: #84a0c6;
   --accent-b: #b4be82;
   --accent-c: #c68984;
+  --accent-ink: #c68984;
   --accent-dot: rgba(132, 160, 198, 0.8);
   --accent-line: rgba(180, 190, 130, 0.28);
   --accent-soft: rgba(180, 190, 130, 0.08);
@@ -2682,6 +2717,7 @@
   --accent-a: #ff7eb6;
   --accent-b: #3ddbd9;
   --accent-c: #7eff87;
+  --accent-ink: #ff7eb6;
   --accent-dot: rgba(255, 126, 182, 0.8);
   --accent-line: rgba(61, 219, 217, 0.28);
   --accent-soft: rgba(61, 219, 217, 0.08);
@@ -2758,6 +2794,7 @@
   --accent-a: #6cb6eb;
   --accent-b: #e87a82;
   --accent-c: #eb6c76;
+  --accent-ink: #eb6c76;
   --accent-dot: rgba(108, 182, 235, 0.8);
   --accent-line: rgba(232, 122, 130, 0.28);
   --accent-soft: rgba(232, 122, 130, 0.08);
@@ -2834,6 +2871,7 @@
   --accent-a: #fc5d7c;
   --accent-b: #f39660;
   --accent-c: #5dfc8d;
+  --accent-ink: #fc5d7c;
   --accent-dot: rgba(252, 93, 124, 0.8);
   --accent-line: rgba(243, 150, 96, 0.28);
   --accent-soft: rgba(243, 150, 96, 0.08);
@@ -2910,6 +2948,7 @@
   --accent-a: #719cd6;
   --accent-b: #9d7cd8;
   --accent-c: #d67871;
+  --accent-ink: #9d7cd8;
   --accent-dot: rgba(113, 156, 214, 0.8);
   --accent-line: rgba(157, 124, 216, 0.28);
   --accent-soft: rgba(157, 124, 216, 0.08);
@@ -2986,6 +3025,7 @@
   --accent-a: #6699cc;
   --accent-b: #ec5f67;
   --accent-c: #cc6666;
+  --accent-ink: #cc6666;
   --accent-dot: rgba(102, 153, 204, 0.8);
   --accent-line: rgba(236, 95, 103, 0.28);
   --accent-soft: rgba(236, 95, 103, 0.08);
@@ -3062,6 +3102,7 @@
   --accent-a: #80cbc4;
   --accent-b: #82b1ff;
   --accent-c: #cb80ac;
+  --accent-ink: #cb80ac;
   --accent-dot: rgba(128, 203, 196, 0.8);
   --accent-line: rgba(130, 177, 255, 0.28);
   --accent-soft: rgba(130, 177, 255, 0.08);
@@ -3138,6 +3179,7 @@
   --accent-a: #e95678;
   --accent-b: #fab795;
   --accent-c: #56e97d;
+  --accent-ink: #e95678;
   --accent-dot: rgba(233, 86, 120, 0.8);
   --accent-line: rgba(250, 183, 149, 0.28);
   --accent-soft: rgba(250, 183, 149, 0.08);
@@ -3214,6 +3256,7 @@
   --accent-a: #5de4c7;
   --accent-b: #add7ff;
   --accent-c: #e45dbe;
+  --accent-ink: #e45dbe;
   --accent-dot: rgba(93, 228, 199, 0.8);
   --accent-line: rgba(173, 215, 255, 0.28);
   --accent-soft: rgba(173, 215, 255, 0.08);
@@ -3290,6 +3333,7 @@
   --accent-a: #ffc600;
   --accent-b: #ff9d00;
   --accent-c: #00b8ff;
+  --accent-ink: #00b8ff;
   --accent-dot: rgba(255, 198, 0, 0.8);
   --accent-line: rgba(255, 157, 0, 0.28);
   --accent-soft: rgba(255, 157, 0, 0.08);
@@ -3366,6 +3410,7 @@
   --accent-a: #ffc799;
   --accent-b: #a0a0a0;
   --accent-c: #99fffa;
+  --accent-ink: #a0a0a0;
   --accent-dot: rgba(255, 199, 153, 0.8);
   --accent-line: rgba(160, 160, 160, 0.28);
   --accent-soft: rgba(160, 160, 160, 0.08);
@@ -3442,6 +3487,7 @@
   --accent-a: #fad000;
   --accent-b: #ff9d00;
   --accent-c: #00a7fa;
+  --accent-ink: #00a7fa;
   --accent-dot: rgba(250, 208, 0, 0.8);
   --accent-line: rgba(255, 157, 0, 0.28);
   --accent-soft: rgba(255, 157, 0, 0.08);
@@ -3518,6 +3564,7 @@
   --accent-a: #f92aad;
   --accent-b: #23e5f5;
   --accent-c: #45f92a;
+  --accent-ink: #f92aad;
   --accent-dot: rgba(249, 42, 173, 0.8);
   --accent-line: rgba(35, 229, 245, 0.28);
   --accent-soft: rgba(35, 229, 245, 0.08);
@@ -3594,6 +3641,7 @@
   --accent-a: #f97583;
   --accent-b: #79b8ff;
   --accent-c: #75f9a9;
+  --accent-ink: #f97583;
   --accent-dot: rgba(249, 117, 131, 0.8);
   --accent-line: rgba(121, 184, 255, 0.28);
   --accent-soft: rgba(121, 184, 255, 0.08);
@@ -3670,6 +3718,7 @@
   --accent-a: #99ad6a;
   --accent-b: #8fbfdc;
   --accent-c: #6a78ad;
+  --accent-ink: #6a78ad;
   --accent-dot: rgba(153, 173, 106, 0.8);
   --accent-line: rgba(143, 191, 220, 0.28);
   --accent-soft: rgba(143, 191, 220, 0.08);
@@ -3746,6 +3795,7 @@
   --accent-a: #cc6666;
   --accent-b: #81a2be;
   --accent-c: #66cc99;
+  --accent-ink: #cc6666;
   --accent-dot: rgba(204, 102, 102, 0.8);
   --accent-line: rgba(129, 162, 190, 0.28);
   --accent-soft: rgba(129, 162, 190, 0.08);

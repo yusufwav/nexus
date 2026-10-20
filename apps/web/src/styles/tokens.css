@@ -27,6 +27,11 @@
   --accent-b: #fdd3aeff;
   --accent-c: #6b0024ff;
 
+  /* The deepest of the three accents - the one that holds up on
+     paper. The palette generator derives the same token for every
+     generated palette. */
+  --accent-ink: #6b0024;
+
   /* Syntax palette — borrowed from the brand colours so highlighted
      code still reads as the same product. */
   --syn-key: #ff7b72;
@@ -337,6 +342,11 @@
   --accent-a: #8b0000;
   --accent-b: #7a2e12;
   --accent-c: #5c001f;
+
+  /* The deepest of the three accents - the one that holds up on
+     paper. The palette generator derives the same token for every
+     generated palette. */
+  --accent-ink: #5c001f;
 
   /* Syntax — a light-background family. The dark set is pastel and
      washes out against white; these are all >=4.5:1. */

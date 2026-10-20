@@ -308,6 +308,22 @@ function derive(p) {
   const accentC = rotate(primary, 150);
 
   /*
+   * THE PALETTE'S DARKEST COLOUR.
+   *
+   * The darkest of the three accents, by luminance. It is the one a light
+   * theme can put on paper and still read, and it is what the landing
+   * page's pixel field uses as its hot core.
+   *
+   * It is not simply the primary: the primary is the palette's identity
+   * colour, and it is not always the deepest. A palette whose primary is
+   * a light blue has a darker rotated hue behind it, and that is the one
+   * that holds up on paper.
+   */
+  const accentInk = [primary, secondary, accentC].reduce((a, b) =>
+    luminance(b) < luminance(a) ? b : a,
+  );
+
+  /*
    * Shadow ink. A shadow on a dark page is black - it can be, because there
    * is nothing darker than the page to make it look wrong. On a white page a
    * black shadow at the same alpha reads as a grey smudge, so the ink moves
@@ -386,6 +402,9 @@ function derive(p) {
     "--accent-a": hex(...primary),
     "--accent-b": hex(...secondary),
     "--accent-c": hex(...accentC),
+    /* The deepest of the three, for anything that needs the palette's
+       darkest colour rather than its identity one. */
+    "--accent-ink": hex(...accentInk),
     "--accent-dot": rgba(primary, 0.8),
     "--accent-line": rgba(bright ? inkAccent : secondary, 0.28),
     "--accent-soft": rgba(bright ? inkAccent : secondary, 0.08),
