@@ -1557,6 +1557,31 @@ html:not([data-reveal-ready]) .nt-root [data-reveal]:not(.is-in) .nt-rv-line {
   z-index: -1;
   pointer-events: none;
   overflow: hidden;
+
+  /*
+    THE DIM.
+
+    The field sits behind paragraphs, and at full strength the cells are
+    the same colour as the text and the page reads as noise. Dimmed, the
+    field is a texture and the text is on top of it.
+
+    The dim lives HERE, on the layer, rather than in the colour the shader
+    is given - because the colour is not what needs dimming. The shader
+    pushes a hot cell toward white on its own
+    (`lit = mix(color, vec3(1.0), 0.45 * hot)`), so the colour is the
+    FLOOR of a cell, not its ceiling. Dimming the colour would barely
+    touch the brightest ones.
+
+    Here, one number dims everything the shader draws - the cells, the hot
+    core in the middle of a bright one, and the glow between them - by the
+    same amount, toward the page's own background. The canvas is
+    transparent, so what shows through is the page, and the field sinks
+    into it.
+
+    White on a dark theme and black on a light one, at this strength, are
+    the same visual distance from their page.
+  */
+  opacity: var(--nt-pixel-dim, 0.2);
 }
 
 .nt-pixel__canvas {

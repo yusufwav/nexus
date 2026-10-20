@@ -179,43 +179,81 @@ const PixelBlast = ({
   /*
     THE COLOUR, READ OFF THE THEME.
 
-    The preset is MONO - one colour, not a gradient - and the URL says that
-    colour is white. On a dark page that is right: the pixels are the page's
-    own foreground. On a LIGHT page a white field is invisible, so the pixels
-    become the page's own INK instead.
+    The pixels are the page's foreground, exactly: white on a dark theme,
+    black on a light one. Nothing is mixed into the colour, because the
+    colour is not what needs dimming.
 
-    In other words the pixels are always the page's foreground colour, and
-    the theme decides what that is. Nothing here names a colour, so all fifty
-    palettes stay correct without a line being edited per theme.
+    What needs dimming is the FIELD, and the field is dimmed in one place
+    instead: the opacity of the canvas layer, in the stylesheet. That is
+    the only lever that dims everything the shader draws - the cells, the
+    hot white core in the middle of a bright one, and the glow between
+    them - by the same amount, toward the page's background.
+
+    Dimming the colour instead does almost nothing, because the shader
+    pushes a hot cell toward white on its own:
+    "lit = mix(color, vec3(1.0), 0.45 * hot)". The colour is the floor
+    of the cell, not its ceiling.
 
     And whether the page is light is decided by how bright its own
-    background is, not by looking for a class named "light". There are fifty
-    generated palettes plus a hand-written pair, and they are not all
+    background is, not by looking for a class named "light". There are
+    fifty generated palettes plus a hand-written pair, and they are not all
     reached by a class called light. This is the same test the ASCII field
     uses.
   */
-  const [theme, setTheme] = useState({ color: "#ffffff", lightMode: false });
+  const [theme, setTheme] = useState({ color: "#ffffff", accentColor: "#ffffff", lightMode: false });
   useEffect(() => {
     const read = (): void => {
       const host = document.querySelector<HTMLElement>(".nt-root");
       const cs = getComputedStyle(host ?? document.documentElement);
-      const bg = cs.getPropertyValue("--bg-0").trim();
-      const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(bg);
-      let light = false;
-      if (m) {
+      const layer = containerRef.current;
+      const read3 = (name: string): [number, number, number] => {
+        const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(
+          cs.getPropertyValue(name).trim(),
+        );
+        if (!m) return [0, 0, 0];
         const hex =
-          m[1].length === 3
-            ? m[1].split("").map((c) => c + c).join("")
-            : m[1];
+          m[1].length === 3 ? m[1].split("").map((c) => c + c).join("") : m[1];
         const n = Number.parseInt(hex, 16);
-        const lum =
-          (0.2126 * ((n >> 16) & 255) +
-            0.7152 * ((n >> 8) & 255) +
-            0.0722 * (n & 255)) /
-          255;
-        light = lum > 0.5;
-      }
-      setTheme({ color: light ? "#12100e" : "#ffffff", lightMode: light });
+        return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+      };
+      const bg = read3("--bg-0");
+      const fg = read3("--fg");
+      const lum = (0.2126 * bg[0] + 0.7152 * bg[1] + 0.0722 * bg[2]) / 255;
+      const light = lum > 0.5;
+      // The foreground, exactly. The dimming happens on the LAYER, in the
+      // stylesheet, where it can dim the whole field at once.
+      /*
+        THE INK.
+
+        White on a dark theme. On a LIGHT theme, the palette's own darkest
+        accent rather than plain black - so the field carries the theme's
+        identity instead of being a generic grey, and the default light
+        theme's field is its dark red.
+
+        The accent the palettes seed is the one that reads on paper. In a
+        light theme that is the primary, which is why the default light
+        theme's is #8b0000 and not a washed brown.
+      */
+      const accent = read3("--accent-a");
+      const ink = light
+        ? "#" + accent.map((v) => v.toString(16).padStart(2, "0")).join("")
+        : "#ffffff";
+      /*
+        THE DIM, AND IT IS NOT THE SAME NUMBER IN BOTH THEMES.
+
+        The dim is the layer's opacity, so it fades the field toward the
+        page. A dimmed black on a cream page lands very close to that
+        page - black at 20% over cream is almost cream. The same 20% of
+        white over black is a clear grey, because black is so much further
+        from white than cream is from black.
+
+        So the light theme needs a heavier hand for the field to read as a
+        field at all, and the dark theme needs a lighter one for the text
+        to stay readable. These two numbers are what make the two themes
+        carry the same weight of texture.
+      */
+      layer?.style.setProperty("--nt-pixel-dim", light ? "0.425" : "0.2");
+      setTheme({ color: ink, accentColor: ink, lightMode: light });
     };
     read();
     const observer = new MutationObserver(read);
