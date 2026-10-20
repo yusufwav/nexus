@@ -422,7 +422,7 @@ export const link = (
 
 const colorCache = new Map();
 
-export const hexToRgb = (hex: string): number[] => {
+export const hexToRgb = (hex: string | undefined): number[] => {
   const key = String(hex);
   const cached = colorCache.get(key);
   if (cached) return cached;
@@ -432,7 +432,7 @@ export const hexToRgb = (hex: string): number[] => {
   return rgb;
 };
 
-export const parseHex = (hex: string): number[] => {
+export const parseHex = (hex: string | undefined): number[] => {
   let h = String(hex || '#ffffff')
     .replace('#', '')
     .trim();
