@@ -145,7 +145,7 @@ const PixelBlast = ({
   className,
   style,
   patternScale = 2.5,
-  patternDensity = 1.1,
+  patternDensity = 1,
   pixelSizeJitter = 1,
   enableRipples = false,
   rippleIntensityScale = 0.2,
@@ -204,6 +204,7 @@ const PixelBlast = ({
     color: "#ffffff",
     accentColor: "#ffffff",
     lightMode: false,
+    density: 1.1,
   });
   useEffect(() => {
     const read = (): void => {
@@ -289,7 +290,16 @@ const PixelBlast = ({
         carry the same weight of texture.
       */
       layer?.style.setProperty("--nt-pixel-dim", light ? "0.475" : "0.2");
-      setTheme({ color: inkBase, accentColor: ink, lightMode: light });
+      setTheme({
+        color: inkBase,
+        accentColor: ink,
+        lightMode: light,
+        // The density. A light page gets the maximum - the field is
+        // sparser-looking on paper, because the cells are dark on a pale
+        // ground, so it needs more of them to read as a field at all. A
+        // dark page keeps the value from the preview URL.
+        density: light ? 2 : 1.1,
+      });
     };
     read();
     const observer = new MutationObserver(read);
@@ -341,6 +351,7 @@ const PixelBlast = ({
   if (color === undefined) settings.color = theme.color;
   if (accentColor === undefined) settings.accentColor = theme.color;
   if (lightMode === undefined) settings.lightMode = theme.lightMode;
+  if (patternDensity === undefined) settings.patternDensity = theme.density;
 
   const settingsRef = useRef<BlastSettings>(settings);
   settingsRef.current = settings;
