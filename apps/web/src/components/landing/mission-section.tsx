@@ -22,6 +22,19 @@ export default function MissionSection({
 }: MissionSectionProps): React.JSX.Element {
   return (
     <section className="nt-mission" id="mission" aria-label="Why this exists">
+      {/*
+        The scrim: a wash of the page's own background colour over the
+        top of this section, so the heading reads against the pixel field.
+        It ends at the bottom of the body text - the "a quick word about
+        me" paragraph is the last thing in it.
+      */}
+      <span
+        className="nt-scrim"
+        data-nt-scrim
+        data-nt-scrim-end=".nt-mission__body"
+        data-nt-scrim-edge="bottom"
+        aria-hidden="true"
+      />
       <div className="nt-wrap nt-wrap--narrow">
         <div className="nt-sec-head" data-reveal="rise">
           <div className="nt-sec-head__bar">

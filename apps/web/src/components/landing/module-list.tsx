@@ -30,6 +30,19 @@ export default function ModuleList({
 }: ModuleListProps): React.JSX.Element {
   return (
     <section className="nt-modules" id="modules" aria-label="Modules">
+      {/*
+        The scrim: a wash of the page's own background colour over the
+        top of this section, so the heading reads against the pixel field.
+        It ends at the bottom of the module list - the last module
+        listed.
+      */}
+      <span
+        className="nt-scrim"
+        data-nt-scrim
+        data-nt-scrim-end=".nt-modlist"
+        data-nt-scrim-edge="bottom"
+        aria-hidden="true"
+      />
       <div className="nt-wrap nt-wrap--narrow">
         <div className="nt-sec-head" data-reveal="rise">
           <div className="nt-sec-head__bar">

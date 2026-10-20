@@ -36,6 +36,21 @@ export default function ReviewsList({
 }: ReviewsListProps): React.JSX.Element {
   return (
     <section className="nt-reviews" id="reviews" aria-label="Reviews">
+      {/*
+        The scrim: a wash of the page's own background colour over the
+        top of this section, so the heading reads against the pixel field.
+
+        It runs UNDER the glass cards and ends below them, so the field
+        stays out of the cards' area entirely and the cards themselves
+        read against a clean background.
+      */}
+      <span
+        className="nt-scrim"
+        data-nt-scrim
+        data-nt-scrim-end=".nt-rev"
+        data-nt-scrim-edge="bottom"
+        aria-hidden="true"
+      />
       <div className="nt-wrap nt-wrap--narrow">
         <div className="nt-sec-head" data-reveal="rise">
           <div className="nt-sec-head__bar">

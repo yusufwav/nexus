@@ -145,7 +145,7 @@ const PixelBlast = ({
   className,
   style,
   patternScale = 2.5,
-  patternDensity = 1.1,
+  patternDensity = 1.4,
   pixelSizeJitter = 1,
   enableRipples = false,
   rippleIntensityScale = 0.2,
@@ -288,7 +288,7 @@ const PixelBlast = ({
         to stay readable. These two numbers are what make the two themes
         carry the same weight of texture.
       */
-      layer?.style.setProperty("--nt-pixel-dim", light ? "0.475" : "0.2");
+      layer?.style.setProperty("--nt-pixel-dim", light ? "0.35" : "0.2");
       setTheme({ color: inkBase, accentColor: ink, lightMode: light });
     };
     read();
@@ -344,12 +344,14 @@ const PixelBlast = ({
   /*
     THE DENSITY.
 
-    A light page gets the maximum. The cells there are dark on a pale
-    ground, so the field reads sparser on paper than it does on a dark
-    page, and it needs more of them to read as a field at all. A dark page
-    keeps the value from the preview URL.
+    The same in both themes, so the field carries the same weight either
+    way. It was higher on a light page - the cells there are dark on a
+    pale ground, so the field reads sparser on paper - but with the dim
+    coming down as well, the two cancelled out and the themes drifted
+    apart in look rather than in weight. One number for both is easier
+    to reason about and easier to keep in step.
   */
-  if (theme.lightMode) settings.patternDensity = 2;
+  settings.patternDensity = 1.4;
 
   const settingsRef = useRef<BlastSettings>(settings);
   settingsRef.current = settings;

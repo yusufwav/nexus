@@ -82,6 +82,8 @@
   max-width: var(--nt-max-w);
   margin-inline: auto;
   padding-inline: var(--sp-5);
+  position: relative;
+  z-index: 1;
 }
 .nt-wrap--narrow {
   max-width: var(--nt-max-w-narrow);
@@ -954,11 +956,30 @@
    side, so the tags read as a dense continuous band rather than as a
    sparse list of separate pills.
 */
+/*
+  The use-case pills, in glass.
+
+  They were outlined boxes, which on a page with a moving field behind it
+  read as a row of empty rectangles - the border said "container" and the
+  middle said "nothing". Glass gives them a surface to sit on, and the
+  blur means the field behind them goes soft rather than showing through
+  as hard dots.
+
+  The blur is a little less than the panels use. A 14px-tall pill already
+  blurs a lot with a 14px radius, and a heavier one turns the label
+  itself soft.
+*/
 .nt-tag {
   padding: var(--sp-2) var(--sp-4);
   margin-right: var(--sp-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--glass-edge);
   border-radius: 999px;
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(8px) saturate(1.25);
+  backdrop-filter: blur(8px) saturate(1.25);
+  box-shadow:
+    inset 0 1px 0 0 var(--glass-sheen),
+    var(--shadow-sm);
   font-size: var(--fs-xs);
   letter-spacing: var(--tracking);
   color: var(--fg-muted);
@@ -1590,4 +1611,51 @@ html:not([data-reveal-ready]) .nt-root [data-reveal]:not(.is-in) .nt-rv-line {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+/*
+ * THE PAGE SCRIMS
+ * ------------------------------------------------------------
+ * A wash of the page's own background colour over the top of a
+ * section, so the section's heading is readable against the pixel
+ * field behind it.
+ *
+ * The colour is the THEME's background - --bg-0 - so it is right in
+ * every one of the fifty palettes, and it is the same colour the
+ * page is painted, so the wash disappears into the page rather than
+ * sitting on it as a band.
+ *
+ * IT FILLS FROM LEFT TO RIGHT with no horizontal fade, and it fades
+ * UP at the top and DOWN at the bottom: transparent at the very top,
+ * solid through the heading, and gone by the time it reaches the
+ * content it is not there for.
+ *
+ * The height is measured, not declared - see page-scrims.tsx for why.
+ */
+.nt-scrim {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--nt-scrim-h, 0px);
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    var(--bg-0) 8%,
+    var(--bg-0) 32%,
+    transparent 100%
+  );
+}
+
+/*
+ * The content of every section sits ABOVE its scrim, so the scrim is a
+ * backdrop and never a veil over the words. The review cards and the
+ * chat panel are inside this, which is why the scrim can safely run
+ * under them.
+ */
+.nt-wrap {
+  position: relative;
+  z-index: 1;
 }

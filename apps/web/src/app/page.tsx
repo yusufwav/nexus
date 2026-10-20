@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import AiMarquee from "@/components/landing/ai-marquee";
 import ChatPartner, { type ChatMessage } from "@/components/landing/chat-partner";
 import GradientAscii from "@/components/landing/gradient-ascii";
+import PageScrims from "@/components/landing/page-scrims";
 import PixelBlast from "@/components/landing/pixel-blast";
 import LandingNav from "@/components/landing/landing-nav";
 import MissionSection from "@/components/landing/mission-section";
@@ -211,6 +212,14 @@ export default function Landing(): React.JSX.Element {
         behind something you cannot see through.
       */}
       <PixelBlast />
+
+      {/*
+        The scrims: a wash of the page's own background colour over the
+        top of four sections, so their headings read against the pixel
+        field. Each one measures where it ends, so none of them is a
+        fixed percentage that happens to be right today.
+      */}
+      <PageScrims />
 
       <LandingNav />
       <ScrollReveal />
