@@ -27,7 +27,7 @@ import * as Haptics from "expo-haptics";
 
 import { useActiveTheme } from "@/theme/ThemeProvider";
 import { TYPE } from "@/theme/typography";
-import { Body, Button, Card, Label, Num, Prose, Title } from "@/components/ui";
+import { Body, Button, Card, Label, Num, Prose, Radio, RadioGroup, Title } from "@/components/ui";
 import { RADIUS } from "@/theme/radius";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { Icon } from "@/components/icons";
@@ -235,7 +235,7 @@ export default function PracticeSessionScreen(): React.JSX.Element {
 
           <View style={styles.actions}>
             <Button label="go again" onPress={goAgain} />
-            <Button label="all modules" tone="ghost" onPress={closeSession} />
+            <Button label="all modules" variant="outline" onPress={closeSession} />
           </View>
         </ScrollView>
       </View>
@@ -258,7 +258,7 @@ export default function PracticeSessionScreen(): React.JSX.Element {
           <Card>
             <Body>{error}</Body>
             <View style={styles.missAction}>
-              <Button label="back to practice" tone="ghost" onPress={closeSession} />
+              <Button label="back to practice" variant="outline" onPress={closeSession} />
             </View>
           </Card>
         ) : current === null ? (
@@ -276,38 +276,24 @@ export default function PracticeSessionScreen(): React.JSX.Element {
 
             <Num style={[styles.prompt, { color: theme.tokens.fg }]}>{current.prompt}</Num>
 
-            <View style={styles.options}>
+            <RadioGroup
+              value={chosen}
+              onValueChange={(next) => setChosen(next)}
+              style={styles.options}
+            >
               {current.options.map((o) => {
                 const isChosen = chosen === o.id;
                 const isAnswer = answered && result?.correctOptionId === o.id;
-                const wrong = answered && isChosen && !isAnswer;
-                const border = answered
-                  ? isAnswer
-                    ? theme.tokens.ok
-                    : wrong
-                      ? theme.tokens.danger
-                      : theme.tokens.line
-                  : isChosen
-                    ? theme.tokens.accentA
-                    : theme.tokens.line;
                 return (
                   <View key={o.id}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: isChosen, disabled: answered }}
+                    <Radio
+                      value={o.text}
+                      selected={isChosen}
                       disabled={answered}
                       onPress={() => setChosen(o.id)}
-                      style={({ pressed }) => [
-                        styles.option,
-                        {
-                          borderColor: border,
-                          backgroundColor: isChosen || isAnswer ? theme.tokens.surfaceRaised : "transparent",
-                          opacity: pressed ? 0.7 : 1,
-                        },
-                      ]}
                     >
                       <Num style={[styles.optionText, { color: theme.tokens.fg }]}>{o.text}</Num>
-                    </Pressable>
+                    </Radio>
                     {answered && (isAnswer || isChosen) ? (
                       <View style={styles.why}>
                         <Text
@@ -332,7 +318,7 @@ export default function PracticeSessionScreen(): React.JSX.Element {
                   </View>
                 );
               })}
-            </View>
+            </RadioGroup>
 
             <View style={styles.actions}>
               {!answered ? (
@@ -351,7 +337,7 @@ export default function PracticeSessionScreen(): React.JSX.Element {
                           ? "understand why — ask the partner"
                           : "still do not get it — ask the partner"
                       }
-                      tone="ghost"
+                      variant="outline"
                       onPress={() => {
                         if (current !== null && result !== null) askTutor(current, result);
                       }}
@@ -443,13 +429,25 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   option: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: RADIUS.control,
+    borderRadius: RADIUS.field,
     paddingHorizontal: 14,
     paddingVertical: 14,
     marginBottom: 10,
     minHeight: 52,
     justifyContent: "center",
+  },
+  /**
+   * The radio mark. A ring that fills in when the answer is chosen.
+   */
+  radio: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
   },
   optionText: {
     ...TYPE.body,

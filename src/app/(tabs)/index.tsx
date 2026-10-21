@@ -431,21 +431,23 @@ export default function HomeScreen(): React.JSX.Element {
           action={
             <Button
               label="open"
-              tone="ghost"
+              variant="ghost"
               onPress={() => router.push("/modules")}
             />
           }
         >
           <Card>
             {ownedModules.length === 0 ? (
-              <View>
-                <Body>
-                  You have not bought anything yet. The catalogue is one tap away.
-                </Body>
-                <View style={styles.cardAction}>
+              <>
+                <Card.Content>
+                  <Body>
+                    You have not bought anything yet. The catalogue is one tap away.
+                  </Body>
+                </Card.Content>
+                <Card.Footer>
                   <Button label="open the catalogue" onPress={() => router.push("/modules")} />
-                </View>
-              </View>
+                </Card.Footer>
+              </>
             ) : (
               ownedModules.map((m) => (
                 <ListRow

@@ -143,13 +143,17 @@ export default function ModuleScreen(): React.JSX.Element {
         {owned ? (
           <Button
             label="remove from your account"
-            tone="quiet"
+            variant="ghost"
             onPress={() => void release()}
             style={styles.release}
           />
         ) : (
           <View style={styles.cta}>
-            <Button label={`unlock for ${formatZar(mod.priceCents)}`} onPress={() => void unlock()} />
+            <Button
+              label={`unlock for ${formatZar(mod.priceCents)}`}
+              onPress={() => void unlock()}
+              fullWidth
+            />
             <Body style={styles.ctaNote}>
               Unlocking is a local purchase — there is no checkout and no card. The notes are yours
               either way.
@@ -161,11 +165,13 @@ export default function ModuleScreen(): React.JSX.Element {
           <>
             <Section title="What this module is">
               <Card>
-                {content.overview.map((paragraph) => (
-                  <View key={paragraph.slice(0, 24)} style={styles.paragraph}>
-                    <Prose>{paragraph}</Prose>
-                  </View>
-                ))}
+                <Card.Content>
+                  {content.overview.map((paragraph) => (
+                    <View key={paragraph.slice(0, 24)} style={styles.paragraph}>
+                      <Prose>{paragraph}</Prose>
+                    </View>
+                  ))}
+                </Card.Content>
               </Card>
             </Section>
 

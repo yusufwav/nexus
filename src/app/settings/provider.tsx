@@ -30,13 +30,14 @@
  * field is there, under the list, for the reader who knows the name.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useActiveTheme } from "@/theme/ThemeProvider";
 import { TYPE } from "@/theme/typography";
-import { Body, Button, Card, Section, Select } from "@/components/ui";
+import { Alert, Body, Button, Card, Section, Select, TextField } from "@/components/ui";
+import { Input } from "@/components/ui/Input";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { Icon } from "@/components/icons";
 import { listModels, type ModelInfo } from "@/lib/llm";
@@ -283,14 +284,14 @@ export default function ProviderScreen(): React.JSX.Element {
                       {!active ? (
                         <Button
                           label="use this one"
-                          tone="quiet"
+                          variant="ghost"
                           onPress={() => void use(provider)}
                           style={styles.providerButton}
                         />
                       ) : null}
                       <Button
                         label="remove"
-                        tone="quiet"
+                        variant="ghost"
                         onPress={() => void remove(provider)}
                         style={styles.providerButton}
                       />
@@ -305,56 +306,58 @@ export default function ProviderScreen(): React.JSX.Element {
         {adding ? (
           <Section title="A new provider" subtitle="Three things, and the model to talk to.">
             <Card>
-              <Text style={[styles.fieldLabel, { color: theme.tokens.fgDim }]}>NAME</Text>
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                placeholder="my laptop"
-                placeholderTextColor={theme.tokens.fgDim}
-                autoCapitalize="none"
-                style={[
-                  styles.input,
-                  { color: theme.tokens.fg, borderColor: theme.tokens.line, backgroundColor: theme.tokens.surfaceRaised },
-                ]}
-              />
+              {/*
+               * THE FIELDS.
+               *
+               * A `TextField` each — HeroUI's composition of a label, a
+               * field and a description. The label says what the field
+               * is, the description says what it means, and the two are
+               * never again lined up by hand at a call site.
+               */}
+              <TextField
+                label="NAME"
+                description="What you call this provider. It is only for you."
+              >
+                <Input
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="my laptop"
+                  autoCapitalize="none"
+                />
+              </TextField>
 
-              <Text style={[styles.fieldLabel, { color: theme.tokens.fgDim }]}>ADDRESS</Text>
-              <TextInput
-                value={address}
-                onChangeText={setAddress}
-                placeholder="https://api.openai.com/v1"
-                placeholderTextColor={theme.tokens.fgDim}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                style={[
-                  styles.input,
-                  { color: theme.tokens.fg, borderColor: theme.tokens.line, backgroundColor: theme.tokens.surfaceRaised },
-                ]}
-              />
-              <Text style={[styles.hint, { color: theme.tokens.fgDim }]}>
-                The address the text completions live at. The endpoint is added for you, and a
-                full address with /chat/completions on the end is fine too.              </Text>
+              <TextField
+                label="ADDRESS"
+                description="The address the text completions live at. The endpoint is added for you, and a full address with /chat/completions on the end is fine too."
+              >
+                <Input
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="https://api.openai.com/v1"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                />
+              </TextField>
 
-              <Text style={[styles.fieldLabel, { color: theme.tokens.fgDim }]}>API KEY</Text>
-              <TextInput
-                value={key}
-                onChangeText={setKey}
-                placeholder="paste your key"
-                placeholderTextColor={theme.tokens.fgDim}
-                autoCapitalize="none"
-                autoCorrect={false}
-                secureTextEntry
-                style={[
-                  styles.input,
-                  { color: theme.tokens.fg, borderColor: theme.tokens.line, backgroundColor: theme.tokens.surfaceRaised },
-                ]}
-              />
+              <TextField
+                label="API KEY"
+                description="It goes into this device's keychain, and from there to the provider and nowhere else."
+              >
+                <Input
+                  value={key}
+                  onChangeText={setKey}
+                  placeholder="paste your key"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  secureTextEntry
+                />
+              </TextField>
 
               <View style={styles.action}>
                 <Button
                   label={busy ? "working…" : "fetch the models"}
-                  tone="ghost"
+                  variant="outline"
                   disabled={busy}
                   onPress={() => void fetchModels()}
                 />
@@ -396,26 +399,33 @@ export default function ProviderScreen(): React.JSX.Element {
                 * not in the list, is a thing that happens — so the name can
                 * be typed, and the list is only the easy way to fill it in.
                 */}
-              <Text style={[styles.fieldLabel, { color: theme.tokens.fgDim }]}>MODEL (ADVANCED)</Text>
-              <TextInput
-                value={model}
-                onChangeText={setModel}
-                placeholder="gpt-4o-mini"
-                placeholderTextColor={theme.tokens.fgDim}
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={[
-                  styles.input,
-                  { color: theme.tokens.fg, borderColor: theme.tokens.line, backgroundColor: theme.tokens.surfaceRaised },
-                ]}
-              />
+              <TextField
+                label="MODEL (ADVANCED)"
+                description="The model to talk to. A provider that does not answer /models, or a model that is not in the list, is a thing that happens — so the name can be typed, and the list is only the easy way to fill it in."
+              >
+                <Input
+                  value={model}
+                  onChangeText={setModel}
+                  placeholder="gpt-4o-mini"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </TextField>
 
+              {/*
+               * THE MESSAGES.
+               *
+               * An `Alert`, so a problem and a note are the same kind of
+               * thing with a different status rather than two different
+               * kinds of thing. The danger one is tinted; the note is
+               * quiet.
+               */}
               {error !== null ? (
-                <Text style={[styles.error, { color: theme.tokens.danger }]}>{error}</Text>
+                <Alert status="danger" title="That did not work">
+                  {error}
+                </Alert>
               ) : null}
-              {note !== null ? (
-                <Text style={[styles.note, { color: theme.tokens.fgDim }]}>{note}</Text>
-              ) : null}
+              {note !== null ? <Alert status="accent">{note}</Alert> : null}
 
               <View style={styles.action}>
                 <Button
@@ -425,7 +435,7 @@ export default function ProviderScreen(): React.JSX.Element {
                 />
                 <Button
                   label="cancel"
-                  tone="quiet"
+                  variant="ghost"
                   onPress={() => {
                     reset();
                     setAdding(false);

@@ -123,6 +123,7 @@ export default function LessonScreen(): React.JSX.Element {
 
         <View style={styles.actions}>
           <Button
+            fullWidth
             label={done ? "marked as read" : "mark as read"}
             tone={done ? "ghost" : "primary"}
             onPress={() => void markDone()}

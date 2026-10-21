@@ -21,14 +21,26 @@
  * is said plainly on the screen rather than implied.
  */
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useActiveTheme, useTheme } from "@/theme/ThemeProvider";
 import { TYPE } from "@/theme/typography";
-import { Body, Button, Card, EmptyState, ListRow, Num, Section } from "@/components/ui";
+import {
+  Avatar,
+  Body,
+  Button,
+  Card,
+  Dialog,
+  EmptyState,
+  ListRow,
+  Num,
+  Section,
+  TextField,
+} from "@/components/ui";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
+import { Input } from "@/components/ui/Input";
 import { getOwnedCodes, listModules, listPurchases } from "@/storage/library";
 import { useAuth } from "@/auth/AuthProvider";
 import { databaseSizeBytes, clearUserData } from "@/storage/database";
@@ -51,6 +63,14 @@ export default function ProfileScreen(): React.JSX.Element {
   >([]);
   const [size, setSize] = useState(0);
   const [providerCount, setProviderCount] = useState(0);
+  /**
+   * Whether the destructive action is waiting to be confirmed.
+   *
+   * Clearing the device is not undoable, and a button that does it on
+   * the first press is a button that gets pressed by accident. So the
+   * press opens a question, and the question is what clears it.
+   */
+  const [confirmingWipe, setConfirmingWipe] = useState(false);
 
   const load = useCallback(async () => {
     setName((await readFirstName()) ?? "");
@@ -134,42 +154,52 @@ export default function ProfileScreen(): React.JSX.Element {
           subtitle="A real account on the Nexus server. The session token lives in this device's encrypted keychain."
         >
           <Card>
-            <ListRow title="Email" subtitle={session?.user.email ?? "not signed in"} />
-            <ListRow title="Name" subtitle={session?.user.name ?? "—"} />
-            <ListRow
-              title="Email verified"
-              subtitle={
-                session?.user.emailVerified === true
-                  ? "confirmed — the whole account is unlocked"
-                  : "not confirmed yet. Some things stay locked until it is."
-              }
-              badge={
-                session?.user.emailVerified === true
-                  ? { label: "VERIFIED", tone: "ok" }
-                  : { label: "PENDING", tone: "warn" }
-              }
-            />
-            <ListRow title="Signed in with" subtitle="an email address and a password" />
-            <Text style={[styles.fieldLabel, { color: theme.tokens.fgDim }]}>
-              WHAT THE NOTES CALL YOU
-            </Text>
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="your name"
-              placeholderTextColor={theme.tokens.fgDim}
-              style={[
-                styles.input,
-                {
-                  color: theme.tokens.fg,
-                  borderColor: theme.tokens.line,
-                  backgroundColor: theme.tokens.surfaceRaised,
-                },
-              ]}
-            />
-            <View style={styles.action}>
+            <Card.Header>
+              <Avatar name={session?.user.name ?? "?"} size="sm" />
+            </Card.Header>
+
+            <Card.Content>
+              <ListRow title="Email" subtitle={session?.user.email ?? "not signed in"} />
+              <ListRow title="Name" subtitle={session?.user.name ?? "—"} />
+              <ListRow
+                title="Email verified"
+                subtitle={
+                  session?.user.emailVerified === true
+                    ? "confirmed — the whole account is unlocked"
+                    : "not confirmed yet. Some things stay locked until it is."
+                }
+                badge={
+                  session?.user.emailVerified === true
+                    ? { label: "VERIFIED", tone: "ok" }
+                    : { label: "PENDING", tone: "warn" }
+                }
+              />
+              <ListRow title="Signed in with" subtitle="an email address and a password" />
+
+              {/*
+               * THE NAME FIELD.
+               *
+               * A `TextField` — HeroUI's composition of a label, a field
+               * and a description — so the label, the box and the hint are
+               * one thing rather than three that have to be lined up by
+               * hand at every call site.
+               */}
+              <TextField
+                label="WHAT THE NOTES CALL YOU"
+                description="This is the name that appears on your lessons and your receipts."
+                style={styles.fieldBlock}
+              >
+                <Input
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="your name"
+                />
+              </TextField>
+            </Card.Content>
+
+            <Card.Footer>
               <Button label="save" onPress={() => void saveName()} />
-            </View>
+            </Card.Footer>
           </Card>
         </Section>
 
@@ -178,12 +208,14 @@ export default function ProfileScreen(): React.JSX.Element {
           subtitle="Signing out locks every screen in the app, and you will need a connection to sign back in."
         >
           <Card>
-            <Button
-              label="sign out"
-              tone="danger"
-              onPress={() => void signOut()}
-              style={styles.signOut}
-            />
+            <Card.Footer column>
+              <Button
+                label="sign out"
+                variant="danger-soft"
+                onPress={() => void signOut()}
+                fullWidth
+              />
+            </Card.Footer>
           </Card>
         </Section>
 
@@ -293,7 +325,11 @@ export default function ProfileScreen(): React.JSX.Element {
             <ListRow title="Attempts" detail="Every question you have answered" />
             <ListRow title="Chat history" detail="Every conversation with the study partner" />
             <View style={styles.action}>
-              <Button label="clear local data" tone="danger" onPress={() => void wipe()} />
+              <Button
+              label="clear local data"
+              variant="danger"
+              onPress={() => setConfirmingWipe(true)}
+            />
             </View>
           </Card>
         </Section>
@@ -305,10 +341,43 @@ export default function ProfileScreen(): React.JSX.Element {
               model — so the same question always gets the same answer.
             </Body>
             <View style={styles.action}>
-              <Button label="about this app" tone="ghost" onPress={() => router.push("/settings/about")} />
+              <Button label="about this app" variant="outline" onPress={() => router.push("/settings/about")} />
             </View>
           </Card>
         </Section>
+
+        {/*
+         * THE CONFIRMATION.
+         *
+         * A dialog, because this is the one action in the app that
+         * cannot be undone, and a dialog is the shape of "are you sure".
+         */}
+        <Dialog
+          visible={confirmingWipe}
+          onClose={() => setConfirmingWipe(false)}
+          title="Clear everything on this device?"
+          actions={
+            <>
+              <Button
+                label="keep it"
+                variant="outline"
+                onPress={() => setConfirmingWipe(false)}
+              />
+              <Button
+                label="clear it"
+                variant="danger"
+                onPress={() => {
+                  setConfirmingWipe(false);
+                  void wipe();
+                }}
+              />
+            </>
+          }
+        >
+          The notes you have read, every answer you have given, and every
+          conversation with the study partner go, and they do not come back.
+          The notes themselves are untouched — only what is on this device.
+        </Dialog>
       </ScrollView>
     </View>
   );
@@ -327,6 +396,12 @@ const styles = StyleSheet.create({
   fieldLabel: {
     ...TYPE.label,
     marginBottom: 6,
+  },
+  /**
+   * A field with a label and a description, as one block.
+   */
+  fieldBlock: {
+    marginTop: 14,
   },
   input: {
     ...TYPE.body,

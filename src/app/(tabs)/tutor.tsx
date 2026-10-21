@@ -56,7 +56,7 @@ import * as Haptics from "expo-haptics";
 import { useActiveTheme } from "@/theme/ThemeProvider";
 import { TYPE } from "@/theme/typography";
 import { Markdown } from "@/components/Markdown";
-import { Body, Button, Label, Select } from "@/components/ui";
+import { Alert, Badge, Body, Button, Label, Select } from "@/components/ui";
 import { RADIUS } from "@/theme/radius";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { Icon } from "@/components/icons";
@@ -545,7 +545,7 @@ export default function TutorScreen(): React.JSX.Element {
             </Text>
             <Button
               label="add one"
-              tone="quiet"
+              variant="ghost"
               onPress={() => router.push("/settings/provider")}
               style={styles.providerButton}
             />
@@ -690,22 +690,35 @@ export default function TutorScreen(): React.JSX.Element {
             </View>
           ) : null}
 
+          {/*
+           * THE ERROR.
+           *
+           * An `Alert`, not a chat bubble. A bubble is something the
+           * study partner said, and the partner did not say this — the
+           * provider did, or the network did. So it is a panel with a
+           * status, sitting outside the conversation, where it can be
+           * told from what the partner said at a glance.
+           */}
           {error !== null ? (
-            <View
-              style={[
-                styles.bubble,
-                styles.bubblePartner,
-                { backgroundColor: theme.tokens.bg1, borderColor: theme.tokens.danger },
-              ]}
-            >
-              <Text style={[styles.userText, { color: theme.tokens.danger }]}>{error}</Text>
-            </View>
+            <Alert status="danger" style={styles.alert}>
+              {error}
+            </Alert>
           ) : null}
 
+          {/*
+           * WHAT THE ANSWER WAS READ FROM.
+           *
+           * A badge rather than a line of text, because it is a label
+           * ABOUT the answer rather than part of it — the same way a
+           * footnote is set apart from the paragraph it belongs to.
+           */}
           {notesRead.length > 0 ? (
-            <Text style={[styles.notesRead, { color: theme.tokens.fgDim }]}>
-              Read from {notesRead.map((n) => n.moduleCode).join(", ")}
-            </Text>
+            <Badge
+              label={`read from ${notesRead.map((n) => n.moduleCode).join(", ")}`}
+              variant="secondary"
+              size="sm"
+              style={styles.notesRead}
+            />
           ) : null}
         </ScrollView>
 
@@ -912,8 +925,14 @@ const styles = StyleSheet.create({
     ...TYPE.body,
   },
   notesRead: {
-    ...TYPE.small,
-    marginTop: 4,
+    marginTop: 6,
+  },
+  /**
+   * The error panel. It sits outside the conversation, so it needs
+   * room of its own below it.
+   */
+  alert: {
+    marginBottom: 10,
   },
   composer: {
     paddingHorizontal: 18,

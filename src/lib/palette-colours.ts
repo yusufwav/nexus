@@ -127,3 +127,31 @@ export function inkFor(background: string): string {
   const againstWhite = 1.05 / (againstBlack + 0.05);
   return againstWhite >= againstBlack ? "#ffffff" : "#000000";
 }
+
+/**
+ * A COLOUR AT A GIVEN ALPHA.
+ *
+ * The semantic layer needs a dozen translucent versions of the palette's
+ * own colours — a soft accent, a hover tint, a backdrop — and there is no
+ * way to get them without mixing the colour by hand, once per palette,
+ * per token.
+ *
+ * So the mixing happens here, once, and every caller asks for a colour and
+ * an alpha and gets the palette's own hue back with that opacity.
+ *
+ * The input may already be translucent, in which case the new alpha
+ * REPLACES the old one rather than multiplying into it. A colour that is
+ * already 30% opaque and is asked for at 15% should be 15% opaque, not
+ * 4.5% — the request is for how transparent the result is, not for how
+ * much to fade what is already there.
+ */
+export function withAlpha(color: string, alpha: number): string {
+  const parsed = parseColor(color);
+  if (parsed === null) {
+    // A colour that cannot be parsed is returned as it is, rather than
+    // becoming transparent and disappearing.
+    return color;
+  }
+  const a = Math.min(1, Math.max(0, alpha));
+  return `rgba(${parsed.r}, ${parsed.g}, ${parsed.b}, ${a})`;
+}

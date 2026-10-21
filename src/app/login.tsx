@@ -32,6 +32,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 
 import { GlassPanel } from "@/components/ui/GlassPanel";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { Icon, type IconName } from "@/components/icons";
 import { useActiveTheme } from "@/theme/ThemeProvider";
@@ -400,22 +402,14 @@ export default function LoginScreen(): React.JSX.Element {
             ) : null}
 
             {/* ---- the primary action ---- */}
-            <Pressable
-              accessibilityRole="button"
-              disabled={!canSubmit}
+            <Button
+              label={mode === "sign-in" ? "SIGN IN" : "CREATE ACCOUNT"}
               onPress={() => void submit()}
-              style={({ pressed }) => [
-                styles.primary,
-                {
-                  backgroundColor: theme.tokens.accentA,
-                  opacity: !canSubmit ? 0.4 : pressed ? 0.78 : 1,
-                },
-              ]}
-            >
-              <Text style={[styles.primaryText, { color: inkFor(theme.tokens.accentA) }]}>
-                {mode === "sign-in" ? "SIGN IN" : "CREATE ACCOUNT"}
-              </Text>
-            </Pressable>
+              disabled={!canSubmit}
+              size="lg"
+              fullWidth
+              style={styles.primary}
+            />
 
             {/* ---- the provider placeholders ---- */}
             <View style={styles.dividerRow}>
@@ -499,44 +493,33 @@ function Field({
       <Text style={[styles.fieldLabel, { color: focused ? theme.tokens.accentA : theme.tokens.fgDim }]}>
         {label}
       </Text>
-      <View>
-        <TextInput
-          ref={inputRef}
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={theme.tokens.fgDim}
-          secureTextEntry={secureTextEntry}
-          autoCapitalize={autoCapitalize}
-          autoCorrect={false}
-          keyboardType={keyboardType}
-          textContentType={textContentType}
-          onFocus={() => {
-            setFocused(true);
-            onFocus?.();
-          }}
-          onBlur={() => {
-            setFocused(false);
-            onBlur?.();
-          }}
-          onSelectionChange={onSelectionChange}
-          style={[
-            styles.input,
-            TYPE.body,
-            trailing !== undefined ? styles.inputWithTrailing : null,
-            {
-              color: theme.tokens.fg,
-              borderColor: focused ? theme.tokens.accentA : theme.tokens.line,
-              backgroundColor: theme.tokens.surfaceRaised,
-            },
-          ]}
-        />
-        {trailing !== undefined ? (
-          <View style={styles.trailing} pointerEvents="box-none">
-            {trailing}
-          </View>
-        ) : null}
-      </View>
+      <Input
+        ref={inputRef}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        secureTextEntry={secureTextEntry}
+        autoCapitalize={autoCapitalize}
+        autoCorrect={false}
+        keyboardType={keyboardType}
+        textContentType={textContentType}
+        onFocus={() => {
+          setFocused(true);
+          onFocus?.();
+        }}
+        onBlur={() => {
+          setFocused(false);
+          onBlur?.();
+        }}
+        onSelectionChange={onSelectionChange}
+        endContent={
+          trailing !== undefined ? (
+            <View style={styles.trailing} pointerEvents="box-none">
+              {trailing}
+            </View>
+          ) : undefined
+        }
+      />
     </View>
   );
 }
@@ -650,15 +633,7 @@ const styles = StyleSheet.create({
   },
 
   primary: {
-    minHeight: 52,
-    alignItems: "center",
-    justifyContent: "center",
     marginTop: 4,
-    borderRadius: RADIUS.control,
-  },
-  primaryText: {
-    ...TYPE.subheading,
-    letterSpacing: 1.6,
   },
 
   dividerRow: {

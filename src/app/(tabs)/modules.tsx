@@ -25,8 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useActiveTheme } from "@/theme/ThemeProvider";
 import { TYPE } from "@/theme/typography";
-import { Body, Chip, Num, Title } from "@/components/ui";
-import { GlassPanel } from "@/components/ui/GlassPanel";
+import { Badge, Body, Card, Chip, Num, Title } from "@/components/ui";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { getOwnedCodes, listModules, subjectOf, type ModuleView } from "@/storage/library";
 import { formatZar } from "@/lib/money";
@@ -93,33 +92,44 @@ export default function ModulesScreen(): React.JSX.Element {
           {/*
            * THE CARD.
            *
-           * A `GlassPanel`, like every other surface in the app, so the
-           * catalogue's cards are the same treatment as the rest.
+           * A `Card` — the app's one container treatment — with HeroUI's
+           * anatomy: a header carrying the code and the status, a body
+           * carrying the name and the description, and a footer carrying
+           * the price. The parts are what make a card a card rather than
+           * a box of text, and the price belongs in the footer because a
+           * price is the thing you act on, not the thing you read.
            */}
-          <GlassPanel strength="soft" padding={16} style={styles.card}>
-            <View style={styles.cardHead}>
+          <Card style={styles.card}>
+            <Card.Header
+              action={
+                isOwned ? (
+                  <Badge label="OWNED" variant="success" />
+                ) : item.status === "available" ? (
+                  <Badge label="READY" variant="warning" />
+                ) : (
+                  <Badge label="SOON" variant="secondary" />
+                )
+              }
+            >
               <Num style={[styles.code, { color: theme.tokens.accentA }]}>{item.code}</Num>
-              {isOwned ? (
-                <Text style={[styles.badge, { color: theme.tokens.ok }]}>OWNED</Text>
-              ) : item.status === "available" ? (
-                <Text style={[styles.badge, { color: theme.tokens.warn }]}>READY</Text>
-              ) : (
-                <Text style={[styles.badge, { color: theme.tokens.fgDim }]}>SOON</Text>
-              )}
-            </View>
-            <Text style={[styles.name, { color: theme.tokens.fg }]}>{item.name}</Text>
-            <Num style={[styles.description, { color: theme.tokens.fgMuted }]}>
-              {item.description}
-            </Num>
-            <View style={styles.cardFoot}>
+            </Card.Header>
+
+            <Card.Content>
+              <Text style={[styles.name, { color: theme.tokens.fg }]}>{item.name}</Text>
+              <Num style={[styles.description, { color: theme.tokens.fgMuted }]}>
+                {item.description}
+              </Num>
+            </Card.Content>
+
+            <Card.Footer>
               <Num style={[styles.price, { color: theme.tokens.fg }]}>
                 {formatZar(item.priceCents)}
               </Num>
               <Num style={[styles.subject, { color: theme.tokens.fgDim }]}>
                 {subjectOf(item.code)}
               </Num>
-            </View>
-          </GlassPanel>
+            </Card.Footer>
+          </Card>
         </Pressable>
       );
     },

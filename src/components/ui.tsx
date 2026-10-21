@@ -5,16 +5,24 @@
  *
  * THE CONTAINER
  * ---------------------------------------------------------------------------
- * Every panel in this app is `GlassPanel` — sharp corners, a blurred and
- * tinted background, and grain over the container only. It is the single
- * container treatment, and it is reused everywhere, which is the point: one
- * surface language across the whole product.
+ * Every panel in this app is `GlassPanel` — one surface treatment, reused
+ * everywhere, which is the point: one surface language across the whole
+ * product.
  *
- * A panel only blurs when there is something behind it to blur. Over the
- * live background fields — the gradient ASCII engine, the pixel field — the
- * blur is on. Over the flat page background it is off, because twenty
- * BlurViews in a scrolling list is twenty native surfaces for no visual
- * gain.
+ * THE PARTS
+ * ---------------------------------------------------------------------------
+ * The parts live in their own files under `src/components/ui/`, and this
+ * file is the door to them. A kit that keeps every part in one file ends
+ * up with a file nobody can find anything in.
+ *
+ *   Button      the variant ladder and the press feedback
+ *   Card        a card with a header, a body and a footer
+ *   Input       the field family — input, text area, field, group
+ *   Parts       the small ones — chip, badge, avatar, separator,
+ *               spinner, skeleton
+ *   Alert       a message that stays until it is read
+ *   Select      a collapsible list of options
+ *   PressableFeedback  the press animation everything tactile shares
  *
  * EVERYTHING IS IN JETBRAINS MONO
  * ---------------------------------------------------------------------------
@@ -36,10 +44,63 @@ import {
 } from "react-native";
 
 import { useActiveTheme } from "@/theme/ThemeProvider";
-import { inkFor } from "@/lib/palette-colours";
 import { FONT, TYPE, splitNumericRuns } from "@/theme/typography";
 import { RADIUS } from "@/theme/radius";
-import { GlassPanel } from "@/components/ui/GlassPanel";
+
+export { Button } from "@/components/ui/Button";
+export type { ButtonProps, ButtonSize, ButtonVariant } from "@/components/ui/Button";
+export { Card } from "@/components/ui/Card";
+export {
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+  Input,
+  InputGroup,
+  SearchField,
+  TextArea,
+  TextField,
+} from "@/components/ui/Input";
+export {
+  Avatar,
+  Badge,
+  Chip,
+  Separator,
+  Skeleton,
+  Spinner,
+} from "@/components/ui/Parts";
+export type {
+  AvatarProps,
+  BadgeProps,
+  ChipProps,
+  ChipSize,
+  ChipVariant,
+  SeparatorProps,
+  SkeletonProps,
+  SpinnerProps,
+  SpinnerSize,
+} from "@/components/ui/Parts";
+export { Alert } from "@/components/ui/Alert";
+export type { AlertProps, AlertStatus } from "@/components/ui/Alert";
+export { PressableFeedback } from "@/components/ui/PressableFeedback";
+export {
+  Dialog,
+  ProgressBar,
+  Radio,
+  RadioGroup,
+  Tabs,
+  TabsLabel,
+  TabsTrigger,
+  Tooltip,
+} from "@/components/ui/Interactive";
+export type {
+  DialogProps,
+  ProgressBarProps,
+  RadioGroupProps,
+  RadioProps,
+  TabsProps,
+  TabsTriggerProps,
+  TooltipProps,
+} from "@/components/ui/Interactive";
 
 /* ------------------------------------------------------------------ *
  *  text
@@ -191,7 +252,11 @@ export function Body({
   const theme = useActiveTheme();
   return (
     <Num
-      style={[styles.body, { color: dim ? theme.tokens.fgDim : theme.tokens.fgMuted }, style]}
+      style={[
+        styles.body,
+        { color: dim ? theme.tokens.fgDim : theme.tokens.fgMuted },
+        style,
+      ]}
     >
       {children}
     </Num>
@@ -214,34 +279,20 @@ export function Label({
 export function Mono({
   children,
   style,
-  color,
 }: {
   children: ReactNode;
   style?: StyleProp<TextStyle>;
-  color?: string;
 }): React.JSX.Element {
   const theme = useActiveTheme();
   return (
-    <Num style={[styles.mono, { color: color ?? theme.tokens.fgMuted }, style]}>
-      {children}
-    </Num>
+    <Num style={[styles.mono, { color: theme.tokens.fg }, style]}>{children}</Num>
   );
 }
 
 /* ------------------------------------------------------------------ *
- *  a picker
+ *  Select
  * ------------------------------------------------------------------ */
 
-/**
- * A PICKER.
- *
- * The app had no dropdown until the tutor needed one, and the platform's
- * own is the wrong shape for it: a native picker is a wheel on iOS and a
- * spinner on Android, and neither one can be given the app's palette, its
- * corners or its type. This one is a sheet of the app's own rows over a
- * dimmed page, so it looks like the rest of the app and is a list the
- * reader can read rather than a wheel they have to spin.
- */
 export type SelectOption = {
   readonly value: string;
   readonly label: string;
@@ -249,19 +300,6 @@ export type SelectOption = {
   readonly detail?: string;
 };
 
-/**
- * A FILTER ON A PICKER.
- *
- * Some lists are too long to read, and some of the list is not what the
- * reader wants at all — a provider that offers two hundred models, of
- * which a handful cost nothing. The filter is a row at the top of the
- * sheet with a switch on it, and it narrows what is listed.
- *
- * It lives in the SHEET rather than beside the trigger, because the
- * trigger is a narrow bar in the tutor's header and the sheet is the
- * only place with room for a second control, and because a filter that
- * is hidden until the list is open is a filter nobody knows to look for.
- */
 export type SelectFilter = {
   /** The label on the switch. */
   readonly label: string;
@@ -273,6 +311,16 @@ export type SelectFilter = {
   readonly matches: (option: SelectOption) => boolean;
 };
 
+/**
+ * A PICKER.
+ *
+ * The app had no dropdown until the tutor needed one, and the platform's
+ * own is the wrong shape for it: a native picker is a wheel on iOS and a
+ * spinner on Android, and neither one can be given the app's palette, its
+ * corners or its type. This one is a sheet of the app's own rows over a
+ * dimmed page, so it looks like the rest of the app and is a list the
+ * reader can read rather than a wheel they have to spin.
+ */
 export function Select({
   label,
   value,
@@ -330,6 +378,7 @@ export function Select({
           {
             backgroundColor: theme.tokens.surfaceRaised,
             borderColor: theme.tokens.line,
+            borderRadius: RADIUS.field,
             opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
           },
         ]}
@@ -362,7 +411,11 @@ export function Select({
           <View
             style={[
               styles.selectSheet,
-              { backgroundColor: theme.tokens.bg1, borderColor: theme.tokens.line },
+              {
+                backgroundColor: theme.tokens.bg1,
+                borderColor: theme.tokens.line,
+                borderRadius: RADIUS.panel,
+              },
             ]}
           >
             {label !== undefined ? (
@@ -441,141 +494,6 @@ export function Select({
         </View>
       </Modal>
     </View>
-  );
-}
-
-/* ------------------------------------------------------------------ *
- *  Card — the shared container
- * ------------------------------------------------------------------ */
-
-export function Card({
-  children,
-  style,
-  strength = "soft",
-  radius = RADIUS.panel,
-}: {
-  children: ReactNode;
-  style?: StyleProp<ViewStyle>;
-  strength?: "soft" | "medium" | "solid";
-  /**
-   * The corner radius, in points. RADIUS.panel is the house style; a card
-   * opts out of it says so here rather than by hard-coding a style.
-   */
-  radius?: number;
-}): React.JSX.Element {
-  return (
-    <GlassPanel strength={strength} padding={16} radius={radius} style={style}>
-      {children}
-    </GlassPanel>
-  );
-}
-
-/* ------------------------------------------------------------------ *
- *  Buttons
- * ------------------------------------------------------------------ */
-
-export type ButtonTone = "primary" | "ghost" | "danger" | "quiet";
-
-export function Button({
-  label,
-  onPress,
-  tone = "primary",
-  disabled = false,
-  style,
-  accessibilityHint,
-}: {
-  label: string;
-  onPress: () => void;
-  tone?: ButtonTone;
-  disabled?: boolean;
-  style?: StyleProp<ViewStyle>;
-  accessibilityHint?: string;
-}): React.JSX.Element {
-  const theme = useActiveTheme();
-  const background =
-    tone === "primary"
-      ? theme.tokens.accentA
-      : tone === "danger"
-        ? theme.tokens.danger
-        : tone === "quiet"
-          ? "transparent"
-          : theme.tokens.surfaceRaised;
-  // The ink on a filled control is CHOSEN against the fill, not inherited
-  // from the page. The base palette's accent is nearly black, and the page
-  // background is black: black on that is not a button, it is two blacks.
-  const color =
-    tone === "primary"
-      ? inkFor(theme.tokens.accentA)
-      : tone === "danger"
-        ? inkFor(theme.tokens.danger)
-        : theme.tokens.fg;
-  const border =
-    tone === "ghost" ? theme.tokens.line : tone === "quiet" ? "transparent" : background;
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ disabled }}
-      accessibilityHint={accessibilityHint}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.button,
-        {
-          backgroundColor: background,
-          borderColor: border,
-          opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
-        },
-        style,
-      ]}
-    >
-      <Num style={[styles.buttonText, { color }]}>{label}</Num>
-    </Pressable>
-  );
-}
-
-export function Chip({
-  label,
-  selected = false,
-  onPress,
-}: {
-  label: string;
-  selected?: boolean;
-  onPress?: () => void;
-}): React.JSX.Element {
-  const theme = useActiveTheme();
-  const content = (
-    <View
-      style={[
-        styles.chip,
-        {
-          backgroundColor: selected ? theme.tokens.accentA : theme.tokens.surfaceRaised,
-          borderColor: selected ? theme.tokens.accentA : theme.tokens.line,
-        },
-      ]}
-    >
-      <Num
-        style={[
-          styles.chipText,
-          { color: selected ? inkFor(theme.tokens.accentA) : theme.tokens.fgMuted },
-        ]}
-      >
-        {label}
-      </Num>
-    </View>
-  );
-  if (onPress === undefined) {
-    return content;
-  }
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      onPress={onPress}
-      style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-    >
-      {content}
-    </Pressable>
   );
 }
 
@@ -680,7 +598,11 @@ export function Stat({
     <View
       style={[
         styles.stat,
-        { borderColor: theme.tokens.line, backgroundColor: theme.tokens.bg1 },
+        {
+          borderColor: theme.tokens.line,
+          backgroundColor: theme.tokens.bg1,
+          borderRadius: RADIUS.panel,
+        },
       ]}
     >
       <Num style={[styles.statLabel, { color: theme.tokens.fgDim }]}>{label}</Num>
@@ -701,7 +623,7 @@ export function EmptyState({
 }): React.JSX.Element {
   const theme = useActiveTheme();
   return (
-    <View style={[styles.empty, { borderColor: theme.tokens.line }]}>
+    <View style={[styles.empty, { borderColor: theme.tokens.line, borderRadius: RADIUS.panel }]}>
       <Num style={[styles.emptyTitle, { color: theme.tokens.fg }]}>{title}</Num>
       <Num style={[styles.emptyBody, { color: theme.tokens.fgDim }]}>{body}</Num>
     </View>
@@ -743,17 +665,10 @@ export function Section({
  *  Prose
  * ------------------------------------------------------------------ */
 
-/**
- * A paragraph of authored prose.
- *
- * The notes carry maths in plain text and use blank lines to mark a
- * paragraph, so the text keeps its line breaks rather than being reflowed
- * into one long line.
- */
 export function Prose({ children }: { children: string }): React.JSX.Element {
   const theme = useActiveTheme();
   return (
-    <Num style={[styles.prose, { color: theme.tokens.fgMuted }]}>{children}</Num>
+    <Text style={[styles.prose, { color: theme.tokens.fgMuted }]}>{children}</Text>
   );
 }
 
@@ -780,25 +695,16 @@ const styles = StyleSheet.create({
   mono: {
     ...TYPE.code,
   },
-
-  button: {
-    minHeight: 48,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: RADIUS.control,
-    borderWidth: StyleSheet.hairlineWidth,
-    alignItems: "center",
-    justifyContent: "center",
+  prose: {
+    ...TYPE.body,
+    lineHeight: 22,
   },
+
   /**
    * A number, in Nova Mono.
    */
   nova: {
     fontFamily: FONT.nova,
-  },
-  buttonText: {
-    ...TYPE.subheading,
-    letterSpacing: 0.6,
   },
 
   selectLabel: {
@@ -809,7 +715,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: RADIUS.control,
     paddingHorizontal: 14,
     paddingVertical: 12,
     minHeight: 48,
@@ -832,8 +737,8 @@ const styles = StyleSheet.create({
   },
   selectSheet: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: RADIUS.panel,
     maxHeight: "62%",
+    overflow: "hidden",
   },
   selectSheetTitle: {
     ...TYPE.label,
@@ -883,19 +788,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
 
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: RADIUS.control,
-    borderWidth: StyleSheet.hairlineWidth,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  chipText: {
-    ...TYPE.small,
-    fontFamily: TYPE.label.fontFamily,
-  },
-
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -939,7 +831,6 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     flexBasis: "46%",
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: RADIUS.panel,
     padding: 14,
     marginBottom: 10,
   },
@@ -958,7 +849,6 @@ const styles = StyleSheet.create({
   empty: {
     borderWidth: StyleSheet.hairlineWidth,
     borderStyle: "dashed",
-    borderRadius: RADIUS.panel,
     padding: 22,
   },
   emptyTitle: {
@@ -974,7 +864,7 @@ const styles = StyleSheet.create({
   },
   sectionHead: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "flex-end",
     justifyContent: "space-between",
     marginBottom: 12,
   },
@@ -986,12 +876,7 @@ const styles = StyleSheet.create({
     ...TYPE.heading,
   },
   sectionSubtitle: {
-    marginTop: 4,
-  },
-
-  prose: {
-    ...TYPE.body,
-    fontSize: 15,
-    lineHeight: 25,
+    ...TYPE.small,
+    marginTop: 3,
   },
 });

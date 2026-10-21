@@ -159,6 +159,85 @@ the app therefore carries `width: "100%"` and `height: "100%"` as well as
 its absolute position, or it renders as a 300 by 150 rectangle in the top
 left of its container.
 
+### 1.3a The component kit
+
+The app's parts live in `src/components/ui/`, one file per family, and
+`src/components/ui.tsx` is the door to them. A kit that keeps every part in
+one file ends up with a file nobody can find anything in.
+
+| File | What it holds |
+| --- | --- |
+| `GlassPanel.tsx` | the one container: fill, grain, hairline, rounded corners |
+| `Card.tsx` | a card with a header, a body and a footer |
+| `Button.tsx` | the variant ladder and the press feedback |
+| `Input.tsx` | the field family: input, text area, field, group, search |
+| `Parts.tsx` | the small ones: chip, badge, avatar, separator, spinner, skeleton |
+| `Interactive.tsx` | tabs, dialog, tooltip, progress bar, radio group |
+| `TerminalPanel.tsx` | the README container |
+| `ScreenHeader.tsx` | the bar at the top of every screen |
+
+**THE PARTS ARE MODELLED ON HEROUI.** HeroUI v3 supports this app's exact
+stack — Expo SDK 58, React Native 0.88, Gesture Handler 3 — but it is built
+on Tailwind CSS v4 by way of Uniwind, and this app has no Tailwind, a
+container treatment of its own, fifty-two palettes rather than one light and
+one dark, and a type scale of its own. Installing it would mean a second
+styling system fighting the first one, and a palette system that could not
+do what this app's does.
+
+So the DESIGN is taken and the LIBRARY is not. What follows is the
+anatomy, the variant ladder, the size ladder and the press behaviour of
+HeroUI's components, expressed in this app's tokens.
+
+**THE VARIANT LADDER.** HeroUI's principle is semantic intent over visual
+style: a button says what it is FOR, not what it looks like.
+
+| Variant | For |
+| --- | --- |
+| `primary` | the main action, to move forward. One per context. |
+| `secondary` | an alternative action. Several allowed. |
+| `tertiary` | a dismissive action — cancel, skip. Sparingly. |
+| `outline` | a bordered button on a surface. |
+| `ghost` | no fill at all, for the quietest actions. |
+| `danger` | a destructive action. |
+| `danger-soft` | a destructive action that is not the main one. |
+
+**THE OLD NAMES STILL WORK.** The app had four button looks before the
+ladder — `primary`, `ghost`, `danger`, `quiet` — and the calls that
+used them are all over the place. They are translated on the way in rather
+than aliased onto the new ones, and they keep their MEANING: the old
+`ghost` was a BORDERED button (HeroUI's `outline`) and the old `quiet`
+was a borderless one (HeroUI's `ghost`). A button that says `ghost` looks
+exactly as it did before the change. New code should say `variant`.
+
+**THE SIZE LADDER.** `sm`, `md` and `lg` — 40, 48 and 56 points tall,
+with the padding and the gap growing alongside. HeroUI's numbers.
+
+**THE PRESS FEEDBACK.** Every tactile control shares it, through
+`PressableFeedback`. Two things happen at once: the control SHRINKS by
+1.5% — barely more than one percent, which reads as the surface being
+pushed in rather than as the whole thing bouncing — and a HIGHLIGHT lays
+over it, a wash of the colour the control turns into when it is hovered.
+It is what makes a press feel like the surface is responding rather than
+like a colour is changing.
+
+The scale is animated on the UI thread, so it stays smooth while the JS
+thread is busy — which matters on a phone, where the JS thread often is.
+
+**THE COLOUR IS SEMANTIC.** `src/theme/semantic.ts` resolves HeroUI's
+colour vocabulary against the active palette: `accent`, `default`,
+`success`, `warning`, `danger`, `surface`, `field`, `separator`,
+`border`, and so on. Every value is a palette token or a derivation from
+one, so a component never hard-codes a colour and the whole app follows
+the reader's palette.
+
+The one place the two systems differ is `default` — HeroUI's neutral
+button fill. This app's palettes have no such thing: their neutrals are
+all very faint overlays (`surfaceRaised` is 2% white), which is right for
+a hairline row on a panel and far too faint for a button you are meant to
+press. So `default` is derived here instead: the palette's own `bg2`,
+which is the third step of its background ramp and therefore a real,
+visible neutral on every one of the fifty-two.
+
 ### 1.4 The terminal panel
 
 `TerminalPanel` (`src/components/ui/TerminalPanel.tsx`) is the README

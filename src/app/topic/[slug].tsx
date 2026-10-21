@@ -118,6 +118,7 @@ export default function TopicScreen(): React.JSX.Element {
         {questionCount > 0 ? (
           <View style={styles.cta}>
             <Button
+              fullWidth
               label="practise this topic"
               onPress={() =>
                 router.push({ pathname: "/practice/[code]", params: { code: module } })
