@@ -41,7 +41,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useActiveTheme } from "@/theme/ThemeProvider";
 import { TYPE } from "@/theme/typography";
 import { Body, Button, Card, EmptyState, Label, ListRow, Section, Stat, Title } from "@/components/ui";
-import { TerminalPanel } from "@/components/ui/TerminalPanel";
+import { GlassPanel } from "@/components/ui/GlassPanel";
 import { ScreenHeader, HEADER_TITLE } from "@/components/ui/ScreenHeader";
 import { Icon } from "@/components/icons";
 import {
@@ -54,17 +54,6 @@ import {
 import { completedLessonCount, listReadPositions, moduleStats, tallyAttempts } from "@/storage/progress";
 import { formatZar } from "@/lib/money";
 import { readFirstName } from "@/storage/settings";
-import { RADIUS } from "@/theme/radius";
-
-/**
- * THE README CONTAINER'S CORNER RADIUS.
- *
- * The README terminal is chrome rather than a card, and chrome on a phone
- * is chrome with a curve on it, so it asks for the panel radius rather than
- * taking the default silently. It is the same twelve points every other
- * surface in the app has, so the rounded things agree with each other.
- */
-const README_RADIUS = RADIUS.panel;
 
 export default function HomeScreen(): React.JSX.Element {
   const theme = useActiveTheme();
@@ -353,7 +342,21 @@ export default function HomeScreen(): React.JSX.Element {
         <Animated.View style={[styles.readme, readmeStyle]}>
           <View style={styles.readmeInner}>
             <View onLayout={onReadmeLayout}>
-              <TerminalPanel radius={README_RADIUS} strength="medium">
+              {/*
+                * THE CONTAINER IS A PANEL, NOT A WINDOW.
+                *
+                * It used to carry the terminal's own bar — three dots on a
+                * raised strip, with a hairline under it — because it was the
+                * only chrome on the screen. The screen header is that bar
+                * now, and it is the big one, so the container's was a second
+                * window drawn ten points under the first: two rows of dots,
+                * two hairlines, nothing between them. The bar is gone.
+                *
+                * What is left is the surface — the opaque `bg1`, the grain,
+                * the hairline edge and `RADIUS.panel` — which is exactly what
+                * `GlassPanel` is, so there is nothing to add to it.
+                */}
+              <GlassPanel>
                 {/* The eyebrow is `fgDim`, which is a dim grey: on a very dark panel it is
                     too close to the panel to read, and on a very light one it is
                     worse. `fgMuted` is the token that holds up on both. */}
@@ -364,7 +367,7 @@ export default function HomeScreen(): React.JSX.Element {
                 <Body style={styles.readmeSub}>
                   The notes we got were good enough. But I made them better.
                 </Body>
-              </TerminalPanel>
+              </GlassPanel>
             </View>
           </View>
         </Animated.View>

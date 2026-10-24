@@ -442,7 +442,6 @@ src/app/
 src/components/
   ui/ScreenHeader.tsx      the bar at the top of every screen
   ui/GlassPanel.tsx        the one container: opaque bg1, grain, hairline
-  ui/TerminalPanel.tsx     the README container
   ui/Button.tsx  Input.tsx  Card.tsx  Alert.tsx
   ui/Interactive.tsx  PressableFeedback.tsx  Parts.tsx
   ui.tsx                   the shared text primitives: Body, Title, Heading, Label, Mono, Num

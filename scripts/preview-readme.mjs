@@ -9,11 +9,20 @@
  * It is a mock, not the real screen, but everything it draws is real: the
  * actual JetBrains Mono files, the actual palette tokens, the actual grain
  * tile, the actual edge and sheen opacities, and the actual spacing numbers
- * from `src/app/(tabs)/index.tsx` and `src/components/ui/TerminalPanel.tsx`.
+ * from `src/app/(tabs)/index.tsx`.
  *
- * The page is flat now — the live fields are gone — so this is a plain
- * rectangle on a plain rectangle, and the whole of the treatment is the
- * hairline between them.
+ * WHAT IT PROVES, NOW THAT THE CONTAINER HAS NO BAR
+ * ---------------------------------------------------------------------------
+ * The container and the screen header used to be two terminal windows: the
+ * header's bar at the top of the screen, and the README container's own
+ * smaller bar a few points under it. Two rows of dots and two hairlines,
+ * one above the other. The container is a plain `GlassPanel` now, so this
+ * draws the header (the only bar) and the panel under it, which is the
+ * arrangement the reader actually sees.
+ *
+ * The field behind the page is a WebGL pipeline in a WebView, which a
+ * headless screenshot cannot draw, so the page is the flat `bg0` here. Every
+ * container, every edge and every number below it is the app's own.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -74,12 +83,12 @@ const T = {
 const GRAIN_OPACITY = 0.14;
 
 /**
- * The edge's colour.
+ * The sheen's colour.
  *
- * `GlassPanel` draws it as `${accentA}38` — the accent at 22% — and the
- * sheen as `${fg}1F` — the foreground at 12%.
+ * `GlassPanel` draws the edge in the palette's own `line` colour — NOT the
+ * accent, which is what this preview used to claim — and the sheen as
+ * `${fg}1F` — the foreground at 12%.
  */
-const EDGE_ALPHA = 0x38 / 255;
 const SHEEN_ALPHA = 0x1f / 255;
 
 /**
@@ -120,19 +129,24 @@ const grainLayer =
     : `<div class="grain" style="background-image:url(${grain})"></div>`;
 
 /*
- * The panel's geometry, in points, from the app:
+ * The geometry, in points, from the app:
  *
  *   screen gutter    18
  *   panel width      390 - 18*2  = 354
- *   bar height        6 + 5 + 6 + 1 = 18  (padding 6/6, a 5pt dot, a hairline)
- *   corner radius     12
- *   body padding     22
+ *   status inset     24    (a phone's status bar, for the header to reach up into)
+ *   header height    44
+ *   header dots      8pt across, 4 radius, 5 apart, 12 from the left edge
+ *   header gap       14    (`styles.readme.marginTop`)
+ *   corner radius    12    (`RADIUS.panel`, the default)
+ *   panel padding    22    (`GlassPanel`'s default)
  *   eyebrow          TYPE.label  10/14
  *   title            TYPE.title  23/29
  *   subtitle         TYPE.small  12/18
  */
 const W = 390;
-const H = 844;
+const H = 420;
+const INSET = 24;
+const HEADER = 44;
 
 const html = `<!doctype html><meta charset="utf-8" />
 <style>
@@ -144,8 +158,21 @@ const html = `<!doctype html><meta charset="utf-8" />
   html, body { background:${T.bg0}; }
   body { width:${W}px; height:${H}px; overflow:hidden; font-family:"JBMono", monospace; position:relative; }
 
+  /* ---- the screen header: the app's only bar ---- */
+  .header { position:absolute; top:0; left:0; right:0; height:${INSET + HEADER}px;
+            padding-top:${INSET}px; background:${T.surfaceRaised};
+            border-bottom:1px solid ${T.line}; }
+  .bar { position:relative; height:${HEADER}px; display:flex; align-items:center;
+         padding:0 12px; }
+  .dots { display:flex; align-items:center; gap:5px; }
+  .dot { width:8px; height:8px; border-radius:4px; }
+  .dot1 { background:${T.accentDot}; } .dot2,.dot3 { background:${T.line}; }
+  /* the title is centred across the WHOLE bar, not the space the dots leave */
+  .g-title { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+             font-size:14px; line-height:20px; letter-spacing:.4px; color:${T.fg}; }
+
   /* ---- the panel: the raised surface, one step off the page ---- */
-  .panel { position:absolute; left:18px; top:150px; width:${W - 36}px;
+  .panel { position:absolute; left:18px; top:${INSET + HEADER + 14}px; width:${W - 36}px;
            background:${T.bg1}; border-radius:12px; overflow:hidden; }
 
   ${grainLayer ? `.panel .grain { position:absolute; inset:0; background-image:url(${grain});
@@ -153,32 +180,29 @@ const html = `<!doctype html><meta charset="utf-8" />
 
   /* the edge, and the sheen along the top of it */
   .panel .edge { position:absolute; inset:0; pointer-events:none;
-                 border:1px solid ${withAlpha(T.accentA, EDGE_ALPHA)}; border-radius:12px; }
+                 border:1px solid ${T.line}; border-radius:12px; }
   .panel .sheen { position:absolute; top:0; left:0; right:0; height:1px;
-                   background:${withAlpha(T.fg, SHEEN_ALPHA)}; }
+                  background:${withAlpha(T.fg, SHEEN_ALPHA)}; }
 
-  /* ---- the bar ---- */
-  .bar { display:flex; align-items:center; gap:3px; padding:6px 8px;
-         border-bottom:1px solid ${T.line}; background:${T.surfaceRaised}; position:relative; }
-  .dots { display:flex; gap:3px; }
-  .dot { width:5px; height:5px; border-radius:2.5px; }
-  .dot1 { background:${T.accentDot}; } .dot2,.dot3 { background:${T.line}; }
-
-  /* ---- the body ---- */
+  /* ---- the body: no bar of its own ---- */
   .body { padding:22px; position:relative; }
   .eyebrow { font-size:10px; line-height:14px; letter-spacing:1.4px; text-transform:uppercase;
-             color:${T.fgDim}; font-weight:500; margin-bottom:10px; }
+             color:${T.fgMuted}; font-weight:500; margin-bottom:10px; }
   .title { font-size:23px; line-height:29px; letter-spacing:-.6px; color:${T.fg}; font-weight:700; }
   .sub { font-size:12px; line-height:18px; color:${T.fgMuted}; margin-top:8px; }
 </style>
+
+<div class="header">
+  <div class="bar">
+    <div class="dots"><span class="dot dot1"></span><span class="dot dot2"></span><span class="dot dot3"></span></div>
+    <div class="g-title">Good evening</div>
+  </div>
+</div>
 
 <div class="panel">
   ${grainLayer ? '<div class="grain"></div>' : ""}
   <div class="edge"></div>
   <div class="sheen"></div>
-  <div class="bar">
-    <div class="dots"><span class="dot dot1"></span><span class="dot dot2"></span><span class="dot dot3"></span></div>
-  </div>
   <div class="body">
     <div class="eyebrow">COMPUTER SCIENCE &middot; NMU</div>
     <div class="title">Notes that learn you as you learn them</div>

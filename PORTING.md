@@ -144,6 +144,15 @@ paints one of its own. Both were `bg0`, and an opaque one is a lid
 over the field. The navigation theme's `background` and the tabs'
 `sceneStyle` are transparent for the same reason the screens' roots are.
 
+**AND IT MEANS A SCREEN CHANGE IS A CUT.** A native transition draws both
+screens at once — Android's default is a 450ms slide and fade — and only
+destroys the old one when it ends. With opaque screens the incoming one covers
+the outgoing one and nobody sees it; with these it is a window onto the old
+screen, so both screens' headers and text are on top of each other for half a
+second. Both navigators therefore set `animation: "none"`, and the field is
+what makes the app feel continuous instead: it is one surface that never
+reloads, so the room stays and the page changes. See STYLING.md §1.7.
+
 ---
 
 ## 3. The offline storage transition
@@ -487,11 +496,14 @@ why.
   palette, so the layout can be looked at without a device.
 * **A bar at the top of every screen, and it is the terminal's.** The web app
   had a fixed top nav on the public pages. On a phone that became the
-  **screen header**: the README container's own bar — three dots, the first
-  one in the accent colour, a raised surface, a hairline along the bottom —
-  made bigger and moved to the top of the screen, with the screen's title
-  centred in it. It reaches up into the status bar, so the status bar's
-  background is the header's background and the reader sees no seam.
+  **screen header**: the bar the README container used to carry — three dots,
+  the first one in the accent colour, a raised surface, a hairline along the
+  bottom — made bigger and moved to the top of the screen, with the screen's
+  title centred in it. It reaches up into the status bar, so the status bar's
+  background is the header's background and the reader sees no seam. The
+  container it came from is a plain panel now: with the header in place its
+  own bar was a second window drawn ten points under the first, so it went and
+  the header is the app's only bar.
   The home screen's bar says **"Good morning"** rather than "Home", and
   tapping it puts the README container away — the container's height
   animates to zero and the content below moves up to take its place, because

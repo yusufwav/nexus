@@ -239,6 +239,40 @@ function AppFrame(): React.JSX.Element {
                   freezeOnBlur: true,
                   contentStyle: { backgroundColor: "transparent" },
                   /*
+                   * NO TRANSITION, AND IT IS NOT A STYLE CHOICE.
+                   *
+                   * Every screen is transparent, because the field is the
+                   * page and it is mounted once behind the navigator. A
+                   * native transition — Android's is a 450ms slide-and-fade
+                   * — draws the outgoing screen and the incoming one IN THE
+                   * SAME FRAME for the length of the animation, then
+                   * destroys the outgoing one.
+                   *
+                   * With opaque screens that is invisible: the new screen
+                   * covers the old. With this app's transparent ones the new
+                   * screen is a window onto the old, so for half a second
+                   * the reader sees two screens' headers and two screens'
+                   * text laid over each other — the old one not yet
+                   * unloading, exactly as it looks. It is not a rendering
+                   * fault and there is no opacity that fixes it: any
+                   * animation in which both screens are drawn at once is a
+                   * double exposure when the one on top is see-through.
+                   *
+                   * So the screens swap in one frame and the FIELD carries
+                   * the continuity instead — it never moves, never reloads
+                   * and never fades, and it is the thing that makes the app
+                   * feel like one place rather than a sequence of pages.
+                   *
+                   * The rejected alternatives: a JS fade of the incoming
+                   * screen after the swap trades a ghost for a flash (the
+                   * field shows through the two screens that are meant to
+                   * be opaque, and on a back-navigation the screen is
+                   * already painted before the fade can start), and making
+                   * every screen opaque again is a lid over the field, which
+                   * is the thing the whole arrangement exists for.
+                   */
+                  animation: "none",
+                  /*
                    * THE STATUS BAR, DRAWN OVER THE PAGE.
                    *
                    * `statusBarTranslucent` makes the screen's content run UNDER
@@ -256,7 +290,18 @@ function AppFrame(): React.JSX.Element {
                 }}
               >
                 <Stack.Screen name="(tabs)" />
-                <Stack.Screen name="login" options={{ animation: "fade" }} />
+                {/*
+                 * THE LOGIN SCREEN HAS NO TRANSITION EITHER.
+                 *
+                 * It used to fade. It does not need to: the gate above holds
+                 * the whole navigator off screen until it knows whether
+                 * there is a session, so `/login` is the FIRST and only
+                 * screen in the stack whenever it appears — and the first
+                 * screen is never animated, by either platform. A fade here
+                 * would only ever cross-fade the boot screen, which is the
+                 * double exposure this file has just ruled out.
+                 */}
+                <Stack.Screen name="login" />
               </Stack>
             </SideMenuProvider>
           </AuthGate>

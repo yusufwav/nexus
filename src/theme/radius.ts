@@ -7,9 +7,9 @@
  * WHY A SCALE AND NOT A NUMBER AT EACH SITE
  * ---------------------------------------------------------------------------
  * The app used to have `borderRadius: 0` everywhere, and the radius was a
- * PROP — `GlassPanel`, `Card` and `TerminalPanel` all took one, and it
- * defaulted to `0`. That was a good rule for a house style of square
- * corners: there was nothing to decide and nothing to get wrong.
+ * PROP — `GlassPanel` and `Card` both took one, and it defaulted to `0`.
+ * That was a good rule for a house style of square corners: there was
+ * nothing to decide and nothing to get wrong.
  *
  * Rounded corners are the opposite of that. A rounded corner says "this is
  * friendly" and a square one says "this is engineered", and once the

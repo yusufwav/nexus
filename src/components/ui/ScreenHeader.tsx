@@ -1,34 +1,35 @@
 /**
  * THE SCREEN HEADER
  * ---------------------------------------------------------------------------
- * The terminal's bar, at the top of the screen, with the app's own title in
+ * The app's one bar, at the top of the screen, with the screen's own title in
  * it.
  *
  * WHY IT EXISTS
  * ---------------------------------------------------------------------------
- * The README container is a TERMINAL WINDOW: a bar with three dots, and a
- * body under it. That bar is the app's most recognisable piece of chrome, and
- * it was doing two jobs at once — being the window's chrome, and being the
- * only thing at the top of the screen.
+ * The README container used to be a TERMINAL WINDOW: a bar with three dots,
+ * and a body under it. That bar was the app's most recognisable piece of
+ * chrome, and it was doing two jobs at once — being the window's chrome, and
+ * being the only thing at the top of the screen.
  *
- * So the bar is now its own thing, at the top of the screen, and the README
- * container keeps its own smaller bar under it. The header is the big one:
- * it reaches UP into the status bar, so the status bar's own background is
- * the header's background and there is no seam between them.
+ * So the bar is now its own thing, at the top of the screen, and it is the
+ * ONLY one: the README container is a plain panel and carries no bar of its
+ * own. Two rows of dots ten points apart is two terminal windows, not one
+ * page. The header is the big one, and it reaches UP into the status bar, so
+ * the status bar's own background is the header's background and there is no
+ * seam between them.
  *
- * IT IS THE SAME BAR, MADE BIGGER
+ * WHAT IS IN IT
  * ---------------------------------------------------------------------------
- * The header is not a new idea — it is the README container's own bar, with
- * the same parts in the same places:
+ *   · three dots, the first one in the accent colour, because that is how a
+ *     terminal marks the one window that has focus;
+ *   · a raised surface behind them;
+ *   · a hairline along the bottom edge;
+ *   · the screen's title, centred across the WHOLE bar;
+ *   · the screen's own controls on the right, when it has any.
  *
- *   · the same three dots, the first one in the accent colour, because that
- *     is how a terminal marks the one window that has focus;
- *   · the same raised surface behind them;
- *   · the same hairline along the bottom edge.
- *
- * Only the size is different. The dots are bigger, the row is taller, and
- * the title is a step down from the screen's own headline — because a bar
- * is a bar and not a headline.
+ * Only the size is different from the bar it came from. The dots are bigger,
+ * the row is taller, and the title is a step down from the screen's own
+ * headline — because a bar is a bar and not a headline.
  */
 import { type ReactNode } from "react";
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
@@ -157,14 +158,15 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: "row",
     alignItems: "center",
-    // The dots sit where the README container's own dots sit, and the row
-    // is taller, because this bar is the big one.
+    // The dots sit on the left of the bar, where the terminal window that
+    // this bar came from put them, and the row is taller than that window's
+    // ever was, because this bar is the big one.
     paddingHorizontal: 12,
   },
   dots: {
     flexDirection: "row",
     alignItems: "center",
-    // The terminal's dots are 5 points across and 3 apart. These are a step
+    // The bar this came from had 5-point dots, 3 apart. These are a step
     // bigger, because the bar they are in is a step bigger.
     gap: 5,
   },

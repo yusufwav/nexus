@@ -54,6 +54,17 @@ export default function TabLayout(): React.JSX.Element {
         headerShown: false,
         freezeOnBlur: true,
         /*
+         * NO TRANSITION BETWEEN TABS EITHER.
+         *
+         * The stack's own `animation: "none"` has the long explanation —
+         * the short version is that a transparent screen cannot animate
+         * over another screen without the two being drawn at once. A tab
+         * switch is already instant here; this says so rather than
+         * relying on the default, so nobody turns on `"fade"` or
+         * `"shift"` without reading why it cannot be one.
+         */
+        animation: "none",
+        /*
          * TRANSPARENT, because the field is the page's background.
          *
          * The field is one WebView for the whole app, above the

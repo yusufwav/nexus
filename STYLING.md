@@ -118,9 +118,9 @@ has its own scale, and it is allowed to be its own thing.
 is a pill, and a pill is a shape with a meaning — a segmented control, a tab
 bar. A button that looks like one is lying about what it is.
 
-**The radius is still a PROP.** `GlassPanel`, `Card` and `TerminalPanel`
-all take `radius`, and it defaults to `RADIUS.panel`. A container that
-wants a different curve asks for one.
+**The radius is still a PROP.** `GlassPanel` and `Card` both take `radius`,
+and it defaults to `RADIUS.panel`. A container that wants a different curve
+asks for one.
 ### 1.3 One container
 
 Every panel in the app is `GlassPanel` (`src/components/ui/GlassPanel.tsx`).
@@ -180,7 +180,6 @@ one file ends up with a file nobody can find anything in.
 | `Input.tsx` | the field family: input, text area, field, group, search |
 | `Parts.tsx` | the small ones: chip, badge, avatar, separator, spinner, skeleton |
 | `Interactive.tsx` | tabs, dialog, tooltip, progress bar, radio group |
-| `TerminalPanel.tsx` | the README container |
 | `ScreenHeader.tsx` | the bar at the top of every screen |
 
 **THE PARTS ARE MODELLED ON HEROUI.** HeroUI v3 supports this app's exact
@@ -275,36 +274,31 @@ the block is full width and the button's own `alignSelf` is overridden.
 standard empty state: the text says what is going on and the button is the
 thing to do about it.
 
-### 1.4 The terminal panel
+### 1.4 The README container
 
-`TerminalPanel` (`src/components/ui/TerminalPanel.tsx`) is the README
-container from the web app's landing page, rebuilt for a phone. It is a
-*shell* rather than a page:
+The home screen's README container — the block that drops out of the header
+when the greeting is tapped — is a plain **`GlassPanel`**: the fill, the
+grain, the hairline, `RADIUS.panel` and the 22-point body padding, with
+nothing added.
 
-* it carries **no text of its own** — the body is `children`, so the same
-  container can hold the README, a lesson summary, a worked example or a
-  test fixture;
-* it has **no fixed height** — the bar is chrome and the body grows with
-  what is put in it, so the container is exactly as tall as its content;
-* the surface underneath is `GlassPanel`, so the panel is the app's one
-  container treatment and this component only adds the terminal's chrome.
+**IT USED TO BE A TERMINAL WINDOW, AND IT IS NOT ONE ANY MORE.** It was
+`TerminalPanel`: a `GlassPanel` with a second bar on top of it — three dots on
+a `surfaceRaised` strip, with a hairline under it — carried over from the web
+app's landing page, where the README is a file in a window and the bar is what
+says so. On a phone the screen header is that bar, made bigger and moved to
+the top of the screen, and it does the job: the container's own bar was a
+second window drawn ten points under the first, two rows of dots and two
+hairlines with no meaning between them. So the bar is gone and the container
+is only a container. See §1.4b.
 
-**The bar.** Three dots and nothing else. There is no path, no window
-title, no filename — a desktop metaphor that means nothing on a phone, and
-a second thing to keep in sync. The bar is deliberately small:
+**THE CORNERS ARE `RADIUS.panel`.** Twelve points, like every other surface
+that holds content — the container used to ask for it explicitly, which was
+the same number a panel gets anyway.
 
-| | |
-| --- | --- |
-| Padding | 6 vertical, 8 horizontal |
-| Dot | 5 × 5, radius 2.5 |
-| Dot gap | 3 |
-| Bar height | 6 + 5 + 6 + 1 hairline = **18** |
-
-**The corners** are rounded at **12 points**, which is this container's one
-exception to §1.2. The web app's terminal had a 10px radius; 12 is the same
-idea at the app's own scale, and it matches the radius the tutor's message
-bubbles already use, so the rounded surfaces in the app agree with each
-other.
+The greeting in the header collapses this container — tapping it animates the
+container's height to zero, so the block *leaves the space it was in* and the
+content below moves up. The mechanics that make that work on Android are in
+§1.4b.
 
 ### 1.4a The system bars
 
@@ -385,18 +379,21 @@ over the app.
 ### 1.4b The screen header
 
 `ScreenHeader` (`src/components/ui/ScreenHeader.tsx`) is the bar at the top of
-every screen. It is **the terminal's own bar, made bigger** — the same three
-dots in the same place, the same raised surface, the same hairline along the
-bottom edge — and it reaches **up into the status bar**, so the status bar's
-background is the header's background and there is no seam between them.
+every screen, and it is **the only bar in the app**: the README container's own
+bar is gone (§1.4), so there is one row of dots per screen rather than two. It
+is the terminal window's bar, made bigger and moved to the top of the screen —
+the same three dots in the same place, the same raised surface, the same
+hairline along the bottom edge — and it reaches **up into the status bar**, so
+the status bar's background is the header's background and there is no seam
+between them.
 
-| | Terminal panel's bar | Screen header |
-| --- | --- | --- |
-| Dot | 5 × 5, radius 2.5 | **8 × 8**, radius 4 |
-| Dot gap | 3 | **5** |
-| Bar height | 18 | **44** (+ the status bar's inset) |
-| Surface | `surfaceRaised` | `surfaceRaised` |
-| Edge | hairline along the bottom | hairline along the bottom |
+| | Screen header |
+| --- | --- |
+| Dot | **8 × 8**, radius 4 |
+| Dot gap | **5** |
+| Bar height | **44** (+ the status bar's inset) |
+| Surface | `surfaceRaised` |
+| Edge | hairline along the bottom |
 
 **The title is centred across the WHOLE bar**, not across the space the dots
 leave. The dots are in the row's own flow on the left and the title is an
@@ -565,6 +562,24 @@ The two screens that are NOT transparent are **You** and **Provider**:
 they keep their flat `bg0` and no field. They are the two places where
 the reader is dealing with a secret or a setting rather than with the
 material.
+
+**A SCREEN CHANGE IS A CUT, NOT A CROSS-FADE.** Both navigators set
+`animation: "none"` (`src/app/_layout.tsx` and `src/app/(tabs)/_layout.tsx`),
+and that is a consequence of the transparency rather than a taste in
+transitions. A native transition — Android's default is a 450ms slide and
+fade — draws the incoming screen and the outgoing one **in the same frame**
+for the length of the animation and only then destroys the old one. With
+opaque screens the new one covers the old and nothing shows. Here the new
+screen is a window onto the old, so for half a second the reader sees two
+headers and two screens' text on top of each other — the old screen not yet
+unloading, which is exactly what it looks like. No opacity fixes it: any
+animation that draws both screens at once is a double exposure when the top
+one is see-through. So the screens swap in one frame, and **the field carries
+the continuity** — it never moves, never reloads and never fades, so the room
+stays and the page changes. A JS fade of the incoming screen was rejected: it
+trades a ghost for a flash of the field through the screens that are meant to
+be opaque, and on a back-navigation the screen is already painted before any
+fade could start.
 
 **THE SHAPE IS `rise`.** The glow's core sits *below* the frame and the
 field spreads upward out of it, so the field comes up from the bottom of
@@ -948,7 +963,7 @@ notice.
 | --- | --- |
 | The type scale and the font families | `src/theme/typography.ts` |
 | The container | `src/components/ui/GlassPanel.tsx` |
-| The terminal container | `src/components/ui/TerminalPanel.tsx` |
+| The screen header | `src/components/ui/ScreenHeader.tsx` |
 | The shared primitives | `src/components/ui.tsx` |
 | The side menu | `src/components/SideMenu.tsx` |
 | The icon registry | `src/components/icons.tsx` |
