@@ -87,7 +87,7 @@ export function TabsTrigger({
       onPress={onPress}
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
-      highlight={s.foreground}
+      highlight={s.pressWash}
       style={[
         styles.tabTrigger,
         {
@@ -352,7 +352,7 @@ export function Radio({
       accessibilityRole="radio"
       accessibilityState={{ selected, disabled }}
       accessibilityLabel={value}
-      highlight={s.foreground}
+      highlight={s.pressWash}
       style={[
         styles.radioRow,
         {

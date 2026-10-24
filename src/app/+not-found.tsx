@@ -24,7 +24,6 @@ export default function NotFoundScreen(): React.JSX.Element {
       style={[
         styles.root,
         {
-          backgroundColor: theme.tokens.bg0,
           paddingTop: insets.top + 40,
           paddingBottom: insets.bottom + 40,
         },
@@ -33,10 +32,21 @@ export default function NotFoundScreen(): React.JSX.Element {
       <Num style={[styles.code, { color: theme.tokens.accentA }]}>404</Num>
       <Title style={styles.title}>Nothing here</Title>
       <Body style={styles.body}>
-        That address does not match anything in the app. The catalogue is a good place to start.
+        That address does not match anything in the app.
       </Body>
+      {/*
+       * THE ONE THING TO DO HERE.
+       *
+       * The screen is already centred, and the button says so too, so
+       * that it stays the middle of the screen whatever happens to the
+       * text above it.
+       */}
       <View style={styles.action}>
-        <Button label="open the catalogue" onPress={() => router.replace("/modules")} />
+        <Button
+          label="open the catalogue"
+          onPress={() => router.replace("/modules")}
+          style={styles.centred}
+        />
       </View>
     </View>
   );
@@ -62,6 +72,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   action: {
-    marginTop: 24,
+    marginTop: 18,
+  },
+  /**
+   * A BUTTON, CENTRED.
+   *
+   * A button brings its own `alignSelf`, and the default would put it
+   * against the left edge of whatever holds it.
+   */
+  centred: {
+    alignSelf: "center",
   },
 });

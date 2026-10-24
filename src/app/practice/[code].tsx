@@ -188,7 +188,7 @@ export default function PracticeSessionScreen(): React.JSX.Element {
   if (finished && session !== null) {
     const total = score.right + score.wrong;
     return (
-      <View style={[styles.root, { backgroundColor: theme.tokens.bg0 }]}>
+      <View style={styles.root}>
         <ScreenHeader title={moduleCode} />
         <ScrollView
           contentContainerStyle={[
@@ -202,7 +202,7 @@ export default function PracticeSessionScreen(): React.JSX.Element {
           </Title>
           <Body style={styles.reviewLead}>
             {missed.length === 0
-              ? "Nothing to look at. Try a harder module, or one you have not seen."
+              ? "Nothing to look at. Try a module you have not seen."
               : `These ${missed.length} are the ones worth a second look.`}
           </Body>
 
@@ -228,14 +228,27 @@ export default function PracticeSessionScreen(): React.JSX.Element {
                   label="ask the partner about this one"
                   tone="ghost"
                   onPress={() => askTutor(m.question, m.result)}
+                  style={styles.centred}
                 />
               </View>
             </Card>
           ))}
 
-          <View style={styles.actions}>
-            <Button label="go again" onPress={goAgain} />
-            <Button label="all modules" variant="outline" onPress={closeSession} />
+          {/*
+           * THE TWO THINGS THE READER CAN DO NEXT.
+           *
+           * They are alternatives — do it again, or go somewhere else —
+           * so they are a ROW rather than a stack, and the row is a group
+           * rather than a list.
+           */}
+          <View style={[styles.actions, styles.actionRow]}>
+            <Button label="go again" onPress={goAgain} style={styles.centred} />
+            <Button
+              label="all modules"
+              variant="outline"
+              onPress={closeSession}
+              style={styles.centred}
+            />
           </View>
         </ScrollView>
       </View>
@@ -258,7 +271,12 @@ export default function PracticeSessionScreen(): React.JSX.Element {
           <Card>
             <Body>{error}</Body>
             <View style={styles.missAction}>
-              <Button label="back to practice" variant="outline" onPress={closeSession} />
+              <Button
+                label="back to practice"
+                variant="outline"
+                onPress={closeSession}
+                style={styles.centred}
+              />
             </View>
           </Card>
         ) : current === null ? (
@@ -326,10 +344,15 @@ export default function PracticeSessionScreen(): React.JSX.Element {
                   label="check answer"
                   disabled={chosen === null}
                   onPress={() => void submit()}
+                  style={styles.centred}
                 />
               ) : (
                 <>
-                  <Button label={isLast ? "finish" : "next question"} onPress={next} />
+                  <Button
+                    label={isLast ? "finish" : "next question"}
+                    onPress={next}
+                    style={styles.centred}
+                  />
                   <View style={styles.missAction}>
                     <Button
                       label={
@@ -341,6 +364,7 @@ export default function PracticeSessionScreen(): React.JSX.Element {
                       onPress={() => {
                         if (current !== null && result !== null) askTutor(current, result);
                       }}
+                      style={styles.centred}
                     />
                   </View>
                 </>
@@ -405,7 +429,28 @@ const styles = StyleSheet.create({
   },
   missAction: {
     marginTop: 14,
-    alignSelf: "flex-start",
+  },
+  /**
+   * A LONE ACTION, CENTRED.
+   *
+   * A button that is the whole point of its block is centred rather than
+   * hugging the left gutter, where it reads as a caption to whatever sits
+   * above it. The wrapper has no `alignSelf`, so it takes the full width
+   * and the centring is against the card rather than against the button.
+   */
+  centred: {
+    alignSelf: "center",
+  },
+  /**
+   * TWO ALTERNATIVES, SIDE BY SIDE.
+   *
+   * "Go again" and "go somewhere else" are alternatives, so they are a
+   * row rather than a stack, and the row reads as a group.
+   */
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   meta: {
     flexDirection: "row",
@@ -422,11 +467,11 @@ const styles = StyleSheet.create({
     ...TYPE.subheading,
     fontSize: 16,
     lineHeight: 25,
-    marginTop: 12,
-    marginBottom: 20,
+    marginTop: 18,
+    marginBottom: 18,
   },
   options: {
-    marginBottom: 20,
+    marginBottom: 18,
   },
   option: {
     flexDirection: "row",
@@ -463,6 +508,6 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   actions: {
-    marginTop: 8,
+    marginTop: 18,
   },
 });

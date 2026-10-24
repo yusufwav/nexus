@@ -67,6 +67,22 @@ export type ScreenHeaderProps = {
    * headline because the bar is a bar and not a headline.
    */
   title?: string;
+  /**
+   * What sits on the RIGHT of the bar.
+   *
+   * This is the slot for a screen's own controls — the tutor's history,
+   * new-chat and delete buttons — which belong in the bar rather than in a
+   * row under it, and which the reader reaches for while they are reading.
+   *
+   * It is NOT the same as `children`. `children` is the centred title
+   * overlay, and it is centred across the whole bar; `trailing` is in the
+   * row's own flow, pushed to the right.
+   *
+   * The slot leaves room on the right for the side menu's button, which
+   * floats in the top-right corner of the app — so a trailing control
+   * never sits under it.
+   */
+  trailing?: ReactNode;
   /** The height of the bar itself, below the status bar. */
   height?: number;
   style?: StyleProp<ViewStyle>;
@@ -75,6 +91,7 @@ export type ScreenHeaderProps = {
 export function ScreenHeader({
   children,
   title,
+  trailing,
   height = 44,
   style,
 }: ScreenHeaderProps): React.JSX.Element {
@@ -121,6 +138,13 @@ export function ScreenHeader({
             {children}
           </View>
         ) : null}
+
+        {/* ---- the screen's own controls, on the right ---- */}
+        {trailing !== undefined ? (
+          <View style={styles.trailing} pointerEvents="box-none">
+            {trailing}
+          </View>
+        ) : null}
       </View>
     </View>
   );
@@ -163,5 +187,19 @@ const styles = StyleSheet.create({
   },
   titleText: {
     ...HEADER_TITLE,
+  },
+  trailing: {
+    // In the row's own flow, pushed to the right — not an overlay like the
+    // title, because a control has to be where it is, not centred.
+    marginLeft: "auto",
+    /*
+     * THE SIDE MENU'S BUTTON.
+     *
+     * It floats in the top-right corner of the app, 40 points wide and 12
+     * from the edge. So the trailing slot stops 48 points short of the
+     * edge: 12 for the margin, 40 for the button, and a little air so the
+     * two do not touch.
+     */
+    marginRight: 48,
   },
 });

@@ -245,8 +245,7 @@ export default function ProviderScreen(): React.JSX.Element {
 
         <Body style={styles.lead}>
           The study partner is a language model, and a language model needs a provider. Bring your
-          own key: it is kept in this device&apos;s keychain and goes from there to the provider, and
-          nowhere else.
+          own key.
         </Body>
 
         {providers.length > 0 ? (
@@ -280,6 +279,21 @@ export default function ProviderScreen(): React.JSX.Element {
                         <Text style={[styles.providerActive, { color: theme.tokens.accentA }]}>IN USE</Text>
                       ) : null}
                     </View>
+                    {/*
+                     * THE ROW'S OWN ACTIONS.
+                     *
+                     * They belong to this provider and to nothing else,
+                     * so they sit at the trailing edge of the card, under
+                     * the "IN USE" mark they answer to.
+                     */}
+                    {/*
+                     * THE PROVIDER'S OWN ACTIONS.
+                     *
+                     * They act on this provider and on nothing else, so
+                     * they sit at the trailing edge of the row under the
+                     * provider's details — the same place the details
+                     * end on a row anywhere else in the app.
+                     */}
                     <View style={styles.providerActions}>
                       {!active ? (
                         <Button
@@ -304,7 +318,7 @@ export default function ProviderScreen(): React.JSX.Element {
         ) : null}
 
         {adding ? (
-          <Section title="A new provider" subtitle="Three things, and the model to talk to.">
+          <Section title="A new provider">
             <Card>
               {/*
                * THE FIELDS.
@@ -316,7 +330,7 @@ export default function ProviderScreen(): React.JSX.Element {
                */}
               <TextField
                 label="NAME"
-                description="What you call this provider. It is only for you."
+                description="What you call this provider."
               >
                 <Input
                   value={name}
@@ -328,7 +342,7 @@ export default function ProviderScreen(): React.JSX.Element {
 
               <TextField
                 label="ADDRESS"
-                description="The address the text completions live at. The endpoint is added for you, and a full address with /chat/completions on the end is fine too."
+                description="The endpoint is added for you, and a full address with /chat/completions on the end is fine too."
               >
                 <Input
                   value={address}
@@ -401,7 +415,7 @@ export default function ProviderScreen(): React.JSX.Element {
                 */}
               <TextField
                 label="MODEL (ADVANCED)"
-                description="The model to talk to. A provider that does not answer /models, or a model that is not in the list, is a thing that happens — so the name can be typed, and the list is only the easy way to fill it in."
+                description="Type the name if the list did not have it."
               >
                 <Input
                   value={model}
@@ -427,11 +441,19 @@ export default function ProviderScreen(): React.JSX.Element {
               ) : null}
               {note !== null ? <Alert status="accent">{note}</Alert> : null}
 
-              <View style={styles.action}>
+              {/*
+               * SAVE, AND THE WAY OUT OF IT.
+               *
+               * Two actions on the same line rather than stacked: they
+               * are the same decision, and a stack makes the second one
+               * look like a separate step.
+               */}
+              <View style={[styles.action, styles.actionRow]}>
                 <Button
                   label="save this provider"
                   disabled={busy}
                   onPress={() => void save()}
+                  style={styles.actionInRow}
                 />
                 <Button
                   label="cancel"
@@ -440,19 +462,20 @@ export default function ProviderScreen(): React.JSX.Element {
                     reset();
                     setAdding(false);
                   }}
-                  style={styles.cancel}
+                  style={styles.actionInRow}
                 />
               </View>
             </Card>
           </Section>
         ) : (
-          <View style={styles.action}>
+          <View style={styles.actionCentred}>
             <Button
               label={providers.length === 0 ? "add a provider" : "add another provider"}
               onPress={() => {
                 reset();
                 setAdding(true);
               }}
+              style={styles.centred}
             />
           </View>
         )}
@@ -505,15 +528,24 @@ const styles = StyleSheet.create({
   providerActive: {
     ...TYPE.label,
   },
+  /**
+   * THE PROVIDER'S OWN ACTIONS.
+   *
+   * `justifyContent: "flex-end"` puts them at the trailing edge of the
+   * card, under the provider's details — a row's actions belong at the
+   * end of the row, not under its first word.
+   */
   providerActions: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "flex-end",
     gap: 10,
     marginTop: 8,
   },
   providerButton: {
     minHeight: 34,
     paddingVertical: 4,
+    alignSelf: "center",
   },
   fieldLabel: {
     ...TYPE.label,
@@ -535,12 +567,42 @@ const styles = StyleSheet.create({
   modelPicker: {
     marginTop: 12,
   },
+  /**
+   * AN ACTION IN THE FORM'S FLOW.
+   *
+   * "Fetch the models" follows the key field and belongs under it, so
+   * it stays against the gutter rather than floating in the middle of
+   * the card.
+   */
   action: {
     marginTop: 16,
     alignItems: "flex-start",
   },
-  cancel: {
-    marginTop: 8,
+  /**
+   * TWO OUTCOMES, SIDE BY SIDE.
+   *
+   * Saving and cancelling are a pair rather than a sequence, so they
+   * are a row.
+   */
+  actionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  actionInRow: {
+    alignSelf: "center",
+  },
+  /**
+   * A LONE ACTION, CENTRED.
+   *
+   * The wrapper has no `alignSelf`, so it takes the screen's full width
+   * and the centring is against the screen rather than the button.
+   */
+  actionCentred: {
+    marginTop: 16,
+  },
+  centred: {
+    alignSelf: "center",
   },
   error: {
     ...TYPE.small,

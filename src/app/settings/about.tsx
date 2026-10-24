@@ -24,7 +24,7 @@ export default function AboutScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.tokens.bg0 }]}>
+    <View style={styles.root}>
       <ScreenHeader title="About" />
       <ScrollView
         contentContainerStyle={[
@@ -45,8 +45,8 @@ export default function AboutScreen(): React.JSX.Element {
 
         <Title style={styles.title}>Nexus</Title>
         <Body style={styles.lead}>
-          First-year Computer Science notes for Nelson Mandela University students, rebuilt from
-          the ground up and carried entirely on your phone.
+          First-year Computer Science notes for Nelson Mandela University students, carried entirely
+          on your phone.
         </Body>
 
         <Section title="What this app is">
@@ -61,8 +61,7 @@ export default function AboutScreen(): React.JSX.Element {
             <Prose>
               The study partner reads the same notes you do. It searches them on your device,
               so every answer it gives is quoted from the notes rather than written fresh — and
-              the notes never leave the phone. The model is one you chose and paid for, with a
-              key that stays in this device&apos;s keychain.
+              the notes never leave the phone.
             </Prose>
           </Card>
         </Section>
@@ -76,7 +75,7 @@ export default function AboutScreen(): React.JSX.Element {
               "Offline PDF bundles",
               "A checkout that takes money",
             ].map((item) => (
-              <ListRow key={item} title={item} detail="planned, not shipped" />
+              <ListRow key={item} title={item} />
             ))}
           </Card>
         </Section>
@@ -95,7 +94,7 @@ export default function AboutScreen(): React.JSX.Element {
           <Card>
             <ListRow title="Notes" detail="13 modules across mathematics, programming, fundamentals and statistics" />
             <ListRow title="Themes" detail="52 palettes, all local" />
-            <ListRow title="Backgrounds" detail="Four OpenGL ES 3.0 engines, all local" />
+            <ListRow title="Search" detail="The notes are searched on the device, never sent" />
             <ListRow title="Built by" detail="a first-year CS student at NMU" />
           </Card>
         </Section>

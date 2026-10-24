@@ -95,7 +95,7 @@ export default function ModuleScreen(): React.JSX.Element {
 
   if (mod === null) {
     return (
-      <View style={[styles.root, { backgroundColor: theme.tokens.bg0 }]}>
+      <View style={styles.root}>
         <ScreenHeader />
         <View style={[styles.content, { paddingTop: 12 }]}>
           <Body>Loading…</Body>
@@ -132,7 +132,7 @@ export default function ModuleScreen(): React.JSX.Element {
             {formatZar(mod.priceCents)}
           </Num>
           {owned ? (
-            <Text style={[styles.badge, { color: theme.tokens.ok }]}>IN YOUR ACCOUNT</Text>
+            <Text style={[styles.badge, { color: theme.tokens.ok }]}>OWNED</Text>
           ) : mod.status === "available" ? (
             <Text style={[styles.badge, { color: theme.tokens.warn }]}>READY</Text>
           ) : (
@@ -140,6 +140,18 @@ export default function ModuleScreen(): React.JSX.Element {
           )}
         </View>
 
+        {/*
+         * THE UNLOCK, AND WHY IT IS NOT A CHECKOUT.
+         *
+         * The unlock is the one thing this screen is for, so it is
+         * centred rather than pushed against the gutter, and the note
+         * under it is centred with it — a centred button over a
+         * left-aligned note reads as two unrelated things.
+         *
+         * The "remove" is the other side of the same coin, and it is
+         * deliberately quiet and left where it is: a removal is not the
+         * thing this screen is for.
+         */}
         {owned ? (
           <Button
             label="remove from your account"
@@ -153,10 +165,10 @@ export default function ModuleScreen(): React.JSX.Element {
               label={`unlock for ${formatZar(mod.priceCents)}`}
               onPress={() => void unlock()}
               fullWidth
+              style={styles.centred}
             />
             <Body style={styles.ctaNote}>
-              Unlocking is a local purchase — there is no checkout and no card. The notes are yours
-              either way.
+              Unlocking is local — there is no checkout and no card.
             </Body>
           </View>
         )}
@@ -175,7 +187,7 @@ export default function ModuleScreen(): React.JSX.Element {
               </Card>
             </Section>
 
-            <Section title="What you will be able to do" subtitle="By the end of the module.">
+            <Section title="What you will be able to do">
               <Card>
                 {content.outcomes.map((outcome) => (
                   <View key={outcome.slice(0, 24)} style={styles.outcomeRow}>
@@ -194,8 +206,8 @@ export default function ModuleScreen(): React.JSX.Element {
               title="Lessons"
               subtitle={
                 completed > 0
-                  ? `${completed} of ${content.lessons.length} finished.`
-                  : `${content.lessons.length} lessons, in order.`
+                  ? `${completed} of ${content.lessons.length} finished`
+                  : `${content.lessons.length} lessons`
               }
             >
               <Card>
@@ -236,7 +248,7 @@ export default function ModuleScreen(): React.JSX.Element {
           </Section>
         )}
 
-        <Section title="Topics" subtitle="One note per topic, so you can take the one you are stuck on.">
+        <Section title="Topics" subtitle="Take the one you are stuck on.">
           <Card>
             {topics.length === 0 ? (
               <Body>No topics yet.</Body>
@@ -256,10 +268,6 @@ export default function ModuleScreen(): React.JSX.Element {
             )}
           </Card>
         </Section>
-
-        <Body style={styles.foot}>
-          Every topic on {mod.code} unlocks with the module — one unlock, all of them.
-        </Body>
       </ScrollView>
     </View>
   );
@@ -296,7 +304,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 16,
+    marginTop: 18,
   },
   price: {
     ...TYPE.title,
@@ -305,20 +313,41 @@ const styles = StyleSheet.create({
     ...TYPE.label,
     fontSize: 9,
   },
+  /**
+   * THE UNLOCK, CENTRED.
+   *
+   * The block takes the screen's full width and the button sits in the
+   * middle of it. The button's own `alignSelf` has to be overridden:
+   * `fullWidth` asks for "stretch", and a stretched button is the width
+   * of the screen rather than the width of the thing it says.
+   */
   cta: {
     marginTop: 18,
+    alignItems: "center",
+  },
+  centred: {
+    alignSelf: "center",
   },
   ctaNote: {
     marginTop: 10,
     fontSize: 12,
     lineHeight: 18,
+    alignSelf: "stretch",
+    textAlign: "center",
   },
   release: {
-    marginTop: 12,
+    marginTop: 18,
     alignSelf: "flex-start",
   },
+  /*
+   * THE PARAGRAPHS OF THE OVERVIEW.
+   *
+   * The card's own content view already spaces its children by ten, so
+   * this is the little that is added on top of it rather than a second
+   * gap of its own.
+   */
   paragraph: {
-    marginBottom: 10,
+    marginBottom: 6,
   },
   outcomeRow: {
     flexDirection: "row",
@@ -339,9 +368,5 @@ const styles = StyleSheet.create({
   outcomeText: {
     ...TYPE.body,
     flex: 1,
-  },
-  foot: {
-    ...TYPE.small,
-    marginTop: 22,
   },
 });

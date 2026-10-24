@@ -28,19 +28,23 @@ remote asset and no telemetry.
 
 ---
 
-## 2. The four visual engines — removed
+## 2. The four visual engines — three gone, and the fourth back
 
 `gradient-ascii`, `pixel-blast`, `horizon-bloom` and `letter-glitch` were
 **Expo DOM Component wrappers**: four WebGL2 fragment pipelines, each in a
 WebView, each carrying the web app's landing backgrounds.
 
-**They are gone.** Every screen's background is now a **flat colour from the
-theme** — `bg0`, which every one of the fifty-two palettes already
-defines — and the four engines, `DOMField` and the generator that copied
-them out of the web app have all been deleted.
+**Three of them are still gone.** Every screen's background is a **flat
+colour from the theme** — `bg0`, which every one of the fifty-two palettes
+already defines — and `pixel-blast`, `horizon-bloom`, `letter-glitch` and
+the generator that copied them out of the web app have all been deleted.
 
-The reason was a native crash that came out of the glassmorphism work, and
-it is worth writing down because the chain is not obvious:
+**`gradient-ascii` is BACK**, as a DOM component, and it is back on every
+screen except **You** and **Provider**. See §2a.
+
+The reason the other three went is a native crash that came out of the
+glassmorphism work, and it is worth writing down because the chain is not
+obvious:
 
 * the panels were `expo-blur`'s `BlurView`, which on **Android** blurs a
   named `BlurTargetView` rather than the backdrop;
@@ -64,7 +68,81 @@ papering over it.
 
 **The engines are still in the web app.** `apps/web/src/components/landing/`
 has all four, and they are what the web app's landing pages still use. Only
-the mobile port gave them up.
+the mobile port gave three of them up.
+
+### 2a. The gradient ASCII field, back
+
+The one that came back is a **port**, not a rewrite:
+`src/components/dom/GradientAscii.tsx` is
+`apps/web/src/components/landing/gradient-ascii.tsx` with a handful of
+changes.
+
+| | the web app | here |
+| --- | --- | --- |
+| shape | `horizon` | **`rise`** — the field comes up from the bottom, out of a core below the frame |
+| extent | the reference's own | the bottom **two thirds** of the screen, in proportion to the screen |
+| colours | four stops of a fixed palette, read off `--bg-0` and `--accent-a` | **ONE colour** — the palette's own accent at its own saturation, at every stop |
+| pointer | a live scramble and a click wave | **none** — it is a background, and there is nothing under the reader's thumb to disturb |
+| grain | a film grain at 24Hz | **none** |
+| motion | `flow 0.5`, `speed 1` | `flow 1`, `speed 1.4` — one colour means the characters are the only thing that moves, and they need more of it to read |
+| font | the app's own mono token | the **platform's** monospace |
+| where it lives | the landing page | **one WebView for the whole app**, above the navigator |
+
+**THE FONT IS A REAL CONSTRAINT, NOT A PREFERENCE.** The app's JetBrains
+Mono is a NATIVE font, registered with Expo. A native font is not a font
+this WebView can rasterise — it is not installed in the WebView's own
+environment, and there is no URL to load it from. The glyph ramp is
+`' =+xX0S8#@'` and every one of those characters is in every monospace
+face on both platforms, so the ramp is drawn in the platform's own.
+
+**THE COLOURS CROSS THE BRIDGE AS TWO STRINGS.** There are no CSS custom
+properties on a phone, so the ramp is derived from exactly the same maths
+on two hex strings instead. The derivation is the same function.
+
+**THE PROPS MUST NOT BE CAPTURED BY THE EFFECT THAT OWNS THE GL CONTEXT.**
+The effect that creates the context, the four programs, the three render
+targets and the glyph atlas must not re-run when the palette changes — a
+second mount would be handed a context the first one's cleanup already
+released. So the effect cannot close over the props it was mounted with:
+it would repaint the palette it BOOTED with, forever, and the reader's
+theme change would change the page and not the field. The props are kept
+in a ref, written by an effect, and the repaint reads them from there.
+
+**THE FADE IS IN THE WEBVIEW.** The tutor's field goes away slowly once the
+reader has sent a message. That fade is the shader's own scale walking
+down, not the opacity of the native view that holds the WebView: a
+WebView is drawn into its own layer on Android, and a layer does not take
+the alpha of the view it is in. A native-side fade is a fade that silently
+does not happen. Only a boolean crosses the bridge.
+
+**THE LIGHT PALETTE NEEDS INK, NOT WHITE.** The web app drew white glyphs
+in both modes, which left the light palettes with a field that could not be
+seen at all. Here the glyphs are the field's own colour composited over
+white — ink on paper — and the composite blends normally rather than
+additively, which is what the reference engine does.
+
+**ONE WEBVIEW FOR THE WHOLE APP, NOT ONE PER SCREEN.** The field used to
+be mounted as the first child of every screen's root, which is the
+obvious way to put a background behind a screen and the wrong one: every
+screen was its own WebView, so every screen paid for a WebView booting,
+four shaders compiling and a 2.4 second intro wiping in, and the reader
+saw the flat page colour for all of it. It is now mounted once, above the
+navigator, and the screens are transparent so it shows through them. The
+screens that are NOT transparent are **You** and **Provider**, which keep
+their flat background and no field.
+
+**A SCREEN ASKS FOR A STRENGTH, IT DOES NOT OWN A FIELD.** With one
+field there is one strength, so the tutor claims ninety per cent while it
+is the screen on top and gives it back when it is not. The claim is a
+context, and the context's provider has to wrap the navigator as well as
+the field — the screens are the field's SIBLINGS, and a sibling cannot
+reach a provider that is inside the field.
+
+**THE SCREENS ARE TRANSPARENT, WHICH MEANS THE NAVIGATOR IS TOO.** The
+navigator paints its own background behind the screens, and the tab scene
+paints one of its own. Both were `bg0`, and an opaque one is a lid
+over the field. The navigation theme's `background` and the tabs'
+`sceneStyle` are transparent for the same reason the screens' roots are.
 
 ---
 
@@ -418,7 +496,11 @@ why.
   tapping it puts the README container away — the container's height
   animates to zero and the content below moves up to take its place, because
   the thing that has to happen is the container *leaving the space it was
-  in*, not sliding about in it.
+  in*, not sliding about in it. The content of that container is **absolutely
+  positioned** inside the box that animates, because a child that is in the
+  flow is sized by its parent on Android, and a parent whose height is
+  animating to zero would measure it as zero — the container would never
+  appear. See STYLING.md §1.4b.
 * **48-point tap targets** on every control, with the card rows at 52.
 * **Icons are lucide, on both platforms.** The web app draws its icons from
   lucide through shadcn's registry; this app draws them from

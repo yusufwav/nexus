@@ -137,7 +137,7 @@ export default function ModulesScreen(): React.JSX.Element {
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.tokens.bg0 }]}>
+    <View style={styles.root}>
       <ScreenHeader title="Modules" />
       <FlatList
         data={visible}
@@ -150,9 +150,7 @@ export default function ModulesScreen(): React.JSX.Element {
         ListHeaderComponent={
           <View style={styles.header}>
             <Title style={styles.title}>{modules.length} modules, {ready} of them ready</Title>
-            <Body style={styles.lead}>
-              Every module is R50 and the notes stay yours either way. Unlock the ones you need.
-            </Body>
+            <Body style={styles.lead}>R50 each, and the notes stay yours.</Body>
             <View style={styles.chips}>
               {subjects.map((s) => (
                 <Chip
@@ -197,6 +195,9 @@ const styles = StyleSheet.create({
   chips: {
     flexDirection: "row",
     flexWrap: "wrap",
+    // The chips are capsules with no margin of their own, so the row
+    // is what puts the space between them. Without this they touch.
+    gap: 8,
     marginTop: 18,
   },
   card: {
@@ -223,7 +224,6 @@ const styles = StyleSheet.create({
   },
   description: {
     ...TYPE.small,
-    marginTop: 6,
   },
   cardFoot: {
     flexDirection: "row",

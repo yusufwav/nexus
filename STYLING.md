@@ -87,8 +87,15 @@ letter-spacing is tightened to keep long headings from running wide.
 | `TYPE.body` | 14 / 21 | regular |
 | `TYPE.small` | 12 / 18 | regular |
 | `TYPE.label` | 10 / 14, tracking 1.4, uppercase | medium |
+| `TYPE.micro` | 8 / 12, tracking 0.2 | medium |
 | `TYPE.code` | 12 / 18, tracking 0.2 | medium |
 | `TYPE.mono` | 13 / 21 | regular |
+
+**`TYPE.micro` IS BELOW THE LABEL SIZE ON PURPOSE.** It is the answer to a
+question the reader did not ask — the model the tutor is talking to, under
+the composer — and an answer that has to be read is a caption, not a
+footnote. Eight points is the smallest thing the app says, and it is
+centred under a control rather than set beside it.
 
 ### 1.2 Rounded corners
 
@@ -238,6 +245,36 @@ press. So `default` is derived here instead: the palette's own `bg2`,
 which is the third step of its background ramp and therefore a real,
 visible neutral on every one of the fifty-two.
 
+### 1.3b Where a button goes
+
+A button's **place** is part of its meaning, and there are only four
+arrangements in this app:
+
+| The button… | goes… |
+| --- | --- |
+| acts on a **row or an item** | on that row, at the **trailing** edge — the same place the row's other content ends |
+| is the **only** action of a block, a card or a screen | **centred** — a lone action against the gutter reads as a caption to whatever is above it |
+| is **one of a pair** — two ways out of the same thing | in a **row**, in order, rather than stacked — a stack makes the second one look like a separate step |
+| **continues a flow** — it follows a field or a paragraph | where it is, against the gutter, under the thing it continues |
+
+**THE BUTTON IS NOT RESTYLED TO MOVE IT.** A button brings its own
+`alignSelf`, and the default is `flex-start` — which in a **column** is the
+horizontal axis, so a button that is meant to be centred has to be told so
+explicitly, and a button that is meant to sit in the middle of a **row** has
+to be told that as well, or it sits at the top of the row.
+
+**A `fullWidth` BUTTON IS NOT FULL WIDTH UNLESS ITS BLOCK IS.** The prop asks
+the button to stretch, and a stretched button is the width of the **block
+that holds it**. A block that is `alignSelf: "flex-start"` is only as wide
+as the button, so the button is exactly as wide as its own label and the
+prop does nothing. Where a full-width button is wanted, the block has to be
+full width too — and where the button should keep the width of its label,
+the block is full width and the button's own `alignSelf` is overridden.
+
+**A CENTRED BUTTON OVER A LEFT-ALIGNED PARAGRAPH IS FINE.** It is the
+standard empty state: the text says what is going on and the button is the
+thing to do about it.
+
 ### 1.4 The terminal panel
 
 `TerminalPanel` (`src/components/ui/TerminalPanel.tsx`) is the README
@@ -383,6 +420,21 @@ the container is *put away* and the content below it moves up to take its
 place, rather than sliding about. It is a height animation because the thing
 that has to happen is the container **leaving the space it was in**.
 
+**THE CONTENT IS ABSOLUTE, AND THAT IS THE WHOLE TRICK.** The height the
+animation starts from has to be measured, and the thing that is measured
+cannot be sized by the box that is being measured. A block child is not
+sized by its parent's height on the web, so the measurement is the content's
+own height and it works; on Android a parent with a height of zero measures
+its child AT_MOST zero, so the child measures zero, so the height it reports
+is zero, so the parent stays zero — and the container never appears at all.
+An **absolute** child is measured with an UNSPECIFIED spec on every
+platform, so it is always measured at its natural height whatever the
+parent's height is. The parent is still the box that shrinks, and its
+`overflow: hidden` still clips the content away as it shrinks.
+
+A measurement of **zero** is also never a real height — it is the height of
+the hole a collapsed container left — so it is ignored rather than recorded.
+
 ### 1.5 The side menu
 
 The drawer is a **full-height panel in the palette's own surface colour**,
@@ -488,6 +540,124 @@ written with one would open a formula that never closes. The splitter
 refuses a span that is closed but does not look like maths — a bare
 number, a span with a space at either end, a span that is not closed —
 so the dollar sign stays a dollar sign and nothing after it is swallowed.
+
+### 1.7 The gradient ASCII field
+
+The one live thing in the app: a field of ASCII characters, lit from below,
+behind every screen.
+
+**IT IS A DOM COMPONENT.** `src/components/dom/GradientAscii.tsx` is a
+`'use dom'` component — a WebView of its own, running the web app's own
+WebGL2 pipeline (four passes: field → glyph atlas → blurred halo →
+composite) rather than a reimplementation of it in a different graphics
+API.
+
+**THERE IS ONE FIELD FOR THE WHOLE APP.** It is mounted once, above the
+navigator, in `src/components/GradientAsciiBackground.tsx`, and every
+screen is transparent so it shows through them. It used to be mounted per
+screen, and that is a lie: every screen was its own WebView, so every
+screen paid for a WebView booting, a set of shaders compiling and a
+2.4 second intro wiping in — and the reader saw the flat page colour for
+all of it, every time they opened a screen. **A background that reloads is
+not a background, it is a flash.**
+
+The two screens that are NOT transparent are **You** and **Provider**:
+they keep their flat `bg0` and no field. They are the two places where
+the reader is dealing with a secret or a setting rather than with the
+material.
+
+**THE SHAPE IS `rise`.** The glow's core sits *below* the frame and the
+field spreads upward out of it, so the field comes up from the bottom of
+the screen. The intro wipe reveals it outward from that same core. It was
+`horizon` in the web app, which put a wide band across the middle of the
+screen — right where the content is.
+
+**THE FIELD REACHES A THIRD OF THE WAY DOWN FROM THE TOP.** The core sits
+at y = -0.67 in the shader's own units, which are the screen's height, so
+the field's extent is a proportion of whatever screen it is on. The tone's
+alpha ramp is stretched to match, so what crosses that distance is a
+GRADIENT and not a solid block with a fade at the top of it.
+
+**THE COLOUR COMES FROM THE PALETTE, AS TWO PROPS.** The web app read
+`--bg-0` and `--accent-a` off the page's own CSS custom properties;
+there are none here, so the active palette's own `bg0` and `accentA`
+are handed across the bridge. **Nothing in the field names a colour**, so
+all fifty-two palettes are correct without a line being edited per theme.
+
+**THERE IS ONE COLOUR.** The ramp is four stops of the palette's own
+accent at its own saturation — the most saturated colour the palette has
+— and every one of them is the SAME colour. The ramp used to be four
+lightnesses, which meant the field changed colour as it climbed and the
+eye read a wash of two colours rather than a glow. What carries the field
+from the bottom of the screen to the top is therefore **alpha**, not hue.
+
+**THE FIELD IS ALIVE.** `flow` is the amplitude of the domain warp that
+bends the noise before the shape is evaluated and `speed` is the clock
+feeding it; at zero they are both zero and the field is a photograph — the
+characters never change and the glow never moves. The warp, the shape's
+own sway and the tick of the characters are all running.
+
+**THE FIELD DOES NOT FOLLOW THE APP'S "REDUCED MOTION" SWITCH.** That
+switch says what it does — "Calms the side menu's slide" — and the field
+is not the side menu. It was wired to it anyway, and the effect was that
+the field stopped DEAD on any device with the switch on: the intro still
+played, because the intro's clock is not the motion's clock, and after
+that nothing moved at all. A background that is not moving is a
+background that is a picture.
+
+**THERE IS NO GRAIN.** The reference's own control panel reads zero, and
+the grain was resampling at 24Hz: a shimmer over the whole screen that
+reads as a rendering fault rather than as a texture.
+
+**THE REST OF THE NUMBERS ARE THE REFERENCE'S.** `density 0.8`, `glyph
+alpha 0.85`, `gradient 0.9`, `glow 0.2`, `flicker 0.2`, `depth 0`,
+`softness 0.5`, an 18px cell and the `' =+xX0S8#@'` ramp. They are
+what make the field read as a FIELD: enough cells carry a glyph, each
+glyph is bright enough to be a character, the bloom behind them is a hint
+and not a fog, and no cell is blurred through a mip.
+
+**THE FIELD IS AT SIXTY PER CENT.** `intensity` is the composite's own
+scale, applied last, so the wash, the glyphs and the halo all come down
+together: the field at sixty per cent is *the same field* at sixty per
+cent, not a field at a hundred per cent under a grey veil. The tutor runs
+it at ninety.
+
+**A SCREEN ASKS FOR THE FIELD, IT DOES NOT OWN IT.** `useFieldLevel`
+claims the field while that screen is the one on top and gives it back
+when it is not, so the tutor can be at ninety per cent and the rest of
+the app at sixty. The strength WALKS to its new value over three quarters
+of a second, so a screen change is a change and not a jump.
+
+**THE FADE IS DONE IN THE WEBVIEW, NOT ON THE NATIVE VIEW.** The tutor
+fades its field away — slowly, over 2.6 seconds — once the reader has
+sent a message, because a conversation is the one screen the field has to
+stop competing with. The fade is the same shader's scale walking down,
+driven by the same clock that draws the field. It is **not** the opacity
+of the native view that holds the WebView: a WebView is drawn into its own
+layer on Android, and a layer does not take the alpha of the view it is
+in, so a native-side fade is a fade that silently does not happen. Only a
+boolean crosses the bridge.
+
+**THE FIELD IS BEHIND THE CONTAINERS, ALWAYS.** Every panel is an opaque
+`bg1`, so the field is only ever in the gaps between the containers, and
+never under the text the reader is trying to read. The one place the text
+sits directly on the field is the tutor's composer, and there the typed
+text takes its colour from the same side the field does: over the lit
+field of a dark screen the ink is the page's own black, and over the pale
+field of a light one it is the page's own white.
+
+| | |
+| --- | --- |
+| shape | `rise` — the field comes up from the bottom |
+| extent | the bottom two thirds of the screen, in proportion to the screen |
+| colour | ONE colour: the palette's accent at its own saturation |
+| intensity | 0.6 everywhere, 0.9 on the tutor |
+| dim | the tutor, once the reader has sent a message; 2.6s |
+| palette | the active theme's `bg0` and `accentA`, as props |
+| motion | `flow 1.8`, `speed 1`, `flicker 0.2`, `variation 0.5` — the field is never a photograph |
+| grain | none |
+| pointer | none. There is nothing under the reader's thumb to scramble |
+| font | the platform's own monospace — the app's JetBrains Mono is a NATIVE font and the WebView cannot rasterise it |
 
 ## 2. The grain
 
@@ -691,11 +861,31 @@ decoration. See §3.1.
 | panel padding | 22 | a `GlassPanel`'s inner padding |
 | card padding | 16 | a `Card`'s inner padding |
 | section gap | 26 | between sections |
+| block gap | 18 | between sibling blocks that are not sections |
 | row gap | 10–14 | between list rows |
+| stat gap | 10 | between stat tiles, in BOTH directions |
 | control height | 48 | every button and input |
 | icon control | 40 | square icon-only buttons |
 | tab bar | 48 | the bottom bar, plus the safe area |
 | theme swatch | 24 | the bar of three accents |
+
+**A CONTAINER OWNS THE SPACE BETWEEN CONTAINERS.** The gap between two
+blocks belongs to the thing that HOLDS them, not to the blocks themselves.
+A margin baked into a child can only ever space that child in one
+direction, so a row of stat tiles with a margin on each tile gets a
+different gap across the row than down it — and a grid that does not line
+up is the first thing the eye notices.
+
+So a grid says `gap`, and a screen's blocks each carry a `marginTop`, and
+neither of them reaches into the other. The stat tiles are the case in
+point: the tile itself has no margin at all, and the row that holds them
+puts a `gap` between them, which is the same number in both directions.
+
+**A FOOTER WITH NOTHING ABOVE IT IS NOT A FOOTER.** A card's footer
+carries a top margin, a top padding and a separator, because its job is to
+be set apart from a body. A card whose only content is the footer has no
+body, and all three of those become dead space and a stray line across an
+otherwise empty card. They come off.
 
 **Tap targets are 48 points.** Not 44 — 48, because these are small screens
 held one-handed and a thumb is worse than a finger.

@@ -43,7 +43,10 @@
     "lint": "expo lint",
     "font-metrics": "node scripts/generate-font-metrics.mjs",
     "test:latex": "node --import ./scripts/register-ts.mjs scripts/test-latex.ts",
-    "preview:latex": "node --import ./scripts/register-ts.mjs scripts/preview-latex.mjs"
+    "preview:latex": "node --import ./scripts/register-ts.mjs scripts/preview-latex.mjs",
+    "preview-picker": "node scripts/preview-picker.mjs",
+    "preview-buttons": "node scripts/preview-buttons.mjs",
+    "preview-tutor": "node scripts/preview-tutor.mjs"
   },
   "private": true
 }

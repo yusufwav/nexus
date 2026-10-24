@@ -152,24 +152,24 @@ const FOOTER: ReadonlyArray<FooterLink> = [
  * ------------------------------------------------------------------ */
 
 /** Each slab's own travel. */
-const LAYER_DURATION = 500;
+const LAYER_DURATION = 350;
 /** How far apart the two slabs start. */
 const LAYER_STAGGER = 70;
 /** The panel's own travel. */
-const PANEL_DURATION = 650;
+const PANEL_DURATION = 300;
 /** The gap between the last slab and the panel. */
-const PANEL_DELAY = LAYER_STAGGER + 80;
+const PANEL_DELAY = LAYER_STAGGER + 70;
 /** How long the closing travel takes. */
 const CLOSE_DURATION = 320;
 /** Each item's own travel. */
-const ITEM_DURATION = 1000;
+const ITEM_DURATION = 600;
 /** How far apart the items start. */
-const ITEM_STAGGER = 100;
+const ITEM_STAGGER = 55;
 /** Where the items start, as a fraction of the panel's travel. */
-const ITEM_START_RATIO = 0.15;
+const ITEM_START_RATIO = 0.05;
 /** The numbers' own travel, and how far apart they start. */
 const NUMBER_DURATION = 600;
-const NUMBER_STAGGER = 80;
+const NUMBER_STAGGER = 55;
 /** How far below its own box an item starts, as a fraction of its height. */
 const ITEM_TRAVEL = 1.4;
 

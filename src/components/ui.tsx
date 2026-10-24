@@ -43,6 +43,7 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import { Icon } from "@/components/icons";
 import { useActiveTheme } from "@/theme/ThemeProvider";
 import { FONT, TYPE, splitNumericRuns } from "@/theme/typography";
 import { RADIUS } from "@/theme/radius";
@@ -312,6 +313,29 @@ export type SelectFilter = {
 };
 
 /**
+ * A GROUP OF OPTIONS UNDER A HEADING.
+ *
+ * A picker whose options come from different sources — the models one
+ * provider offers, say — is a list of lists, and a flat list of them loses
+ * where each one came from. So the sheet can be given GROUPS instead of
+ * options, and a heading opens to show what is under it.
+ *
+ * The heading is what the reader sees when the group is closed, so the
+ * heading carries the group: collapsing a provider's models out of its name
+ * leaves the provider, and nothing else.
+ */
+export type SelectGroup = {
+  /** A stable id, so a group can be opened, closed and remembered. */
+  readonly id: string;
+  /** The heading the group is shown under. */
+  readonly label: string;
+  /** The options under it. */
+  readonly options: ReadonlyArray<SelectOption>;
+  /** A second line under the heading — "loading", a count, a hint. */
+  readonly detail?: string;
+};
+
+/**
  * A PICKER.
  *
  * The app had no dropdown until the tutor needed one, and the platform's
@@ -329,6 +353,11 @@ export function Select({
   placeholder = "choose one",
   disabled = false,
   filter,
+  triggerLabel,
+  chevron = true,
+  trigger,
+  groups,
+  onGroupOpen,
   style,
 }: {
   /** The name of the thing being chosen, shown above the trigger. */
@@ -341,10 +370,48 @@ export function Select({
   readonly disabled?: boolean;
   /** An optional filter, shown at the top of the sheet. */
   readonly filter?: SelectFilter;
+  /**
+   * What the trigger says, whatever is chosen.
+   *
+   * A trigger that names the chosen thing is right for a form, where the
+   * field has to say what is in it. It is wrong for a control that sits in a
+   * row of other controls, where the name of the thing is already beside it
+   * and the trigger's only job is to open the list.
+   */
+  readonly triggerLabel?: string;
+  /** Whether the trigger carries a chevron. */
+  readonly chevron?: boolean;
+  /**
+   * What the control that opens the sheet looks like.
+   *
+   * The default is the app's own trigger — a filled row carrying the
+   * chosen value. A screen that wants the sheet to open from somewhere
+   * ELSE — a header icon, say — gives its own control here instead, and
+   * the sheet still belongs to the `Select`: the trigger only says when
+   * to open it.
+   */
+  readonly trigger?: (props: { readonly onPress: () => void }) => ReactNode;
+  /**
+   * The options, grouped under headings.
+   *
+   * When these are given they are what the sheet lists, and `options` is
+   * ignored. A heading opens to show what is under it.
+   */
+  readonly groups?: ReadonlyArray<SelectGroup>;
+  /**
+   * Called when a group is opened.
+   *
+   * So a group can be filled in when it is opened rather than all at once,
+   * which matters when its options are a network call away.
+   */
+  readonly onGroupOpen?: (group: SelectGroup) => void;
   style?: StyleProp<ViewStyle>;
 }): React.JSX.Element {
   const theme = useActiveTheme();
   const [open, setOpen] = useState(false);
+  /** The groups the reader has opened. A group is a disclosure, not a
+   * navigation, so it is remembered while the sheet is open. */
+  const [opened, setOpened] = useState<ReadonlyArray<string>>([]);
 
   const chosen = options.find((o) => o.value === value) ?? null;
 
@@ -361,39 +428,102 @@ export function Select({
     : options;
   const hidden = options.length - shown.length;
 
+  /**
+   * ONE OPTION'S ROW.
+   *
+   * The same row whether the sheet is listing a flat list or one group's
+   * options, so it is written once.
+   */
+  const optionRow = (option: SelectOption): React.JSX.Element => {
+    const active = option.value === value;
+    return (
+      <Pressable
+        key={option.value}
+        accessibilityRole="button"
+        accessibilityState={{ selected: active }}
+        onPress={() => {
+          onChange(option.value);
+          setOpen(false);
+        }}
+        style={({ pressed }) => [styles.selectRow, { opacity: pressed ? 0.7 : 1 }]}
+      >
+        <View style={styles.selectRowText}>
+          <Text
+            style={[
+              styles.selectRowLabel,
+              { color: active ? theme.tokens.accentA : theme.tokens.fg },
+            ]}
+            numberOfLines={1}
+          >
+            {option.label}
+          </Text>
+          {option.detail !== undefined ? (
+            <Text
+              style={[styles.selectRowDetail, { color: theme.tokens.fgDim }]}
+              numberOfLines={1}
+            >
+              {option.detail}
+            </Text>
+          ) : null}
+        </View>
+        {active ? <Icon name="check" size={16} tone="accent" /> : null}
+      </Pressable>
+    );
+  };
+
   return (
     <View style={style}>
       {label !== undefined ? (
         <Text style={[styles.selectLabel, { color: theme.tokens.fgDim }]}>{label}</Text>
       ) : null}
 
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={label ?? "choose"}
-        accessibilityValue={{ text: chosen?.label ?? placeholder }}
-        disabled={disabled}
-        onPress={() => setOpen(true)}
-        style={({ pressed }) => [
-          styles.selectTrigger,
-          {
-            backgroundColor: theme.tokens.surfaceRaised,
-            borderColor: theme.tokens.line,
-            borderRadius: RADIUS.field,
-            opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
-          },
-        ]}
-      >
-        <Text
-          style={[
-            styles.selectValue,
-            { color: chosen === null ? theme.tokens.fgDim : theme.tokens.fg },
+      {trigger !== undefined ? (
+        /*
+         * THE CALLER'S OWN TRIGGER.
+         *
+         * The sheet is still the Select's — the trigger only says when to
+         * open it — so a screen that puts the control somewhere else does
+         * not have to own a sheet of its own.
+         */
+        trigger({ onPress: () => setOpen(true) })
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={label ?? "choose"}
+          accessibilityValue={{ text: triggerLabel ?? chosen?.label ?? placeholder }}
+          disabled={disabled}
+          onPress={() => setOpen(true)}
+          style={({ pressed }) => [
+            styles.selectTrigger,
+            {
+              backgroundColor: theme.tokens.surfaceRaised,
+              borderColor: theme.tokens.line,
+              borderRadius: RADIUS.field,
+              opacity: disabled ? 0.45 : pressed ? 0.7 : 1,
+            },
           ]}
-          numberOfLines={1}
         >
-          {chosen?.label ?? placeholder}
-        </Text>
-        <Text style={[styles.selectChevron, { color: theme.tokens.fgDim }]}>▾</Text>
-      </Pressable>
+          <Text
+            style={[
+              styles.selectValue,
+              {
+                color:
+                  triggerLabel !== undefined || chosen === null
+                    ? theme.tokens.fgDim
+                    : theme.tokens.fg,
+              },
+            ]}
+            numberOfLines={1}
+          >
+            {triggerLabel ?? chosen?.label ?? placeholder}
+          </Text>
+          {chevron ? (
+            <View style={styles.selectChevron}>
+              <Icon name="chevronDown" size={16} tone="dim" />
+            </View>
+          ) : null}
+        </Pressable>
+      )}
 
       <Modal
         visible={open}
@@ -441,54 +571,91 @@ export function Select({
               style={styles.selectList}
               contentContainerStyle={styles.selectListContent}
             >
-              {shown.map((option) => {
-                const active = option.value === value;
-                return (
-                  <Pressable
-                    key={option.value}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    onPress={() => {
-                      onChange(option.value);
-                      setOpen(false);
-                    }}
-                    style={({ pressed }) => [styles.selectRow, { opacity: pressed ? 0.7 : 1 }]}
-                  >
-                    <View style={styles.selectRowText}>
-                      <Text
-                        style={[
-                          styles.selectRowLabel,
-                          { color: active ? theme.tokens.accentA : theme.tokens.fg },
+              {groups === undefined ? (
+                <>
+                  {shown.map((option) => optionRow(option))}
+                  {options.length === 0 ? (
+                    <Text style={[styles.selectEmpty, { color: theme.tokens.fgDim }]}>
+                      Nothing to choose from yet.
+                    </Text>
+                  ) : null}
+                  {options.length > 0 && shown.length === 0 ? (
+                    <Text style={[styles.selectEmpty, { color: theme.tokens.fgDim }]}>
+                      {`${hidden} hidden by the filter. Turn it off to see them.`}
+                    </Text>
+                  ) : null}
+                </>
+              ) : (
+                /*
+                 * THE GROUPS.
+                 *
+                 * A heading opens to show what is under it, and the heading
+                 * is what the reader sees when it is closed — so a provider's
+                 * models collapse into the provider's name, and the sheet is
+                 * a list of providers until one of them is opened.
+                 */
+                groups.map((group) => {
+                  const isOpen = opened.includes(group.id);
+                  const visible =
+                    filter !== undefined && filter.active
+                      ? group.options.filter((option) => filter.matches(option))
+                      : group.options;
+                  return (
+                    <View key={group.id}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: isOpen }}
+                        accessibilityLabel={group.label}
+                        onPress={() => {
+                          setOpened((prev) =>
+                            prev.includes(group.id)
+                              ? prev.filter((id) => id !== group.id)
+                              : [...prev, group.id],
+                          );
+                          if (!isOpen) onGroupOpen?.(group);
+                        }}
+                        style={({ pressed }) => [
+                          styles.selectGroup,
+                          { opacity: pressed ? 0.7 : 1 },
                         ]}
-                        numberOfLines={1}
                       >
-                        {option.label}
-                      </Text>
-                      {option.detail !== undefined ? (
-                        <Text
-                          style={[styles.selectRowDetail, { color: theme.tokens.fgDim }]}
-                          numberOfLines={1}
-                        >
-                          {option.detail}
-                        </Text>
+                        <View style={styles.selectGroupText}>
+                          <Text
+                            style={[styles.selectGroupLabel, { color: theme.tokens.fg }]}
+                            numberOfLines={1}
+                          >
+                            {group.label}
+                          </Text>
+                          {group.detail !== undefined ? (
+                            <Text
+                              style={[styles.selectRowDetail, { color: theme.tokens.fgDim }]}
+                              numberOfLines={1}
+                            >
+                              {group.detail}
+                            </Text>
+                          ) : null}
+                        </View>
+                        <Icon
+                          name={isOpen ? "chevronDown" : "chevronRight"}
+                          size={16}
+                          tone="dim"
+                        />
+                      </Pressable>
+                      {isOpen ? (
+                        visible.length === 0 ? (
+                          <Text style={[styles.selectEmpty, { color: theme.tokens.fgDim }]}>
+                            {filter !== undefined && filter.active
+                              ? "Nothing here is free."
+                              : "Nothing to choose from here."}
+                          </Text>
+                        ) : (
+                          visible.map((option) => optionRow(option))
+                        )
                       ) : null}
                     </View>
-                    {active ? (
-                      <Text style={[styles.selectTick, { color: theme.tokens.accentA }]}>✓</Text>
-                    ) : null}
-                  </Pressable>
-                );
-              })}
-              {options.length === 0 ? (
-                <Text style={[styles.selectEmpty, { color: theme.tokens.fgDim }]}>
-                  Nothing to choose from yet.
-                </Text>
-              ) : null}
-              {options.length > 0 && shown.length === 0 ? (
-                <Text style={[styles.selectEmpty, { color: theme.tokens.fgDim }]}>
-                  {`${hidden} hidden by the filter. Turn it off to see them.`}
-                </Text>
-              ) : null}
+                  );
+                })
+              )}
             </ScrollView>
           </View>
         </View>
@@ -724,8 +891,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   selectChevron: {
-    ...TYPE.body,
     marginLeft: 10,
+  },
+  selectGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 10,
+  },
+  selectGroupText: {
+    flex: 1,
+  },
+  selectGroupLabel: {
+    ...TYPE.subheading,
   },
   selectScrim: {
     ...StyleSheet.absoluteFill,
@@ -827,12 +1006,23 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 
+  /*
+   * A STAT TILE.
+   *
+   * It carries NO margin of its own. The grid that holds the stats owns
+   * the space between them — `gap` on the row — because a margin baked
+   * into the tile can only ever space the tiles in ONE direction, and a
+   * row of tiles with a gap on the sides and a different one above and
+   * below is a grid that does not line up.
+   *
+   * The padding is the card padding, 16, so a stat tile and a card are
+   * padded the same way and the two read as the same kind of thing.
+   */
   stat: {
     flexGrow: 1,
     flexBasis: "46%",
     borderWidth: StyleSheet.hairlineWidth,
-    padding: 14,
-    marginBottom: 10,
+    padding: 16,
   },
   statLabel: {
     ...TYPE.label,

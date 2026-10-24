@@ -59,6 +59,7 @@ import { Markdown } from "@/components/Markdown";
 import { Alert, Badge, Body, Button, Label, Select } from "@/components/ui";
 import { RADIUS } from "@/theme/radius";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
+import { useFieldLevel } from "@/components/GradientAsciiBackground";
 import { Icon } from "@/components/icons";
 import { STARTERS, titleFor } from "@/lib/tutor-engine";
 import {
@@ -68,11 +69,13 @@ import {
   type NotesRead,
 } from "@/lib/tutor-prompt";
 import { listModels, streamChat, type ChatMessage, type ModelInfo } from "@/lib/llm";
+import { modelOption, modelValue, splitModelValue } from "@/lib/model-picker";
 import {
   getProviderWithKey,
   listProviders,
   readActiveProviderId,
   readModelChoice,
+  writeActiveProviderId,
   writeModelChoice,
   type Provider,
 } from "@/storage/provider";
@@ -115,11 +118,29 @@ export default function TutorScreen(): React.JSX.Element {
   const [provider, setProvider] = useState<Provider | null>(null);
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [model, setModel] = useState<string>("");
-  const [models, setModels] = useState<ReadonlyArray<ModelInfo>>([]);
+  /** Every provider the reader has added, not only the active one. */
+  const [providers, setProviders] = useState<ReadonlyArray<Provider>>([]);
+  /** The models of each provider, fetched once and kept. */
+  const [modelsByProvider, setModelsByProvider] = useState<
+    Readonly<Record<string, ReadonlyArray<ModelInfo>>>
+  >({});
+  /** The providers whose models are being fetched right now. */
+  const [loadingProviders, setLoadingProviders] = useState<ReadonlyArray<string>>([]);
 
   const [keyboardTop, setKeyboardTop] = useState<number | null>(null);
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView> | null>(null);
   const seeded = useRef(false);
+  /** The providers whose models have already been asked for. */
+  const asked = useRef<ReadonlyArray<string>>([]);
+
+  /**
+   * FREE ONLY, IN THE CHAT TOO.
+   *
+   * The same filter the settings screen offers, for the same reason: a
+   * provider that lists hundreds of models is a list nobody scrolls
+   * through, and the ones that cost nothing are usually the ones wanted.
+   */
+  const [freeOnly, setFreeOnly] = useState(true);
   const abortRef = useRef<AbortController | null>(null);
 
   /*
@@ -171,11 +192,15 @@ export default function TutorScreen(): React.JSX.Element {
     const all = await listProviders();
     const activeId = await readActiveProviderId();
     const chosen = all.find((p) => p.id === activeId) ?? all[0] ?? null;
+    setProviders(all);
     setProvider(chosen);
+    // A provider's catalogue can change, and a reader who has just been in
+    // the settings may have added one, so the models are asked for again.
+    setModelsByProvider({});
+    asked.current = [];
     if (chosen === null) {
       setApiKey(null);
       setModel("");
-      setModels([]);
       return;
     }
     const withKey = await getProviderWithKey(chosen.id);
@@ -210,33 +235,69 @@ export default function TutorScreen(): React.JSX.Element {
   );
 
   /* ---- the models, from the provider's own list ---- */
-  const loadModels = useCallback(async () => {
-    if (provider === null || apiKey === null) return;
-    try {
-      const list = await listModels(provider.baseUrl, apiKey);
-      setModels(list);
-    } catch {
-      // A provider that will not list its models is not a failure: the
-      // reader can still type one in the settings.
-      setModels([]);
-    }
-  }, [apiKey, provider]);
+  /**
+   * A PROVIDER'S MODELS, FETCHED ONCE AND KEPT.
+   *
+   * The reader can open any provider's models from the picker, so the list
+   * is fetched per provider and kept: a provider is asked once, and the
+   * answer is remembered for as long as the screen is mounted.
+   */
+  const loadProviderModels = useCallback(
+    async (providerId: string): Promise<void> => {
+      if (asked.current.includes(providerId)) return;
+      const target = providers.find((p) => p.id === providerId);
+      if (target === undefined) return;
+      asked.current = [...asked.current, providerId];
+      setLoadingProviders((prev) =>
+        prev.includes(providerId) ? prev : [...prev, providerId],
+      );
+      const withKey = await getProviderWithKey(providerId);
+      let list: ReadonlyArray<ModelInfo> = [];
+      if (withKey !== null) {
+        try {
+          list = await listModels(target.baseUrl, withKey.apiKey);
+        } catch {
+          // A provider that will not list its models is not a failure: the
+          // reader can still type one in the settings.
+          list = [];
+        }
+      }
+      setModelsByProvider((prev) => ({ ...prev, [providerId]: list }));
+      setLoadingProviders((prev) => prev.filter((id) => id !== providerId));
+    },
+    [providers],
+  );
 
   useEffect(() => {
     if (provider === null) return;
     void (async () => {
-      await loadModels();
+      await loadProviderModels(provider.id);
     })();
-  }, [loadModels, provider]);
+  }, [loadProviderModels, provider]);
 
   const chooseModel = useCallback(
     (next: string) => {
-      setModel(next);
-      if (provider !== null) {
-        void writeModelChoice(provider.id, next);
+      const parsed = splitModelValue(next);
+      if (parsed === null) return;
+      if (provider !== null && provider.id === parsed.providerId) {
+        setModel(parsed.modelId);
+        void writeModelChoice(parsed.providerId, parsed.modelId);
+        return;
       }
+      /*
+       * A MODEL FROM ANOTHER PROVIDER.
+       *
+       * That provider becomes the active one, because a model the reader has
+       * picked and the provider the tutor is talking to have to be the same
+       * one — otherwise the choice means nothing.
+       */
+      void (async () => {
+        await writeActiveProviderId(parsed.providerId);
+        await writeModelChoice(parsed.providerId, parsed.modelId);
+        await loadProvider();
+      })();
     },
-    [provider],
+    [loadProvider, provider],
   );
 
   /* ---- `?ask=` PRE-FILLS THE COMPOSER, and deliberately does not send ---- */
@@ -473,43 +534,106 @@ export default function TutorScreen(): React.JSX.Element {
     abortRef.current?.abort();
   }, []);
 
-  const modelOptions = useMemo(
+  /**
+   * THE PROVIDERS, AND THEIR MODELS UNDER THEM.
+   *
+   * A group is a provider, and the models are under it. A provider that has
+   * not been opened yet has no models, so the group says how many it has
+   * rather than showing an empty list.
+   */
+  const modelGroups = useMemo(
     () =>
-      models.map((m) => ({
-        value: m.id,
-        label: m.label,
-        detail: m.free ? `${m.id}  ·  free` : m.id,
-      })),
-    [models],
+      providers.map((p) => {
+        const list = modelsByProvider[p.id];
+        const loading = loadingProviders.includes(p.id);
+        return {
+          id: p.id,
+          label: p.name,
+          detail: loading
+            ? "loading…"
+            : list === undefined
+              ? undefined
+              : freeOnly
+                ? `${list.filter((m) => m.free === true).length} free`
+                : `${list.length} models`,
+          options: (list ?? []).map((m) => modelOption(p.id, m)),
+        };
+      }),
+    [freeOnly, loadingProviders, modelsByProvider, providers],
   );
 
   /**
-   * FREE ONLY, IN THE CHAT TOO.
+   * THE FREE MODELS, AS VALUES.
    *
-   * The same filter the settings screen offers, for the same reason: a
-   * provider that lists hundreds of models is a list nobody scrolls
-   * through, and the ones that cost nothing are usually the ones wanted.
+   * The filter is on by default, because a provider that lists hundreds of
+   * models is a list nobody scrolls through, and the ones that cost nothing
+   * are usually the ones wanted.
    */
-  const [freeOnly, setFreeOnly] = useState(true);
+  const freeValues = useMemo(() => {
+    const set = new Set<string>();
+    for (const [providerId, list] of Object.entries(modelsByProvider)) {
+      for (const m of list) {
+        if (m.free === true) set.add(modelValue(providerId, m.id));
+      }
+    }
+    return set;
+  }, [modelsByProvider]);
+
 
   const noProvider = provider === null;
 
+  /**
+   * HAS THE READER SAID ANYTHING YET?
+   *
+   * The field is at ninety per cent until they do, and then it goes
+   * away, slowly, because a conversation is the one screen the field
+   * has to stop competing with.
+   *
+   * It is `rows` and not a flag, so starting a new chat puts the field
+   * back: an empty conversation is the field's screen, and a full one is
+   * not. And because the screen is not unmounted when the reader opens
+   * another one and comes back, the conversation is still on the screen
+   * when they return — and so is the decision about the field.
+   */
+  const hasMessages = rows.length > 0;
+
+  /*
+   * THE FIELD, WHILE THIS SCREEN IS THE ONE ON TOP.
+   *
+   * There is one field for the whole app now — see
+   * `src/components/GradientAsciiBackground.tsx` — so the tutor asks for
+   * it rather than owning it. The claim is given back when the reader
+   * moves to another screen, and the field goes back to being the app's
+   * background there.
+   */
+  useFieldLevel({ intensity: 0.9, dim: hasMessages });
+
   return (
-    <View style={[styles.root, { backgroundColor: theme.tokens.bg0 }]}>
-      <ScreenHeader title="Study partner" />
-      <View style={styles.shell}>
-        {/* ---- the header ----
-             The title is in the screen's own bar now, so what is left here
-             is the line under it and the tools. The tools used to sit in the
-             top-right corner, which is where the side menu's button is, so
-             they have moved down onto their own row. */}
-        <View style={styles.head}>
-          <View style={styles.headText}>
-            <Body style={styles.sub}>
-              It reads the same notes you do, so it can explain the part you are stuck on.
-            </Body>
-          </View>
-          <View style={styles.tools}>
+    <View style={styles.root}>
+      {/*
+       * THE HEADER.
+       *
+       * The tool buttons live IN the bar, on the right, where the screen's
+       * title used to be. The title went because the bar already says what
+       * this screen is — it is the tutor, and the tab it is on says so —
+       * and the tools are what the reader actually reaches for while they
+       * are mid-conversation.
+       *
+       * THE MODEL PICKER IS ONE OF THEM.
+       *
+       * It used to be a filled bar under the composer, which put the thing
+       * the reader picks least often in the place their thumb rests and
+       * the thing they are typing in the way. The model is a choice, and a
+       * choice belongs with the other choices — in the bar — while the
+       * name of what was chosen stays under the form as a footnote.
+       *
+       * The bar's right edge leaves room for the side menu's button, which
+       * floats in the top-right corner of the app. The tools stop short of
+       * it rather than sitting under it.
+       */}
+      <ScreenHeader
+        trailing={
+          <View style={styles.headerTools}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Chat history"
@@ -534,52 +658,46 @@ export default function TutorScreen(): React.JSX.Element {
             >
               <Icon name="trash" size={20} tone="danger" />
             </Pressable>
-          </View>
-        </View>
-
-        {/* ---- the model bar: which provider, and which model ---- */}
-        {noProvider ? (
-          <View style={[styles.providerBar, { borderColor: theme.tokens.line }]}>
-            <Text style={[styles.providerName, { color: theme.tokens.fgDim }]}>
-              No model provider yet.
-            </Text>
-            <Button
-              label="add one"
-              variant="ghost"
-              onPress={() => router.push("/settings/provider")}
-              style={styles.providerButton}
-            />
-          </View>
-        ) : (
-          <View style={[styles.providerBar, { borderColor: theme.tokens.line }]}>
-            <View style={styles.providerText}>
-              <Text style={[styles.providerName, { color: theme.tokens.fg }]} numberOfLines={1}>
-                {provider.name}
-              </Text>
-              <Text style={[styles.providerModel, { color: theme.tokens.fgDim }]} numberOfLines={1}>
-                {model.length > 0 ? model : "no model chosen"}
-              </Text>
-            </View>
-            <View style={styles.modelPicker}>
+            {/*
+             * THE MODEL PICKER.
+             *
+             * The sheet is the `Select`'s own — the trigger only says when
+             * to open it — so the list of models, the groups, the free
+             * filter and the tick all still live in one place.
+             */}
+            {provider !== null ? (
               <Select
-                value={model.length > 0 ? model : null}
-                options={modelOptions}
+                trigger={({ onPress }) => (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Choose the model"
+                    onPress={onPress}
+                    style={({ pressed }) => [styles.tool, { opacity: pressed ? 0.6 : 1 }]}
+                  >
+                    <Icon name="model" size={20} tone="muted" />
+                  </Pressable>
+                )}
+                value={
+                  provider !== null && model.length > 0
+                    ? modelValue(provider.id, model)
+                    : null
+                }
+                options={[]}
                 onChange={chooseModel}
-                placeholder="choose a model"
+                groups={modelGroups}
+                onGroupOpen={(group) => void loadProviderModels(group.id)}
                 filter={{
                   label: "Free only",
                   active: freeOnly,
                   onToggle: () => setFreeOnly((prev) => !prev),
-                  matches: (option) => {
-                    const found = models.find((m) => m.id === option.value);
-                    return found?.free === true;
-                  },
+                  matches: (option) => freeValues.has(option.value),
                 }}
               />
-            </View>
+            ) : null}
           </View>
-        )}
-
+        }
+      />
+      <View style={styles.shell}>
         {/* ---- the history pane ---- */}
         {paneOpen ? (
           <View style={[styles.pane, { borderColor: theme.tokens.line }]}>
@@ -618,41 +736,78 @@ export default function TutorScreen(): React.JSX.Element {
           {rows.length === 0 && !streaming ? (
             noProvider ? (
               <View style={styles.empty}>
-                <Text style={[styles.emptyLead, { color: theme.tokens.fg }]}>
-                  The study partner is a language model, so it needs a provider of your own.
-                </Text>
-                <Text style={[styles.emptySub, { color: theme.tokens.fgDim }]}>
-                  Add one under You → Study partner, with the key it gave you. The notes stay on
-                  this device: the model searches them for itself, and never keeps a copy.
-                </Text>
-                <View style={styles.emptyAction}>
-                  <Button label="add a provider" onPress={() => router.push("/settings/provider")} />
+                <View style={styles.emptyHead}>
+                  <Text style={[styles.emptyLead, { color: theme.tokens.fg }]}>
+                    The study partner is a language model, so it needs a provider of your own.
+                  </Text>
+                  <Text style={[styles.emptySub, { color: theme.tokens.fgDim }]}>
+                    Add one under You → Study partner. The notes stay on this device — the model
+                    searches them and never keeps a copy.
+                  </Text>
+                </View>
+                <View style={styles.emptyBody}>
+                  {/*
+                   * THE ONE THING TO DO HERE.
+                   *
+                   * The empty state has a single action, and it is the
+                   * point of the screen, so it is centred rather than
+                   * pushed against the gutter.
+                   */}
+                  <View style={styles.emptyAction}>
+                    <Button
+                      label="add a provider"
+                      onPress={() => router.push("/settings/provider")}
+                      style={styles.centred}
+                    />
+                  </View>
                 </View>
               </View>
             ) : (
               <View style={styles.empty}>
-                <Label>START HERE</Label>
-                <Text style={[styles.emptyLead, { color: theme.tokens.fg }]}>
-                  Pick one of these, or just ask.
-                </Text>
-                {STARTERS.map((s) => (
-                  <Pressable
-                    key={s}
-                    accessibilityRole="button"
-                    onPress={() => send(s)}
-                    style={({ pressed }) => [
-                      styles.starter,
-                      {
-                        borderColor: theme.tokens.line,
-                        backgroundColor: theme.tokens.surfaceRaised,
-                        opacity: pressed ? 0.7 : 1,
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.starterText, { color: theme.tokens.fgMuted }]}>{s}</Text>
-                    <Icon name="arrowUp" size={16} tone="accent" strokeWidth={2} />
-                  </Pressable>
-                ))}
+                {/*
+                 * THE HEADING, AT THE TOP.
+                 *
+                 * It is centred and it is the first thing on the screen,
+                 * because it is the label ON the three questions rather
+                 * than a paragraph in its own right. The questions
+                 * themselves sit in the middle of the screen — a blank
+                 * conversation with three suggestions pinned to the top
+                 * of it looks like the app ran out of room.
+                 */}
+                <View style={styles.emptyHead}>
+                  <Label>START HERE</Label>
+                  <Text style={[styles.emptyLead, { color: theme.tokens.fg }]}>
+                    Pick one of these, or just ask.
+                  </Text>
+                </View>
+                <View style={styles.emptyBody}>
+                  {STARTERS.map((s) => (
+                    <Pressable
+                      key={s}
+                      accessibilityRole="button"
+                      onPress={() => send(s)}
+                      style={({ pressed }) => [
+                        styles.starter,
+                        {
+                          borderColor: theme.tokens.line,
+                          /*
+                           * OPAQUE, like every other panel in the app.
+                           *
+                           * `surfaceRaised` is a two per cent white: over
+                           * the page it is a panel, and over the field it
+                           * is nothing at all, and the ASCII field came
+                           * straight through the three questions.
+                           */
+                          backgroundColor: theme.tokens.bg1,
+                          opacity: pressed ? 0.7 : 1,
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.starterText, { color: theme.tokens.fgMuted }]}>{s}</Text>
+                      <Icon name="arrowUp" size={16} tone="accent" strokeWidth={2} />
+                    </Pressable>
+                  ))}
+                </View>
               </View>
             )
           ) : null}
@@ -665,7 +820,7 @@ export default function TutorScreen(): React.JSX.Element {
                 row.role === "user" ? styles.bubbleUser : styles.bubblePartner,
                 {
                   backgroundColor:
-                    row.role === "user" ? theme.tokens.surfaceRaised : theme.tokens.bg1,
+                    row.role === "user" ? theme.tokens.bg2 : theme.tokens.bg1,
                   borderColor: theme.tokens.line,
                 },
               ]}
@@ -733,12 +888,36 @@ export default function TutorScreen(): React.JSX.Element {
             },
           ]}
         >
-          <View style={[styles.composerRow, { borderColor: theme.tokens.line }]}>
+          <View
+            style={[
+              styles.composerRow,
+              {
+                borderColor: theme.tokens.line,
+                /*
+                 * OPAQUE, like every other panel in the app.
+                 *
+                 * The composer is the one control the reader's thumb is
+                 * on, and it was the one control the field came through:
+                 * the row had a hairline and nothing behind it, so the
+                 * ASCII was under the text they were typing. It is a
+                 * panel now, and the send button is in it with it.
+                 */
+                backgroundColor: theme.tokens.bg1,
+              },
+            ]}
+          >
             <TextInput
               value={input}
               onChangeText={setInput}
-              placeholder="Ask about anything in the modules"
+              placeholder="What's on your mind?"
               placeholderTextColor={theme.tokens.fgDim}
+              /*
+               * THE TYPED TEXT.
+               *
+               * The composer is a panel, so the text is read against the
+               * panel and not against the field, and it is the palette's
+               * own foreground like every other piece of type in the app.
+               */
               style={[styles.input, { color: theme.tokens.fg }]}
               multiline
               onSubmitEditing={() => send(input)}
@@ -753,7 +932,7 @@ export default function TutorScreen(): React.JSX.Element {
                 style={({ pressed }) => [
                   styles.send,
                   {
-                    backgroundColor: theme.tokens.surfaceRaised,
+                    backgroundColor: theme.tokens.bg2,
                     opacity: pressed ? 0.7 : 1,
                   },
                 ]}
@@ -778,6 +957,39 @@ export default function TutorScreen(): React.JSX.Element {
               </Pressable>
             )}
           </View>
+
+          {/*
+           * THE MODEL, UNDER THE FORM.
+           *
+           * Just the name, just under the box the reader is typing in, and
+           * as small as the app says anything. It is an answer to a
+           * question the reader did not ask, so it is a footnote and not a
+           * control: the CONTROL — the thing that changes the model — is
+           * the icon in the bar.
+           *
+           * The name is the provider's own, exactly as its own
+           * `/v1/models` listed it, because that is the name the reader
+           * would have to type to ask for it somewhere else.
+           */}
+          <View style={styles.modelLine}>
+            {noProvider ? (
+              <>
+                <Text style={[styles.modelName, { color: theme.tokens.fgDim }]}>
+                  no model provider yet
+                </Text>
+                <Button
+                  label="add one"
+                  variant="ghost"
+                  onPress={() => router.push("/settings/provider")}
+                  style={styles.providerButton}
+                />
+              </>
+            ) : (
+              <Text style={[styles.modelName, { color: theme.tokens.fgDim }]} numberOfLines={1}>
+                {model.length > 0 ? model : "no model chosen"}
+              </Text>
+            )}
+          </View>
         </View>
       </View>
     </View>
@@ -791,31 +1003,16 @@ const styles = StyleSheet.create({
   shell: {
     flex: 1,
   },
-  head: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    paddingHorizontal: 18,
-    paddingBottom: 12,
-  },
-  headText: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  title: {
-    ...TYPE.title,
-  },
-  sub: {
-    ...TYPE.small,
-    marginTop: 4,
-  },
-  tools: {
+  /*
+   * THE TOOLS IN THE BAR.
+   *
+   * They sit on the right of the header, and the header's `trailing` slot
+   * is what puts them there and keeps them clear of the side menu's
+   * button — which floats in the top-right corner of the app.
+   */
+  headerTools: {
     flexDirection: "row",
     alignItems: "center",
-    /*
-     * The tools used to step aside to leave room for the side menu's button,
-     * which lived in the top-right corner. They are below the header now, so
-     * there is nothing to step aside for.
-     */
   },
   tool: {
     width: 40,
@@ -823,34 +1020,37 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  providerBar: {
+  /*
+   * THE MODEL BAR, UNDER THE FORM.
+   *
+   * It is a bar rather than a row of the composer's own, because it is
+   * the same object it was when it was at the top of the screen: the
+   * provider, the model, and the picker. What changed is where it lives.
+   *
+   * `marginTop` rather than `marginBottom`, because it now sits BELOW the
+   * form instead of above it.
+   */
+  /**
+   * THE MODEL'S NAME, UNDER THE FORM.
+   *
+   * A line of text and nothing else — no box, no edge, no fill. The
+   * control that changes the model is the icon in the bar, so what is
+   * left here is only the answer, and an answer does not need a frame
+   * around it.
+   */
+  modelLine: {
     flexDirection: "row",
     alignItems: "center",
-    marginHorizontal: 18,
-    marginBottom: 10,
-    paddingLeft: 14,
-    paddingRight: 8,
-    paddingVertical: 6,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: RADIUS.panel,
+    justifyContent: "center",
+    gap: 10,
+    marginTop: 6,
   },
-  providerText: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  providerName: {
-    ...TYPE.subheading,
-  },
-  providerModel: {
-    ...TYPE.small,
-    marginTop: 2,
+  modelName: {
+    ...TYPE.micro,
   },
   providerButton: {
     minHeight: 34,
     paddingVertical: 4,
-  },
-  modelPicker: {
-    width: 132,
   },
   pane: {
     marginHorizontal: 18,
@@ -873,24 +1073,73 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
   },
+  /**
+   * THE TRANSCRIPT'S CONTENT.
+   *
+   * `flexGrow: 1` so the content is at least as tall as the transcript
+   * when there is not much of it — which is what lets the empty state
+   * centre itself in the space rather than sitting at the top of it.
+   */
   bodyContent: {
+    flexGrow: 1,
     paddingHorizontal: 18,
     paddingBottom: 12,
   },
+  /**
+   * THE EMPTY STATE.
+   *
+   * Two parts: a HEAD at the top and a BODY that takes the rest. The
+   * head says what the screen is; the body holds the three default
+   * questions in the MIDDLE of the screen, not under the bar — an empty
+   * conversation with three suggestions pinned to the top of it looks
+   * like the app ran out of room.
+   */
   empty: {
+    flex: 1,
+  },
+  /**
+   * THE HEAD, AT THE TOP AND CENTRED.
+   *
+   * It is the label on the three questions below it, so it is centred
+   * over them and it is the first thing on the screen.
+   */
+  emptyHead: {
+    alignItems: "center",
     paddingTop: 12,
+    paddingHorizontal: 8,
+  },
+  emptyBody: {
+    flex: 1,
+    justifyContent: "center",
   },
   emptyLead: {
     ...TYPE.subheading,
     marginTop: 8,
+    textAlign: "center",
   },
   emptySub: {
     ...TYPE.small,
     marginTop: 8,
+    textAlign: "center",
   },
+  /**
+   * THE EMPTY STATE'S ONE ACTION.
+   *
+   * The wrapper has no `alignSelf`, so it takes the transcript's full
+   * width and the centring is against the transcript rather than
+   * against the button.
+   */
   emptyAction: {
-    marginTop: 16,
-    alignSelf: "flex-start",
+    marginTop: 18,
+  },
+  /**
+   * A BUTTON, CENTRED.
+   *
+   * A button brings its own `alignSelf`, and the default would put it
+   * against the left edge of whatever holds it.
+   */
+  centred: {
+    alignSelf: "center",
   },
   starter: {
     flexDirection: "row",

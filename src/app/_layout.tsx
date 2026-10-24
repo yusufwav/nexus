@@ -34,6 +34,7 @@ import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { enableFreeze } from "react-native-screens";
 import "react-native-reanimated";
 
 import { ThemeProvider, useTheme } from "@/theme/ThemeProvider";
@@ -42,6 +43,7 @@ import { seedLibrary } from "@/storage/library";
 import { AuthProvider, useAuth } from "@/auth/AuthProvider";
 import { SideMenuProvider } from "@/components/SideMenu";
 import { NativeWindowBackground } from "@/components/NativeWindowBackground";
+import { GradientAsciiBackground } from "@/components/GradientAsciiBackground";
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -54,6 +56,21 @@ export const unstable_settings = {
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+
+/**
+ * THE BLURRED SCREEN IS FROZEN, NOT JUST INVISIBLE.
+ *
+ * Every screen's root is transparent now, because the field is one WebView
+ * for the whole app and it is what is behind them. A screen that is merely
+ * hidden — the one below in a stack, the tab the reader has left — is still
+ * in the hierarchy, and on Android its text came through the transparent
+ * screen above it: two screens' words on top of each other.
+ *
+ * A frozen screen is taken out of the hierarchy entirely, which is what
+ * stops it, and its React state is kept, so the tutor's conversation is
+ * still on the screen when the reader comes back to it.
+ */
+enableFreeze();
 
 export default function RootLayout(): React.JSX.Element | null {
   const [loaded, fontError] = useFonts(FONT_ASSETS);
@@ -160,7 +177,15 @@ function AppFrame(): React.JSX.Element {
       dark,
       colors: {
         primary: theme.tokens.accentA,
-        background: theme.tokens.bg0,
+        /*
+         * TRANSPARENT, because the field is the page's background now.
+         *
+         * The navigator paints its own background behind the screens, and
+         * an opaque one is a lid over the field: the screens are
+         * transparent so the field shows through them, and this is the
+         * last opaque thing between the field and the reader.
+         */
+        background: "transparent",
         card: theme.tokens.bg1,
         text: theme.tokens.fg,
         border: theme.tokens.line,
@@ -174,49 +199,69 @@ function AppFrame(): React.JSX.Element {
   return (
     <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={dark ? "light" : "dark"} />
-      <AuthGate>
-        {/*
-         * THE SIDE MENU.
-         *
-         * It wraps the navigator rather than sitting beside it, because it
-         * is an ancestor of the app and that is what lets the edge swipe
-         * work: a touch is offered to the view that was actually pressed
-         * FIRST, and the app has already had its chance by the time the
-         * menu is asked — so a tap goes to the app, and a swipe from the
-         * right edge is claimed only once it is clearly a swipe.
-         *
-         * The drawer itself is drawn over the whole app, so it covers the
-         * tab bar that used to be here: the drawer is the app's navigation
-         * now. It stays off the login screen on its own, because the
-         * component knows whether there is a session.
-         */}
-        <SideMenuProvider>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: theme.tokens.bg0 },
-              /*
-               * THE STATUS BAR, DRAWN OVER THE PAGE.
-               *
-               * `statusBarTranslucent` makes the screen's content run UNDER
-               * the status bar instead of starting below it, and
-               * `statusBarBackgroundColor` gives the bar itself the page's
-               * colour.
-               *
-               * Together they are what stop the pale band: with the content
-               * inset, the strip the bar sits on belongs to the native
-               * window rather than to the app, and the window's own
-               * background is what the reader sees there.
-               */
-              statusBarTranslucent: true,
-              statusBarBackgroundColor: theme.tokens.bg0,
-            }}
-          >
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="login" options={{ animation: "fade" }} />
-          </Stack>
-        </SideMenuProvider>
-      </AuthGate>
+      {/*
+       * THE FIELD, AND THE APP UNDER IT.
+       *
+       * One WebView, above the navigator, painted once and never again: a
+       * background that reloads with every screen is not a background, it
+       * is a flash. The screens themselves are transparent, so this is
+       * what is behind them, except on **You** and **Provider**, which
+       * keep their own flat background.
+       */}
+      <View style={styles.root}>
+        <GradientAsciiBackground>
+          <AuthGate>
+            {/*
+             * THE SIDE MENU.
+             *
+             * It wraps the navigator rather than sitting beside it, because it
+             * is an ancestor of the app and that is what lets the edge swipe
+             * work: a touch is offered to the view that was actually pressed
+             * FIRST, and the app has already had its chance by the time the
+             * menu is asked — so a tap goes to the app, and a swipe from the
+             * right edge is claimed only once it is clearly a swipe.
+             *
+             * The drawer itself is drawn over the whole app, so it covers the
+             * tab bar that used to be here: the drawer is the app's navigation
+             * now. It stays off the login screen on its own, because the
+             * component knows whether there is a session.
+             */}
+            <SideMenuProvider>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  /*
+                   * THE SCREEN BELOW IS FROZEN, NOT DRAWN OVER.
+                   *
+                   * The screens are transparent, so a screen that is still
+                   * in the hierarchy shows through the one above it.
+                   */
+                  freezeOnBlur: true,
+                  contentStyle: { backgroundColor: "transparent" },
+                  /*
+                   * THE STATUS BAR, DRAWN OVER THE PAGE.
+                   *
+                   * `statusBarTranslucent` makes the screen's content run UNDER
+                   * the status bar instead of starting below it, and
+                   * `statusBarBackgroundColor` gives the bar itself the page's
+                   * colour.
+                   *
+                   * Together they are what stop the pale band: with the content
+                   * inset, the strip the bar sits on belongs to the native
+                   * window rather than to the app, and the window's own
+                   * background is what the reader sees there.
+                   */
+                  statusBarTranslucent: true,
+                  statusBarBackgroundColor: theme.tokens.bg0,
+                }}
+              >
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="login" options={{ animation: "fade" }} />
+              </Stack>
+            </SideMenuProvider>
+          </AuthGate>
+        </GradientAsciiBackground>
+      </View>
     </NavigationThemeProvider>
   );
 }

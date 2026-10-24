@@ -49,9 +49,11 @@ import {
   ArrowUp,
   ArrowUpRight,
   Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleUserRound,
+  Cpu,
   Eye,
   EyeOff,
   GitBranch,
@@ -100,6 +102,8 @@ export const ICONS = {
   chevronLeft: ChevronLeft,
   /** The chevron that says "this row opens something". */
   chevronRight: ChevronRight,
+  /** The chevron on a control that opens downwards. */
+  chevronDown: ChevronDown,
   /** The menu — three lines, and the way into the side menu. */
   menu: Menu,
   /** The cross that closes it. */
@@ -130,6 +134,8 @@ export const ICONS = {
   system: MonitorSmartphone,
   /** A model provider — somewhere the tutor's key is sent. */
   provider: Server,
+  /** The model the tutor is talking to — the chip behind the choice. */
+  model: Cpu,
 
   /* ---- sign-in providers ---- */
   /** Google. Lucide has no brand marks, so this is the globe it started as. */

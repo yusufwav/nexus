@@ -268,6 +268,10 @@ export default function HomeScreen(): React.JSX.Element {
 
   const onReadmeLayout = useCallback((event: LayoutChangeEvent) => {
     const height = event.nativeEvent.layout.height;
+    // A container that is collapsed measures ZERO, and zero is not its
+    // height — it is the height of the hole it left. Recording it would
+    // make the animation chase a target that is already gone.
+    if (height <= 0) return;
     const readmeHeight = readmeHeightRef.current;
     if (Math.abs(readmeHeight.get() - height) > 0.5) {
       readmeHeight.set(height);
@@ -288,13 +292,8 @@ export default function HomeScreen(): React.JSX.Element {
     overflow: "hidden",
   }));
 
-  const readmeInnerStyle = useAnimatedStyle(() => ({
-    height: readmeHeightRef.current.value * (1 - collapseRef.current.value),
-    overflow: "hidden",
-  }));
-
   return (
-    <View style={[styles.root, { backgroundColor: theme.tokens.bg0 }]}>
+    <View style={styles.root}>
       {/*
        * THE HEADER.
        *
@@ -325,17 +324,34 @@ export default function HomeScreen(): React.JSX.Element {
         }
       >
         {/* ---- The README container, dropping out of the header ----
-             THREE LAYERS, and each one is there for a reason:
-               · the OUTER view is the animated one — its height is what the
-                 collapse changes, so it is the box that shrinks;
-               · the MIDDLE view carries the same animated height, because
-                 `overflow: hidden` on the outer one does not reliably
-                 clip a child that has a height of its own;
-               · the INNER view is the one that is MEASURED, and it is not
-                 animated at all — measuring the outer one would measure
-                 the animation, and the container would never appear. */}
+             TWO LAYERS, and the second one is ABSOLUTE on purpose.
+
+             THE BUG THIS FIXES
+             ---------------
+             The outer view is the animated one: its height is what the
+             collapse changes, so it is the box that shrinks. The content
+             has to be measured to know what that height starts at — and
+             the content used to be a FLOW child of the box that was
+             measuring it.
+
+             That works on the web, where a block child is not sized by
+             its parent's height: the parent clips the overflow and the
+             child keeps its natural size, so the measurement is the
+             content's real height.
+
+             It does not work on Android. There, a parent with a height
+             of zero measures its child AT_MOST zero, so the child
+             measures zero, so the height it reports is zero, so the
+             parent stays zero. The container never appears at all, and
+             the collapse has nothing to collapse.
+
+             An ABSOLUTE child is measured with an UNSPECIFIED spec on
+             both platforms, so it is always measured at its natural
+             height whatever the parent's height is. The parent is still
+             the box that shrinks, and its `overflow: hidden` still
+             clips the content away as it shrinks. */}
         <Animated.View style={[styles.readme, readmeStyle]}>
-          <Animated.View style={readmeInnerStyle}>
+          <View style={styles.readmeInner}>
             <View onLayout={onReadmeLayout}>
               <TerminalPanel radius={README_RADIUS} strength="medium">
                 {/* The eyebrow is `fgDim`, which is a dim grey: on a very dark panel it is
@@ -350,38 +366,38 @@ export default function HomeScreen(): React.JSX.Element {
                 </Body>
               </TerminalPanel>
             </View>
-          </Animated.View>
+          </View>
         </Animated.View>
 
         {/*
          * THE ONE LINE UNDER THE HEADER.
          *
          * The greeting is in the header now, so what is left of the old
-         * identity strip is the one thing it said that the header does not:
-         * how much the reader has, in a single line. The "NEXUS" eyebrow
-         * went with the greeting — the header is the app's name, in the
-         * window's own bar, and repeating it under itself was noise.
+         * identity strip is the one thing it said that the header does not.
+         *
+         * It is only said when the reader owns NOTHING. The moment they
+         * own a module, the two stat tiles below say exactly this — how
+         * many modules and how many sections are in reach — so saying it
+         * here as well was the same fact twice, thirty points apart.
          */}
-        <Body style={[styles.stripSub, styles.onField]}>
-          {ownedModules.length === 0
-            ? "Pick a module and the notes come with it."
-            : `${ownedModules.length} module${ownedModules.length === 1 ? "" : "s"} open · ${sections} section${sections === 1 ? "" : "s"} in reach`}
-        </Body>
+        {ownedModules.length === 0 ? (
+          <Body style={styles.stripSub}>Pick a module and the notes come with it.</Body>
+        ) : null}
 
         {/* ---- The numbers ---- */}
         <View style={styles.stats}>
           <Stat
             label="modules owned"
             value={`${ownedModules.length}/${modules.length}`}
-            foot={ownedModules.length === 0 ? "browse the catalogue" : "in your account"}
+            foot={ownedModules.length === 0 ? "browse the catalogue" : undefined}
           />
           <Stat
-            label="sections in reach"
+            label="topics owned"
             value={String(sections)}
-            foot={ownedModules.length === 0 ? "buy a module to unlock" : "across what you own"}
+            foot={ownedModules.length === 0 ? "buy a module to unlock" : undefined}
           />
           <Stat
-            label="practice"
+            label="for practice"
             value={accuracy === null ? "—" : `${accuracy}%`}
             foot={
               attempts.right + attempts.wrong === 0
@@ -392,26 +408,19 @@ export default function HomeScreen(): React.JSX.Element {
           <Stat
             label="total spent"
             value={formatZar(spent)}
-            foot={purchaseCount === 0 ? "no purchases yet" : "lifetime, notes included"}
+            foot={purchaseCount === 0 ? "no purchases yet" : "lifetime"}
           />
         </View>
 
         {/* ---- Continue reading ---- */}
-        <Section
-          title="Continue reading"
-          subtitle="Pick up where you left off in a module you own."
-        >
+        <Section title="Continue reading">
           <Card>
             {resume === null ? (
-              <EmptyState
-                title="Nothing open"
-                body="Open a lesson and this becomes a one-tap way back into it."
-              />
+              <EmptyState title="Nothing open" body="Open a lesson to start one." />
             ) : (
               <ListRow
                 title={resume.title}
                 subtitle={`${resume.moduleCode} · Lesson ${resume.lessonN}`}
-                detail="Tap to pick up where you left off."
                 onPress={() =>
                   router.push({
                     pathname: "/lesson/[code]/[n]",
@@ -425,27 +434,19 @@ export default function HomeScreen(): React.JSX.Element {
         </Section>
 
         {/* ---- Your modules ---- */}
-        <Section
-          title="Your modules"
-          subtitle="Everything you have unlocked."
-          action={
-            <Button
-              label="open"
-              variant="ghost"
-              onPress={() => router.push("/modules")}
-            />
-          }
-        >
+        <Section title="Your modules">
           <Card>
             {ownedModules.length === 0 ? (
               <>
                 <Card.Content>
-                  <Body>
-                    You have not bought anything yet. The catalogue is one tap away.
-                  </Body>
+                  <Body>You have not bought anything yet.</Body>
                 </Card.Content>
-                <Card.Footer>
-                  <Button label="open the catalogue" onPress={() => router.push("/modules")} />
+                <Card.Footer column>
+                  <Button
+                    label="open the catalogue"
+                    onPress={() => router.push("/modules")}
+                    style={styles.centred}
+                  />
                 </Card.Footer>
               </>
             ) : (
@@ -466,17 +467,14 @@ export default function HomeScreen(): React.JSX.Element {
 
         {/* ---- Weak spots ---- */}
         {weak.length > 0 ? (
-          <Section
-            title="Weak spots"
-            subtitle="Which modules you keep getting wrong, worst first."
-          >
+          <Section title="Weak spots">
             <Card>
               {weak.map((w) => (
                 <ListRow
                   key={w.moduleCode}
                   title={w.moduleCode}
                   subtitle={subjectOf(w.moduleCode)}
-                  detail={`${w.wrong} wrong — worth a second look`}
+                  detail={`${w.wrong} wrong`}
                   onPress={() => router.push("/practice")}
                 />
               ))}
@@ -485,10 +483,7 @@ export default function HomeScreen(): React.JSX.Element {
         ) : null}
 
         {/* ---- What is not built yet ---- */}
-        <Section
-          title="Not built yet"
-          subtitle="Honest list of what the app does not do yet."
-        >
+        <Section title="Not built yet">
           <Card>
             {[
               "Spaced revision cards",
@@ -496,7 +491,7 @@ export default function HomeScreen(): React.JSX.Element {
               "Annotations on the notes",
               "Offline PDF bundles",
             ].map((item) => (
-              <ListRow key={item} title={item} detail="planned, not shipped" />
+              <ListRow key={item} title={item} />
             ))}
           </Card>
         </Section>
@@ -529,10 +524,27 @@ const styles = StyleSheet.create({
    * It sits under the header, and the header's background runs up into the
    * status bar — so the container drops out of the header rather than
    * floating on the page.
+   *
+   * The space BELOW it is the next block's business: the one line and the
+   * stat grid each carry their own `marginTop`, so the gap between two
+   * blocks is one number and not the sum of two.
    */
   readme: {
     marginTop: 14,
-    marginBottom: 14,
+  },
+  /**
+   * THE CONTENT, ABSOLUTE.
+   *
+   * It is out of the flow so that the box that animates cannot size it.
+   * An absolute child is measured at its natural height on every
+   * platform, so the height the collapse starts from is the content's
+   * own height and not the height of the hole it left.
+   */
+  readmeInner: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
   },
   readmeEyebrow: {
     ...TYPE.label,
@@ -553,28 +565,33 @@ const styles = StyleSheet.create({
    */
   stripSub: {
     ...TYPE.small,
-    marginBottom: 18,
+    marginTop: 18,
   },
-  /*
-   * TEXT THAT SITS DIRECTLY ON THE FIELD.
-   *
-   * The identity block is the one piece of the home screen that is not
-   * inside a panel, so it is the one piece of type that has to be
-   * readable over a live ASCII gradient. A soft shadow does that without
-   * putting a box around it, and a box around it would be a rectangle
-   * inside the rectangle the README container already is.
-   */
-  onField: {
-    textShadowColor: "rgba(0, 0, 0, 0.85)",
-    textShadowRadius: 10,
-    textShadowOffset: { width: 0, height: 1 },
-  },
+  /*
+   * THE GRID OF NUMBERS.
+   *
+   * `gap` and not a margin on the tiles: one number spaces the tiles in
+   * BOTH directions, so the row and the column are the same distance
+   * apart. A margin can only ever space them one way.
+   */
   stats: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: 20,
+    gap: 10,
+    marginTop: 18,
   },
   cardAction: {
     marginTop: 16,
+  },
+  /**
+   * A BUTTON, CENTRED.
+   *
+   * A card whose only button is that card's whole point centres it
+   * rather than letting it hug the left gutter, where it reads as a
+   * caption to whatever is above it. A button brings its own
+   * `alignSelf`, and the default would put it against the left edge.
+   */
+  centred: {
+    alignSelf: "center",
   },
 });

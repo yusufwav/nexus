@@ -30,11 +30,7 @@
  */
 import { Tabs } from "expo-router";
 
-import { useActiveTheme } from "@/theme/ThemeProvider";
-
 export default function TabLayout(): React.JSX.Element {
-  const theme = useActiveTheme();
-
   return (
     <Tabs
       /**
@@ -45,10 +41,28 @@ export default function TabLayout(): React.JSX.Element {
        * field they were typing in. The drawer replaces it.
        */
       tabBar={() => null}
+      /**
+       * FREEZE THE TAB THE READER IS NOT ON.
+       *
+       * The screens are transparent, so a tab that is still in the
+       * hierarchy draws its words over the tab that is on top of it. A
+       * frozen tab is out of the hierarchy, and its state is kept, so the
+       * tutor's conversation is still on the screen when the reader
+       * comes back to it. `enableFreeze()` is called in the root layout.
+       */
       screenOptions={{
         headerShown: false,
+        freezeOnBlur: true,
+        /*
+         * TRANSPARENT, because the field is the page's background.
+         *
+         * The field is one WebView for the whole app, above the
+         * navigator, and every screen is transparent so it shows
+         * through them. This is the tab scene's own background, and an
+         * opaque one is a lid over the field.
+         */
         sceneStyle: {
-          backgroundColor: theme.tokens.bg0,
+          backgroundColor: "transparent",
         },
       }}
     >

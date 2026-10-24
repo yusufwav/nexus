@@ -140,7 +140,7 @@ export function Chip({
   return (
     <PressableFeedback
       onPress={onPress}
-      highlight={s.foreground}
+      highlight={s.pressWash}
       accessibilityLabel={accessibilityLabel ?? label}
       accessibilityState={{ selected }}
       style={shell}

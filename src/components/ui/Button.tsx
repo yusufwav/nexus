@@ -187,19 +187,18 @@ export function Button({
   /*
    * THE PRESS HIGHLIGHT.
    *
-   * The wash that lays over the control while it is held down. On a filled
-   * control it is the foreground colour, so the fill brightens; on an
-   * outline or a ghost it is the foreground at a low opacity, so the
-   * surface darkens under the finger. Either way it is the SAME colour
-   * doing the same job, which is what makes a press feel like the
-   * surface is responding rather than like a colour is changing.
+   * The wash that lays over the control while it is held down.
+   *
+   * On the black and white palettes it is the PAGE'S OWN COLOUR, so a
+   * pressed control recedes into the page rather than lighting up. On
+   * the colourful ones it is the ink of the fill. Both are decided in
+   * the semantic layer, because a component that picked the wash
+   * itself would have to know which palettes are which.
    */
   const highlight =
     resolved === "primary" || resolved === "danger"
-      ? s.accentForeground
-      : resolved === "secondary" || resolved === "tertiary"
-        ? s.foreground
-        : s.foreground;
+      ? s.pressWashAccent
+      : s.pressWash;
 
   const content =
     children ?? (

@@ -106,6 +106,21 @@ export const TYPE = {
     letterSpacing: 1.4,
     textTransform: "uppercase",
   },
+  /**
+   * The smallest thing the app says.
+   *
+   * A footnote to a control rather than a label on one — the model the
+   * tutor is talking to, under the composer. Eight points is BELOW the
+   * label size on purpose: it is the answer to a question the reader did
+   * not ask, and it should read as an annotation rather than as something
+   * to read.
+   */
+  micro: {
+    fontFamily: FONT.medium,
+    fontSize: 8,
+    lineHeight: 12,
+    letterSpacing: 0.2,
+  },
   /** A code-ish run, a course code, a path. */
   code: {
     fontFamily: FONT.medium,

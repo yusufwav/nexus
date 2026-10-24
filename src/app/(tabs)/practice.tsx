@@ -65,7 +65,7 @@ export default function PracticeScreen(): React.JSX.Element {
       : Math.round((attempts.right / (attempts.right + attempts.wrong)) * 100);
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.tokens.bg0 }]}>
+    <View style={styles.root}>
       <ScreenHeader title="Practice" />
       <ScrollView
         contentContainerStyle={[
@@ -74,25 +74,23 @@ export default function PracticeScreen(): React.JSX.Element {
         ]}
       >
         <Title style={styles.title}>One question at a time</Title>
-        <Body style={styles.lead}>
-          Every option is explained, right or wrong — the wrong ones are the useful ones.
-        </Body>
+        <Body style={styles.lead}>Every answer is explained, right or wrong.</Body>
 
         <View style={styles.stats}>
           <Stat
             label="answered"
             value={String(attempts.right + attempts.wrong)}
-            foot={attempts.right + attempts.wrong === 0 ? "nothing yet" : "questions marked"}
+            foot={attempts.right + attempts.wrong === 0 ? "nothing yet" : undefined}
           />
           <Stat
             label="accuracy"
             value={accuracy === null ? "—" : `${accuracy}%`}
-            foot={attempts.wrong === 0 ? "nothing to look at" : `${attempts.wrong} to look at`}
+            foot={attempts.wrong === 0 ? "no misses" : `${attempts.wrong} to look at`}
           />
         </View>
 
         {weak.length > 0 ? (
-          <Section title="Worth a second look" subtitle="Where you keep getting it wrong.">
+          <Section title="Worth a second look">
             <Card>
               {weak.map((w) => (
                 <View key={w.moduleCode} style={styles.weakRow}>
@@ -108,32 +106,51 @@ export default function PracticeScreen(): React.JSX.Element {
           </Section>
         ) : null}
 
-        <Section title="Choose a module" subtitle="Questions arrive one at a time, and you are told why each answer is right or wrong.">
+        <Section title="Choose a module">
           {available.length === 0 ? (
             <EmptyState
               title="No questions yet"
-              body="Practice questions arrive with your module as they are written. The catalogue is one tap away."
+              body="Practice questions arrive with your module. The catalogue is one tap away."
             />
           ) : (
             available.map((m) => (
-              <View key={m.code} style={styles.moduleCard}>
-                <View style={styles.moduleHead}>
+              /*
+               * A CARD, LIKE EVERY OTHER BLOCK ON THE SCREEN.
+               *
+               * These used to be bare views, so their text sat on the
+               * screen's gutter with nothing around it while every other
+               * section on the app was a card. They are cards now, and the
+               * space between them is the same space the other lists use.
+               *
+               * THE START BUTTON IS ON THE NAME'S LINE.
+               *
+               * The button acts on this module, so it belongs on the line
+               * that names it, at the trailing edge — and the count of
+               * quizzes, which is about the module rather than about the
+               * action, sits under the name.
+               */
+              <Card key={m.code} style={styles.moduleCard}>
+                <Card.Header>
                   <Num style={[styles.code, { color: theme.tokens.accentA }]}>{m.code}</Num>
+                </Card.Header>
+
+                <Card.Content>
+                  <View style={styles.moduleRow}>
+                    <Text style={[styles.name, { color: theme.tokens.fg }]}>{m.name}</Text>
+                    <Button
+                      label="start"
+                      tone={owned.has(m.code) ? "primary" : "ghost"}
+                      onPress={() =>
+                        router.push({ pathname: "/practice/[code]", params: { code: m.code } })
+                      }
+                      style={styles.start}
+                    />
+                  </View>
                   <Num style={[styles.count, { color: theme.tokens.fgDim }]}>
-                    {m.count} question{m.count === 1 ? "" : "s"}
+                    {m.count} quiz{m.count === 1 ? "" : "zes"}
                   </Num>
-                </View>
-                <Text style={[styles.name, { color: theme.tokens.fg }]}>{m.name}</Text>
-                <View style={styles.moduleAction}>
-                  <Button
-                    label="start"
-                    tone={owned.has(m.code) ? "primary" : "ghost"}
-                    onPress={() =>
-                      router.push({ pathname: "/practice/[code]", params: { code: m.code } })
-                    }
-                  />
-                </View>
-              </View>
+                </Card.Content>
+              </Card>
             ))
           )}
         </Section>
@@ -156,10 +173,17 @@ const styles = StyleSheet.create({
   lead: {
     marginTop: 8,
   },
+  /*
+   * THE GRID OF NUMBERS.
+   *
+   * `gap` rather than a margin on the tiles, so the row and the column
+   * are the same distance apart.
+   */
   stats: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: 20,
+    gap: 10,
+    marginTop: 18,
   },
   weakRow: {
     flexDirection: "row",
@@ -177,10 +201,17 @@ const styles = StyleSheet.create({
   moduleCard: {
     marginBottom: 12,
   },
-  moduleHead: {
+  /**
+   * THE NAME AND THE BUTTON, ON ONE LINE.
+   *
+   * The button acts on the module, so it sits on the line that names it,
+   * at the trailing edge. The name takes the room and the button takes
+   * what it needs.
+   */
+  moduleRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    gap: 12,
   },
   code: {
     ...TYPE.code,
@@ -188,13 +219,20 @@ const styles = StyleSheet.create({
   },
   count: {
     ...TYPE.small,
+    marginTop: 4,
   },
   name: {
     ...TYPE.subheading,
-    marginTop: 6,
+    flex: 1,
   },
-  moduleAction: {
-    marginTop: 12,
-    alignSelf: "flex-start",
+  /**
+   * The start button, at the trailing edge of the name's line.
+   *
+   * `alignSelf: "center"` rather than "flex-start" because the button
+   * brings its own default — and in a ROW that default would put it at
+   * the TOP of the line rather than in the middle of it.
+   */
+  start: {
+    alignSelf: "center",
   },
 });

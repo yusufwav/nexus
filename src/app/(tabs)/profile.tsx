@@ -145,27 +145,33 @@ export default function ProfileScreen(): React.JSX.Element {
       >
         <Body style={styles.lead}>
           {offline
-            ? "Running offline. Your session is cached on this device, and everything in the app works."
-            : "Signed in to your Nexus account. The notes, the practice bank and the study partner all work with the data off."}
+            ? "Running offline. Your session is cached on this device."
+            : "Signed in. The notes, the practice bank and the study partner work with the data off."}
         </Body>
 
-        <Section
-          title="Your account"
-          subtitle="A real account on the Nexus server. The session token lives in this device's encrypted keychain."
-        >
+        <Section title="Your account" subtitle="The session token lives in this device's keychain.">
           <Card>
-            <Card.Header>
-              <Avatar name={session?.user.name ?? "?"} size="sm" />
-            </Card.Header>
-
             <Card.Content>
               <ListRow title="Email" subtitle={session?.user.email ?? "not signed in"} />
-              <ListRow title="Name" subtitle={session?.user.name ?? "—"} />
+              {/*
+               * THE NAME, AND THE FACE.
+               *
+               * The picture belongs beside the name it is a picture OF —
+               * at the trailing edge of the row, where the eye finishes
+               * a row. It was a header of its own, which put the face
+               * above the name and made the card a portrait with a
+               * settings list under it.
+               */}
+              <ListRow
+                title="Name"
+                subtitle={session?.user.name ?? "—"}
+                trailing={<Avatar name={session?.user.name ?? "?"} size="sm" />}
+              />
               <ListRow
                 title="Email verified"
                 subtitle={
                   session?.user.emailVerified === true
-                    ? "confirmed — the whole account is unlocked"
+                    ? "confirmed"
                     : "not confirmed yet. Some things stay locked until it is."
                 }
                 badge={
@@ -197,8 +203,8 @@ export default function ProfileScreen(): React.JSX.Element {
               </TextField>
             </Card.Content>
 
-            <Card.Footer>
-              <Button label="save" onPress={() => void saveName()} />
+            <Card.Footer column>
+              <Button label="save" fullWidth onPress={() => void saveName()} />
             </Card.Footer>
           </Card>
         </Section>
@@ -208,7 +214,15 @@ export default function ProfileScreen(): React.JSX.Element {
           subtitle="Signing out locks every screen in the app, and you will need a connection to sign back in."
         >
           <Card>
-            <Card.Footer column>
+            {/*
+             * A CARD WHOSE ONLY CONTENT IS ITS FOOTER.
+             *
+             * The footer's own top margin and its separator are what
+             * separate a footer from the body above it. With no body
+             * above it they are dead space and a stray line across an
+             * otherwise empty card, so they come off.
+             */}
+            <Card.Footer column style={styles.footerOnly}>
               <Button
                 label="sign out"
                 variant="danger-soft"
@@ -219,10 +233,7 @@ export default function ProfileScreen(): React.JSX.Element {
           </Card>
         </Section>
 
-        <Section
-          title="Study partner"
-          subtitle="The tutor is a language model, and it needs a provider of your own."
-        >
+        <Section title="Study partner">
           <Card>
             <ListRow
               title="Model provider"
@@ -232,16 +243,14 @@ export default function ProfileScreen(): React.JSX.Element {
                   : `${providerCount} provider${providerCount === 1 ? "" : "s"}`
               }
               detail={
-                providerCount === 0
-                  ? "Add one with the key it gave you."
-                  : "Which provider, and which model."
+                providerCount === 0 ? "Add one with the key it gave you." : undefined
               }
               onPress={() => router.push("/settings/provider")}
             />
           </Card>
         </Section>
 
-        <Section title="Appearance" subtitle="Fifty-two palettes, all of them offline.">
+        <Section title="Appearance">
           <Card>
             <ListRow
               title="Theme"
@@ -253,7 +262,7 @@ export default function ProfileScreen(): React.JSX.Element {
               <View style={styles.switchText}>
                 <Text style={[styles.switchTitle, { color: theme.tokens.fg }]}>Reduced motion</Text>
                 <Text style={[styles.switchSub, { color: theme.tokens.fgDim }]}>
-                  Freezes the animated backgrounds.
+                  Calms the side menu&apos;s slide.
                 </Text>
               </View>
               <Switch
@@ -265,7 +274,6 @@ export default function ProfileScreen(): React.JSX.Element {
             </View>
             <ListRow
               title="Match the system"
-              subtitle="Follow the operating system's light or dark setting"
               onPress={() => setThemeId(themeId === "system" ? "dark" : "system")}
               trailing={
                 <Text style={[styles.state, { color: theme.tokens.accentA }]}>
@@ -276,7 +284,7 @@ export default function ProfileScreen(): React.JSX.Element {
           </Card>
         </Section>
 
-        <Section title="Your modules" subtitle="Everything you have unlocked.">
+        <Section title="Your modules">
           <Card>
             {owned.length === 0 ? (
               <EmptyState
@@ -319,7 +327,7 @@ export default function ProfileScreen(): React.JSX.Element {
           </Card>
         </Section>
 
-        <Section title="On this device" subtitle="Everything the app stores, and how to clear it.">
+        <Section title="On this device">
           <Card>
             <ListRow title="Local database" detail={`${Math.max(1, Math.round(size / 1024))} KB of notes, attempts and history`} />
             <ListRow title="Attempts" detail="Every question you have answered" />
@@ -328,20 +336,21 @@ export default function ProfileScreen(): React.JSX.Element {
               <Button
               label="clear local data"
               variant="danger"
+              fullWidth
               onPress={() => setConfirmingWipe(true)}
             />
             </View>
           </Card>
         </Section>
 
-        <Section title="Support" subtitle="Built by a first-year CS student at NMU.">
+        <Section title="Support">
           <Card>
             <Body>
               The notes are written by hand and the questions are marked by a fixed rule, not by a
               model — so the same question always gets the same answer.
             </Body>
             <View style={styles.action}>
-              <Button label="about this app" variant="outline" onPress={() => router.push("/settings/about")} />
+              <Button label="about this app" variant="outline" fullWidth onPress={() => router.push("/settings/about")} />
             </View>
           </Card>
         </Section>
@@ -412,9 +421,28 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     minHeight: 48,
   },
+  /**
+   * A CARD'S ONE ACTION.
+   *
+   * The wrapper has no `alignSelf`, so it takes the card's full width and
+   * the button inside it fills that width — which is what makes every
+   * button on this screen the same size as the sign-out one.
+   */
   action: {
-    marginTop: 10,
-    alignSelf: "flex-start",
+    marginTop: 18,
+  },
+  /**
+   * A FOOTER WITH NOTHING ABOVE IT.
+   *
+   * The footer's top margin, its top padding and its separator are there
+   * to set a footer apart from a body. A card whose only content is the
+   * footer has no body, so all three are dead space — and the separator
+   * draws a line across an otherwise empty card.
+   */
+  footerOnly: {
+    marginTop: 0,
+    paddingTop: 0,
+    borderTopWidth: 0,
   },
   signOut: {
     alignSelf: "stretch",

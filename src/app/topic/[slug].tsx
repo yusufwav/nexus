@@ -72,7 +72,7 @@ export default function TopicScreen(): React.JSX.Element {
 
   if (topic === null) {
     return (
-      <View style={[styles.root, { backgroundColor: theme.tokens.bg0 }]}>
+      <View style={styles.root}>
         <ScreenHeader />
         <View style={[styles.content, { paddingTop: 12 }]}>
           <EmptyState title="No such topic" body="This note is not in the catalogue." />
@@ -123,11 +123,12 @@ export default function TopicScreen(): React.JSX.Element {
               onPress={() =>
                 router.push({ pathname: "/practice/[code]", params: { code: module } })
               }
+              style={styles.centred}
             />
           </View>
         ) : null}
 
-        <Section title="Where this is covered" subtitle="The lessons that carry this topic.">
+        <Section title="Where this is covered">
           <Card>
             {lessons.length === 0 ? (
               <Body>This module is announced but not written yet.</Body>
@@ -151,7 +152,7 @@ export default function TopicScreen(): React.JSX.Element {
         </Section>
 
         {lessons.length > 0 ? (
-          <Section title="In short" subtitle="The lesson that covers it, in its own words.">
+          <Section title="In short">
             <Card>
               {lessons.slice(0, 2).map((lesson) => (
                 <View key={lesson.n} style={styles.excerpt}>
@@ -205,18 +206,30 @@ const styles = StyleSheet.create({
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 14,
+    marginTop: 18,
   },
   meta: {
     ...TYPE.small,
     marginRight: 16,
   },
+  /**
+   * THE PRACTISE BUTTON, CENTRED.
+   *
+   * It is the one thing this screen is for, so it sits in the middle of
+   * the screen rather than against the gutter. The block takes the full
+   * width and the button's own `alignSelf` is overridden — `fullWidth`
+   * asks for "stretch", and a stretched button is the width of the
+   * screen rather than the width of the thing it says.
+   */
   cta: {
     marginTop: 18,
-    alignSelf: "flex-start",
+    alignItems: "center",
+  },
+  centred: {
+    alignSelf: "center",
   },
   excerpt: {
-    marginBottom: 16,
+    marginBottom: 18,
   },
   excerptTitle: {
     ...TYPE.subheading,
@@ -224,6 +237,6 @@ const styles = StyleSheet.create({
   },
   foot: {
     ...TYPE.small,
-    marginTop: 22,
+    marginTop: 26,
   },
 });

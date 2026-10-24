@@ -31,6 +31,7 @@
 import { useMemo } from "react";
 
 import { useActiveTheme } from "@/theme/ThemeProvider";
+import { themeGroup } from "@/theme/themes";
 import { inkFor, withAlpha } from "@/lib/palette-colours";
 
 export type Semantic = {
@@ -87,6 +88,16 @@ export type Semantic = {
   readonly fieldForeground: string;
   readonly fieldPlaceholder: string;
   readonly fieldBorder: string;
+
+  /* press feedback */
+  /**
+   * The wash a press lays over a control that is NOT filled with the accent.
+   */
+  readonly pressWash: string;
+  /**
+   * The wash a press lays over a control that IS filled with the accent.
+   */
+  readonly pressWashAccent: string;
 };
 
 /**
@@ -101,58 +112,90 @@ export function useSemantic(): Semantic {
   const t = theme.tokens;
 
   return useMemo<Semantic>(
-    () => ({
-      accent: t.accentA,
-      // The ink on an accent fill, CHOSEN against the fill rather than
-      // inherited from the page — see `inkFor`. The app's accents are
-      // designed to be fills, and some of them are nearly black.
-      accentForeground: inkFor(t.accentA),
-      accentSoft: withAlpha(t.accentA, 0.15),
-      accentSoftForeground: t.accentA,
-      accentHover: withAlpha(t.fg, 0.12),
+    () => {
+      /*
+       * THE PRESS WASH.
+       *
+       * The wash that lays over a control while it is held down, and the
+       * one place the rule for it is decided.
+       *
+       * On the two MONOCHROME groups — the black ones and the white ones —
+       * the wash is the PAGE'S OWN COLOUR at thirty percent: a black
+       * page's button goes black when it is pressed and a white page's
+       * button goes white. So the control does not change colour when it
+       * is pressed, it RECEDES INTO THE PAGE, and the press reads as a
+       * surface being pushed rather than as a light being switched on.
+       *
+       * The thirty percent is the whole of it. At full strength a black
+       * wash over a black button is a hole, and a white wash over a white
+       * one is a hole the other way; at thirty it is a shading, which is
+       * what a press should look like.
+       *
+       * The COLOURFUL palettes are the ones whose background has
+       * brightened into a colour of its own, and they keep the wash they
+       * had: the ink of the fill. Their page is a colour, so a
+       * page-coloured wash on them would be a colour on a colour.
+       */
+      const group = themeGroup(theme);
+      const monochrome = group === "dark" || group === "light";
+      const pageWash = withAlpha(t.bg0, 0.3);
 
-      default: t.bg2,
-      defaultForeground: t.fg,
-      defaultHover: withAlpha(t.fg, 0.08),
+      return {
+        accent: t.accentA,
+        // The ink on an accent fill, CHOSEN against the fill rather than
+        // inherited from the page — see `inkFor`. The app's accents are
+        // designed to be fills, and some of them are nearly black.
+        accentForeground: inkFor(t.accentA),
+        accentSoft: withAlpha(t.accentA, 0.15),
+        accentSoftForeground: t.accentA,
+        accentHover: withAlpha(t.fg, 0.12),
 
-      surface: t.bg1,
-      surfaceSecondary: t.bg2,
-      surfaceTertiary: t.surfaceRaised,
-      overlay: t.bg1,
-      backdrop: "rgba(0, 0, 0, 0.55)",
+        default: t.bg2,
+        defaultForeground: t.fg,
+        defaultHover: withAlpha(t.fg, 0.08),
 
-      foreground: t.fg,
-      muted: t.fgMuted,
-      dim: t.fgDim,
-      link: t.accentA,
+        surface: t.bg1,
+        surfaceSecondary: t.bg2,
+        surfaceTertiary: t.surfaceRaised,
+        overlay: t.bg1,
+        backdrop: "rgba(0, 0, 0, 0.55)",
 
-      success: t.ok,
-      successSoft: withAlpha(t.ok, 0.15),
-      successSoftForeground: t.ok,
-      successHover: withAlpha(t.fg, 0.12),
+        foreground: t.fg,
+        muted: t.fgMuted,
+        dim: t.fgDim,
+        link: t.accentA,
 
-      warning: t.warn,
-      warningSoft: withAlpha(t.warn, 0.15),
-      warningSoftForeground: t.warn,
-      warningHover: withAlpha(t.fg, 0.12),
+        success: t.ok,
+        successSoft: withAlpha(t.ok, 0.15),
+        successSoftForeground: t.ok,
+        successHover: withAlpha(t.fg, 0.12),
 
-      danger: t.danger,
-      // The ink on a danger fill, chosen against the fill — the same
-      // reasoning as the accent's ink.
-      dangerForeground: inkFor(t.danger),
-      dangerSoft: withAlpha(t.danger, 0.15),
-      dangerSoftForeground: t.danger,
-      dangerHover: withAlpha(t.fg, 0.12),
+        warning: t.warn,
+        warningSoft: withAlpha(t.warn, 0.15),
+        warningSoftForeground: t.warn,
+        warningHover: withAlpha(t.fg, 0.12),
 
-      border: t.line,
-      separator: t.lineSoft,
-      focus: t.accentA,
+        danger: t.danger,
+        // The ink on a danger fill, chosen against the fill — the same
+        // reasoning as the accent's ink.
+        dangerForeground: inkFor(t.danger),
+        dangerSoft: withAlpha(t.danger, 0.15),
+        dangerSoftForeground: t.danger,
+        dangerHover: withAlpha(t.fg, 0.12),
 
-      field: t.surfaceRaised,
-      fieldForeground: t.fg,
-      fieldPlaceholder: t.fgDim,
-      fieldBorder: t.line,
-    }),
-    [t],
+        border: t.line,
+        separator: t.lineSoft,
+        focus: t.accentA,
+
+        field: t.surfaceRaised,
+        fieldForeground: t.fg,
+        fieldPlaceholder: t.fgDim,
+        fieldBorder: t.line,
+
+        pressWash: monochrome ? pageWash : t.fg,
+        pressWashAccent: monochrome ? pageWash : inkFor(t.accentA),
+      };
+    },
+    [t, theme],
   );
 }

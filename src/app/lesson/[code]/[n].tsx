@@ -62,7 +62,7 @@ export default function LessonScreen(): React.JSX.Element {
 
   if (lesson === null) {
     return (
-      <View style={[styles.root, { backgroundColor: theme.tokens.bg0 }]}>
+      <View style={styles.root}>
         <ScreenHeader />
         <View style={[styles.content, { paddingTop: 12 }]}>
           <Body>Loading…</Body>
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   body: {
-    marginTop: 16,
+    marginTop: 18,
   },
   points: {
     marginTop: 18,
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     ...TYPE.mono,
   },
   actions: {
-    marginTop: 24,
+    marginTop: 26,
   },
   pager: {
     flexDirection: "row",

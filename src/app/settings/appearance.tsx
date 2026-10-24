@@ -45,7 +45,7 @@ export default function AppearanceScreen(): React.JSX.Element {
   }, []);
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.tokens.bg0 }]}>
+    <View style={styles.root}>
       <ScreenHeader title="Appearance" />
       <ScrollView
         contentContainerStyle={[
@@ -66,8 +66,7 @@ export default function AppearanceScreen(): React.JSX.Element {
 
         <Title style={styles.title}>{THEME_LIST.length} palettes</Title>
         <Body style={styles.lead}>
-          Every palette is a set of colours the four background fields read from, so the scenes
-          change with the theme rather than fighting it.
+          Every surface in the app reads from the palette you pick.
         </Body>
 
         <Pressable
@@ -87,9 +86,6 @@ export default function AppearanceScreen(): React.JSX.Element {
           </View>
           <View style={styles.systemText}>
             <Text style={[styles.systemTitle, { color: theme.tokens.fg }]}>Match system</Text>
-            <Text style={[styles.systemSub, { color: theme.tokens.fgDim }]}>
-              Follow your operating system&apos;s setting
-            </Text>
           </View>
         </Pressable>
 
@@ -216,7 +212,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: RADIUS.panel,
     padding: 14,
-    marginTop: 20,
+    marginTop: 18,
   },
   systemGlyph: {
     width: 30,
@@ -227,17 +223,23 @@ const styles = StyleSheet.create({
   systemTitle: {
     ...TYPE.subheading,
   },
-  systemSub: {
-    fontSize: 12,
-    marginTop: 2,
-  },
   group: {
-    marginTop: 24,
+    marginTop: 26,
   },
   groupLabel: {
     ...TYPE.label,
-    marginBottom: 12,
+    marginBottom: 10,
   },
+  /*
+   * THE GRID OF SWATCHES.
+   *
+   * The negative margin cancels the swatches' own horizontal padding, so
+   * the first and last swatch sit flush with the gutter while the gap
+   * BETWEEN them is the padding added together — ten.
+   *
+   * The row gap is the same ten, so the grid is square: the space down
+   * the columns is the space across the rows.
+   */
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -246,7 +248,7 @@ const styles = StyleSheet.create({
   swatch: {
     width: "33.33%",
     paddingHorizontal: 5,
-    paddingBottom: 12,
+    paddingBottom: 10,
   },
   /**
    * The bar of three colours.

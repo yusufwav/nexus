@@ -198,9 +198,7 @@ export default function LoginScreen(): React.JSX.Element {
   ]);
 
   const pressProvider = useCallback((label: string) => {
-    setNotice(
-      `${label} sign-in is not wired up yet — this build has no OAuth client. Use an email address.`,
-    );
+    setNotice(`${label} sign-in is not wired up yet. Use an email address.`);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   }, []);
 
@@ -211,7 +209,7 @@ export default function LoginScreen(): React.JSX.Element {
     !busy;
 
   return (
-    <View style={[styles.root, { backgroundColor: theme.tokens.bg0 }]}>
+    <View style={styles.root}>
       {/*
        * THE HEADER.
        *
@@ -443,7 +441,7 @@ export default function LoginScreen(): React.JSX.Element {
             </View>
 
             <Text style={[styles.foot, { color: theme.tokens.fgDim }]}>
-              {"Signing in needs a connection. Once you are in, everything else\nworks with the data off."}
+              Signing in needs a connection.
             </Text>
           </GlassPanel>
       </KeyboardAwareScrollView>
@@ -577,7 +575,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: RADIUS.control,
     overflow: "hidden",
-    marginBottom: 20,
+    marginBottom: 18,
   },
   segmentItem: {
     flex: 1,
@@ -639,7 +637,7 @@ const styles = StyleSheet.create({
   dividerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 20,
+    marginTop: 18,
     marginBottom: 14,
   },
   dividerLine: {
