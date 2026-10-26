@@ -22,6 +22,21 @@
  */
 import * as SecureStore from "expo-secure-store";
 
+/**
+ * HOW THE KEYCHAIN ENTRY IS PROTECTED.
+ *
+ * `WHEN_UNLOCKED_THIS_DEVICE_ONLY` means the item is readable only while the
+ * device is unlocked and is NOT restored onto a new device from an iCloud or
+ * iTunes backup. The default (`WHEN_UNLOCKED`) is restorable, which would
+ * copy a session token and a provider key onto every device the backup is
+ * restored to. On Android the option is ignored — the Android Keystore
+ * already refuses to export the key material — so this is an iOS hardening
+ * that costs nothing on the platform that has no equivalent switch.
+ */
+const OPTIONS: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+};
+
 const KEYS = {
   accounts: "nexus.accounts",
   session: "nexus.session",
@@ -38,7 +53,7 @@ const KEYS = {
 /** Read a secret. Returns null when there is nothing, or on any failure. */
 export async function readSecret(key: string): Promise<string | null> {
   try {
-    return await SecureStore.getItemAsync(key);
+    return await SecureStore.getItemAsync(key, OPTIONS);
   } catch {
     return null;
   }
@@ -47,7 +62,7 @@ export async function readSecret(key: string): Promise<string | null> {
 /** Write a secret. A failure here means the secret does not persist. */
 export async function writeSecret(key: string, value: string): Promise<void> {
   try {
-    await SecureStore.setItemAsync(key, value);
+    await SecureStore.setItemAsync(key, value, OPTIONS);
   } catch {
     // Nothing to do.
   }
@@ -56,7 +71,7 @@ export async function writeSecret(key: string, value: string): Promise<void> {
 /** Delete a secret. */
 export async function deleteSecret(key: string): Promise<void> {
   try {
-    await SecureStore.deleteItemAsync(key);
+    await SecureStore.deleteItemAsync(key, OPTIONS);
   } catch {
     // Nothing to do.
   }

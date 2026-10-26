@@ -43,6 +43,7 @@ import {
   writeCachedSession,
   type CachedSession,
 } from "@/storage/auth";
+import { adoptUserScope } from "@/storage/scope";
 
 export type AuthStatus = "loading" | "signed-out" | "signed-in";
 
@@ -86,6 +87,30 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
         return;
       }
 
+      /*
+       * A CACHED SESSION IS NOT A LICENCE FOREVER.
+       *
+       * The cache exists so a reader offline can still open the app. It must
+       * not outlive the expiry the server gave it: after seven days the
+       * token is dead on the server, and letting the app keep showing a
+       * signed-in shell would be a session that no one can revoke. The
+       * comparison is only made when the stored date parses; a cache written
+       * before this check existed has a real ISO date and is treated the
+       * same way.
+       */
+      const expiresAt = Date.parse(cached.expiresAt);
+      if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) {
+        await clearCachedSession();
+        setStatus("signed-out");
+        return;
+      }
+
+      /*
+       * Whose data is this? A different account signing in on the same phone
+       * must not inherit the previous reader's history.
+       */
+      await adoptUserScope(cached.user.id);
+
       setSession(cached);
       setStatus("signed-in");
 
@@ -103,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
           return;
         }
         const refreshed: CachedSession = { ...result.data, ...(cached.cookie === undefined ? {} : { cookie: cached.cookie }) };
+        await adoptUserScope(refreshed.user.id);
         await writeCachedSession(refreshed);
         setSession(refreshed);
         return;
@@ -153,8 +179,26 @@ export function AuthProvider({ children }: { children: ReactNode }): React.JSX.E
       );
       return false;
     }
-    await writeCachedSession(fresh);
-    setSession(fresh);
+
+    /*
+     * THE SERVER'S ANSWER WINS.
+     *
+     * The sign-in response body does not carry an expiry, so `toSession`
+     * used a seven-day assumption. The `get-session` confirmation does carry
+     * the real one, and its user record is the server's current copy. When
+     * the confirmation succeeds, that is what gets cached — not the guess.
+     */
+    const accepted: CachedSession =
+      verified.ok && verified.data !== null
+        ? {
+            ...verified.data,
+            ...(fresh.cookie === undefined ? {} : { cookie: fresh.cookie }),
+          }
+        : fresh;
+
+    await adoptUserScope(accepted.user.id);
+    await writeCachedSession(accepted);
+    setSession(accepted);
     setStatus("signed-in");
     setOffline(false);
     return true;

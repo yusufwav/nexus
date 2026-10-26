@@ -10,6 +10,7 @@
  *
  * On the phone they live in the same local SQLite database.
  */
+import { newId } from "@/lib/ids";
 import { getDatabase } from "@/storage/database";
 
 export type Attempt = {
@@ -46,7 +47,7 @@ export async function recordAttempt(
     `INSERT INTO attempts (id, question_id, chosen_option_id, outcome, explanation, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
     [
-      `att_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      newId("att"),
       questionId,
       chosenOptionId,
       outcome,

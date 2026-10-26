@@ -35,6 +35,8 @@
  */
 import { fetch } from "expo/fetch";
 
+import { checkProviderUrl } from "@/lib/provider-url";
+
 /* ------------------------------------------------------------------ *
  *  the shapes
  * ------------------------------------------------------------------ */
@@ -259,18 +261,38 @@ type OpenAiChunk = {
  * A frame ends at a blank line, and a frame's data is the part after
  * `data: `. The buffer is carried across reads, because a chunk boundary
  * can land in the middle of a frame.
+ *
+ * THE SIZE CEILING.
+ *
+ * The address is the reader's, but the bytes are the provider's — and a
+ * provider (or whatever answers at that address) can send a stream with no
+ * blank line in it for as long as it likes. `buffer` grows by one network
+ * chunk per read, so without a ceiling a hostile or broken endpoint turns a
+ * chat message into an out-of-memory crash. The ceiling is per frame and per
+ * response: a real answer is kilobytes, and four megabytes is already two
+ * orders of magnitude past the longest one this app has seen.
  */
+const OVERSIZE = "\u0000nexus:oversize";
+const MAX_FRAME_CHARS = 1_000_000;
+const MAX_TOTAL_BYTES = 4_000_000;
+
 async function* readFrames(
   body: ReadableStream<Uint8Array>,
 ): AsyncGenerator<string> {
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let total = 0;
   try {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+      total += value.byteLength;
       buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+      if (total > MAX_TOTAL_BYTES || buffer.length > MAX_FRAME_CHARS) {
+        yield OVERSIZE;
+        return;
+      }
       let cut = buffer.indexOf("\n\n");
       while (cut !== -1) {
         const frame = buffer.slice(0, cut);
@@ -302,10 +324,22 @@ export async function* streamChat(
   const maxSteps = options.maxSteps ?? 4;
   const history: ChatMessage[] = [...options.messages];
 
+  /*
+   * The last gate before the key is put in a header. The settings screen and
+   * the storage layer both check, but a stored record can outlive the check
+   * that wrote it, so the request checks the address it is actually about to
+   * call. A private or plain-http address never receives the key.
+   */
+  const destination = checkProviderUrl(options.baseUrl);
+  if (!destination.ok) {
+    yield { kind: "error", message: destination.reason };
+    return;
+  }
+
   for (let step = 0; step < maxSteps; step += 1) {
     let response: Response;
     try {
-      response = await fetch(endpointFor(options.baseUrl), {
+      response = await fetch(endpointFor(destination.url), {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -349,6 +383,14 @@ export async function* streamChat(
     const calls = new Map<number, { id: string; name: string; args: string }>();
 
     for await (const data of readFrames(response.body)) {
+      if (data === OVERSIZE) {
+        yield {
+          kind: "error",
+          message:
+            "The provider sent a response that was too large to read. Try a shorter question.",
+        };
+        return;
+      }
       if (data === "[DONE]") break;
 
       let chunk: OpenAiChunk;
@@ -498,20 +540,44 @@ export async function listModels(
   apiKey: string,
   signal?: AbortSignal,
 ): Promise<ReadonlyArray<ModelInfo>> {
-  const base = baseUrl.trim().replace(/\/+$/, "");
+  const destination = checkProviderUrl(baseUrl);
+  if (!destination.ok) {
+    throw new LlmError(destination.reason);
+  }
+
+  /*
+   * A KEY GOES OUT HERE, SO THE CALL HAS A DEADLINE.
+   *
+   * Without one, a provider that accepts the connection and then says
+   * nothing leaves the settings screen on "busy" forever, holding the key in
+   * a live request. Twenty seconds is longer than any /models call takes and
+   * shorter than a reader's patience.
+   */
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+  if (signal !== undefined) {
+    if (signal.aborted) controller.abort();
+    else signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
+
   let response: Response;
   try {
-    response = await fetch(`${base}/models`, {
+    response = await fetch(`${destination.url}/models`, {
       method: "GET",
       headers: { accept: "application/json", authorization: `Bearer ${apiKey}` },
-      signal,
+      signal: controller.signal,
     });
   } catch (err) {
+    clearTimeout(timer);
+    if (controller.signal.aborted && signal?.aborted !== true) {
+      throw new LlmError("That provider did not answer in time. Try again in a moment.");
+    }
     throw new LlmError(
       classify(err instanceof Error ? err.message : String(err), null),
     );
   }
   if (!response.ok) {
+    clearTimeout(timer);
     throw new LlmError(classify(await response.text().catch(() => ""), response.status));
   }
   let parsed: unknown;
@@ -519,6 +585,9 @@ export async function listModels(
     parsed = await response.json();
   } catch {
     throw new LlmError("That provider's model list could not be read.");
+  } finally {
+    // The deadline covers the body too; headers alone can arrive and stall.
+    clearTimeout(timer);
   }
   const data = (parsed as { data?: unknown }).data;
   if (!Array.isArray(data)) {

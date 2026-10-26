@@ -78,11 +78,14 @@ Each of these is a fact in the current source, not a preference.
       positions, threads, messages, the profile row, the cached session and
       the keychain keys — **the account on the server survives**. Say so, or
       add account deletion (§9).
-- [ ] **A shared device leaks progress between accounts.** `signOut`
-      (`src/auth/AuthProvider.tsx:203-219`) clears only the session; the
-      SQLite database is untouched, so the next reader on the phone inherits
-      the previous one's purchases, progress and chat threads. Decide: wipe on
-      sign-out, namespace the database by user, or warn.
+- [x] **A shared device leaks progress between accounts.** Fixed in
+      `src/storage/scope.ts`: the account that owns the local data is recorded
+      in `meta.owner_user_id`, and a different account signing in wipes the
+      previous account's purchases, progress, threads and provider keys before
+      it sees anything. Sign-out still keeps the data, because the app is
+      offline-first and the data is the reader's notes — the wipe happens at
+      the account boundary, which is the moment that matters. See
+      `VULNERABILITIES.md` §1.
 - [ ] **The 404 screen is the only one with no header.** `src/app/+not-found.tsx:27`
       pads itself with `insets.top + 40` and uses no `ScreenHeader`, against
       `AGENTS.md` rule 1. Give it a header and drop the inset.

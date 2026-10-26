@@ -38,6 +38,8 @@
  * already on the end. So the address is accepted in either shape and
  * reduced to the base the request is built from.
  */
+import { checkProviderUrl, normaliseBaseUrl } from "@/lib/provider-url";
+import { newId } from "@/lib/ids";
 import { readSetting, writeSetting, removeSetting } from "@/storage/settings";
 import {
   clearProviderKey,
@@ -75,9 +77,9 @@ export type ProviderWithKey = {
   readonly apiKey: string;
 };
 
-/** A provider id, minted on the device. */
+/** A provider id, minted on the device from the platform CSPRNG. */
 export function newProviderId(): string {
-  return `pv_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  return newId("pv");
 }
 
 /** The last four characters of a key, which is all the list shows. */
@@ -92,16 +94,12 @@ export function lastFourOf(key: string): string {
  * address with that endpoint taken off the end if it is there, and with any
  * trailing slashes removed — a provider that answers on
  * `https://host/v1/` must not be asked for `https://host/v1//chat/completions`.
+ *
+ * The implementation lives in `lib/provider-url.ts`, next to the guard that
+ * decides whether a key may be sent there at all; it is re-exported here
+ * because this module is where callers expect to find it.
  */
-export function normaliseBaseUrl(raw: string): string {
-  let url = raw.trim();
-  if (url.length === 0) return "";
-  // A reader who pasted the whole endpoint gets the base back.
-  url = url.replace(/\/+$/, "");
-  url = url.replace(/\/chat\/completions$/i, "");
-  url = url.replace(/\/completions$/i, "");
-  return url.replace(/\/+$/, "");
-}
+export { normaliseBaseUrl };
 
 /**
  * THE ENDPOINT A REQUEST GOES TO.
@@ -159,9 +157,20 @@ export async function saveProvider(
   provider: Provider,
   apiKey: string,
 ): Promise<void> {
+  /*
+   * The screen validates too, but this is the last gate before a key is
+   * written: a caller that skips the form (a restored record, a future
+   * importer) must not be able to store an address the key would be sent to
+   * in clear, or a private one.
+   */
+  const checked = checkProviderUrl(provider.baseUrl);
+  if (!checked.ok) {
+    throw new Error(checked.reason);
+  }
+  const safe: Provider = { ...provider, baseUrl: checked.url };
   const all = await listProviders();
   const next = all.filter((p) => p.id !== provider.id);
-  next.push(provider);
+  next.push(safe);
   await writeSetting(KEY, JSON.stringify(next));
   await writeProviderKey(provider.id, apiKey);
 }

@@ -143,7 +143,28 @@ export function isDisplayDelimiter(line: string): boolean {
 export type MathLayout = {
   readonly layout: Layout;
   readonly display: boolean;
+  /**
+   * True when the source was longer than `MAX_MATH_SOURCE` and was cut
+   * before layout. Callers should show the source rather than a half-drawn
+   * equation; see the note on `layoutMath`.
+   */
+  readonly truncated: boolean;
 };
+
+/**
+ * THE LONGEST SOURCE THAT WILL BE LAID OUT.
+ *
+ * The layout engine is O(n²) in the number of glyphs: every run is appended
+ * to the parent's primitive list, and a 100,000-character expression takes
+ * over two minutes on a desktop (measured). A tutor answer is the input, and
+ * an answer can come from any endpoint the reader added, so an unbounded
+ * input is a way to freeze the UI for as long as the sender likes.
+ *
+ * Two thousand characters is far past any real equation — a full matrix is a
+ * few hundred — and it lays out in about sixty milliseconds. Longer input is
+ * cut here and the caller is told, so it can render the text instead.
+ */
+export const MAX_MATH_SOURCE = 2000;
 
 /**
  * Parse and lay out a piece of maths.
@@ -153,9 +174,11 @@ export type MathLayout = {
  * limits above and below, and the caller gives the result more room.
  */
 export function layoutMath(latex: string, display: boolean): MathLayout {
-  const tree = parseLatex(latex);
+  const truncated = latex.length > MAX_MATH_SOURCE;
+  const source = truncated ? latex.slice(0, MAX_MATH_SOURCE) : latex;
+  const tree = parseLatex(source);
   const layout = layoutNode(tree, 1, { display });
-  return { layout, display };
+  return { layout, display, truncated };
 }
 
 export type { Layout, Primitive } from "@/lib/latex/layout";

@@ -10,6 +10,7 @@
  * continued still persists — which leaves the delete button as the only way
  * to lose one.
  */
+import { newId } from "@/lib/ids";
 import { getDatabase } from "@/storage/database";
 
 export type ThreadSummary = {
@@ -30,9 +31,9 @@ export type StoredRow = {
   readonly content: string;
 };
 
-/** A short id the client owns and the database stores verbatim. */
+/** A short id the client owns, from the platform CSPRNG. */
 export function newThreadId(): string {
-  return `th_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  return newId("th");
 }
 
 /** Every thread, most recently updated first. */
@@ -73,14 +74,12 @@ export async function persistMessages(
   const db = await getDatabase();
   const now = new Date().toISOString();
   await db.withExclusiveTransactionAsync(async (txn) => {
-    for (const row of rows) {
-      await txn.runAsync(
-        `INSERT INTO messages (id, thread_id, role, content, created_at)
-         VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET content = excluded.content`,
-        [row.id, threadId, row.role, row.content, now],
-      );
-    }
+    /*
+     * THE THREAD FIRST. Messages carry a foreign key to it, so a message
+     * written before its thread exists is refused by SQLite — which is the
+     * constraint doing its job, and the reason the order here is not the
+     * order the rows were handed in.
+     */
     const existing = await txn.getFirstAsync<{ title: string }>(
       "SELECT title FROM threads WHERE id = ?",
       [threadId],
@@ -91,6 +90,14 @@ export async function persistMessages(
        ON CONFLICT(id) DO UPDATE SET title = excluded.title, updated_at = excluded.updated_at`,
       [threadId, resolved, now],
     );
+    for (const row of rows) {
+      await txn.runAsync(
+        `INSERT INTO messages (id, thread_id, role, content, created_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET content = excluded.content`,
+        [row.id, threadId, row.role, row.content, now],
+      );
+    }
   });
 }
 
@@ -100,9 +107,11 @@ export async function renameThread(threadId: string, title: string): Promise<voi
   await db.runAsync("UPDATE threads SET title = ? WHERE id = ?", [title, threadId]);
 }
 
-/** Forget a conversation. The database cascades to its messages. */
+/** Forget a conversation, and its messages, in one transaction. */
 export async function deleteThread(threadId: string): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync("DELETE FROM messages WHERE thread_id = ?", [threadId]);
-  await db.runAsync("DELETE FROM threads WHERE id = ?", [threadId]);
+  await db.withExclusiveTransactionAsync(async (txn) => {
+    await txn.runAsync("DELETE FROM messages WHERE thread_id = ?", [threadId]);
+    await txn.runAsync("DELETE FROM threads WHERE id = ?", [threadId]);
+  });
 }

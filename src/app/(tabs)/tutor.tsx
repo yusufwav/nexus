@@ -62,6 +62,7 @@ import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { useFieldLevel } from "@/components/GradientAsciiBackground";
 import { Icon } from "@/components/icons";
 import { STARTERS, titleFor } from "@/lib/tutor-engine";
+import { newId } from "@/lib/ids";
 import {
   SEARCH_NOTES_TOOL,
   TUTOR_SYSTEM_PROMPT,
@@ -455,7 +456,7 @@ export default function TutorScreen(): React.JSX.Element {
       setNotesRead([]);
       void Haptics.selectionAsync();
 
-      const userId = `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      const userId = newId("m");
       const question = body;
       setRows((prev) => [...prev, { id: userId, role: "user", content: question }]);
       setInput("");
@@ -469,7 +470,7 @@ export default function TutorScreen(): React.JSX.Element {
        */
       void persistMessages(threadId, [{ id: userId, role: "user", content: question }], titleFor(question));
 
-      const assistantId = `m_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+      const assistantId = newId("m");
       let answer = "";
 
       const controller = new AbortController();

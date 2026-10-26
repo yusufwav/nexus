@@ -105,6 +105,8 @@ type MathsPiece = {
   readonly layout: Layout;
   /** The margin that puts its baseline on the prose's baseline. */
   readonly marginTop: number;
+  /** True when the source was too long to lay out; show it as written. */
+  readonly truncated: boolean;
 };
 
 export function Markdown({ source }: { source: string }): React.JSX.Element {
@@ -145,10 +147,14 @@ export function Markdown({ source }: { source: string }): React.JSX.Element {
     const latex = display.join("\n").trim();
     display = null;
     if (latex.length === 0) return;
-    const { layout } = layoutMath(latex, true);
+    const { layout, truncated } = layoutMath(latex, true);
     blocks.push(
       <View key={`display-${blocks.length}`} style={styles.display}>
-        <MathBox layout={layout} display color={theme.tokens.fg} ruleColor={theme.tokens.fgMuted} />
+        {truncated ? (
+          <Text style={[styles.overflow, { color: theme.tokens.fg }]}>{latex}</Text>
+        ) : (
+          <MathBox layout={layout} display color={theme.tokens.fg} ruleColor={theme.tokens.fgMuted} />
+        )}
       </View>,
     );
   };
@@ -292,11 +298,11 @@ function MathsLine({ segments }: { segments: readonly LineSegment[] }): React.JS
       continue;
     }
     const display = segment.kind === "display";
-    const { layout } = layoutMath(segment.latex, display);
+    const { layout, truncated } = layoutMath(segment.latex, display);
     const size = display ? MATH_SIZE.display : MATH_SIZE.inline;
     const marginTop = PROSE_BASELINE - layout.height * size;
     if (marginTop < lowest) lowest = marginTop;
-    pieces.push({ latex: segment.latex, display, layout, marginTop });
+    pieces.push({ latex: segment.latex, display, layout, marginTop, truncated });
   }
 
   /*
@@ -342,6 +348,21 @@ function MathsLine({ segments }: { segments: readonly LineSegment[] }): React.JS
 
         const piece = pieces[index];
         if (piece === null) return null;
+        /*
+         * A source too long to lay out is shown as it was written. Drawing
+         * the part that fitted would be a half-equation with no sign that
+         * anything was cut.
+         */
+        if (piece.truncated) {
+          return (
+            <Text
+              key={`m-${index}`}
+              style={[styles.overflow, { color: theme.tokens.fg }]}
+            >
+              {piece.latex}
+            </Text>
+          );
+        }
         return (
           <View key={`m-${index}`} style={{ marginTop: piece.marginTop }}>
             <MathBox
@@ -379,6 +400,13 @@ const styles = StyleSheet.create({
   display: {
     alignItems: "center",
     marginVertical: 12,
+  },
+  overflow: {
+    // A source too long to lay out, shown as written.
+    ...TYPE.body,
+    fontSize: 13,
+    lineHeight: 20,
+    flexShrink: 1,
   },
   bold: {
     fontWeight: "800",

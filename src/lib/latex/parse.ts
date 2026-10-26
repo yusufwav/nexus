@@ -219,9 +219,36 @@ const MATRIX_ENVIRONMENTS: Readonly<Record<string, { left: string; right: string
 /** The size modifiers, which the layout engine ignores but must not choke on. */
 const SIZE_MODIFIERS = new Set(["\\big", "\\Big", "\\bigg", "\\Bigg", "\\bigl", "\\bigr", "\\Bigl", "\\Bigr"]);
 
+/** Thrown when the input nests deeper than `Parser.MAX_DEPTH`. */
+class DepthExceeded extends Error {
+  constructor() {
+    super("The expression nests too deeply to draw.");
+    this.name = "DepthExceeded";
+  }
+}
+
 class Parser {
   private readonly tokens: readonly Token[];
   private at = 0;
+
+  /**
+   * HOW DEEP THE RECURSION MAY GO.
+   *
+   * Every `{`, `\left`, `\sqrt` and `\frac` descends one level, and an
+   * unclosed one descends for as long as there are tokens left. A model
+   * answer of two thousand `{` is not an equation, but it is enough to
+   * exhaust the JavaScript stack — and a stack overflow inside a render is
+   * not a caught error on a phone, it is a crash.
+   *
+   * Sixty-four is far past real maths (a continued fraction inside a matrix
+   * inside a root is about six) and shallow enough that the layout engine,
+   * which walks the same tree, is safe too. Past the cap the parser stops
+   * descending and keeps reading at the level it is on, so the source is
+   * still shown rather than swallowed.
+   */
+  private static readonly MAX_DEPTH = 64;
+
+  private depth = 0;
 
   constructor(tokens: readonly Token[]) {
     this.tokens = tokens;
@@ -244,36 +271,52 @@ class Parser {
    * `\right`, not at a brace.
    */
   parseSequence(stopAtRight = false): { nodes: Node[]; stoppedAtRight: boolean } {
-    const nodes: Node[] = [];
-
-    while (this.at < this.tokens.length) {
-      const token = this.tokens[this.at]!;
-
-      if (token.type === "rbrace") {
-        // The closing brace is CONSUMED here, not left for the caller:
-        // every caller of this method is a group, and a group that does
-        // not swallow its own brace leaves the next argument reading
-        // the wrong token.
-        this.at += 1;
-        break;
-      }
-
-      if (token.type === "command" && token.name === "\\right") {
-        if (stopAtRight) return { nodes, stoppedAtRight: true };
-        // A `\right` with no `\left` — skip it and carry on.
-        this.at += 1;
-        this.readDelimiter();
-        continue;
-      }
-
-      const node = this.parseAtom(nodes);
-      if (node !== null) {
-        nodes.push(node);
-        this.attachScripts(nodes);
-      }
+    if (this.depth >= Parser.MAX_DEPTH) {
+      /*
+       * Too deep to be real maths. Throwing unwinds to `parseLatex`, whose
+       * fallback is the source as literal text — so the reader sees what the
+       * model wrote instead of an empty box. A thrown error at depth sixty-
+       * four is nowhere near the stack limit; letting the recursion continue
+       * is what would reach it.
+       */
+      throw new DepthExceeded();
     }
 
-    return { nodes, stoppedAtRight: false };
+    this.depth += 1;
+    try {
+      const nodes: Node[] = [];
+
+      while (this.at < this.tokens.length) {
+        const token = this.tokens[this.at]!;
+
+        if (token.type === "rbrace") {
+          // The closing brace is CONSUMED here, not left for the caller:
+          // every caller of this method is a group, and a group that does
+          // not swallow its own brace leaves the next argument reading
+          // the wrong token.
+          this.at += 1;
+          break;
+        }
+
+        if (token.type === "command" && token.name === "\\right") {
+          if (stopAtRight) return { nodes, stoppedAtRight: true };
+          // A `\right` with no `\left` — skip it and carry on.
+          this.at += 1;
+          this.readDelimiter();
+          continue;
+        }
+
+        const node = this.parseAtom(nodes);
+        if (node !== null) {
+          nodes.push(node);
+          this.attachScripts(nodes);
+        }
+      }
+
+      return { nodes, stoppedAtRight: false };
+    } finally {
+      this.depth -= 1;
+    }
   }
 
   /**
@@ -541,6 +584,15 @@ class Parser {
   private readArgument(): Node | null {
     const token = this.peek();
     if (token === undefined) return null;
+
+    /*
+     * `\frac\frac\frac…` needs no braces to recurse: each command's argument
+     * is the next command. The guard is here as well as in `parseSequence`
+     * because this is the other door into the recursion.
+     */
+    if (this.depth >= Parser.MAX_DEPTH) {
+      throw new DepthExceeded();
+    }
 
     if (token.type === "lbrace") {
       this.next();

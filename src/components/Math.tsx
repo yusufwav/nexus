@@ -185,7 +185,16 @@ export function Math({
   color,
   ruleColor,
 }: MathProps): React.JSX.Element {
-  const { layout } = layoutMath(latex, display);
+  const { layout, truncated } = layoutMath(latex, display);
+  /*
+   * A source too long to lay out is shown as it was written. A half-drawn
+   * equation is worse than an ugly one: the reader cannot tell that the
+   * engine stopped at a character boundary, but they can tell that the
+   * source is what the model said.
+   */
+  if (truncated) {
+    return <Text style={[styles.overflow, { color }]}>{latex}</Text>;
+  }
   return <MathBox layout={layout} display={display} color={color} ruleColor={ruleColor} />;
 }
 
@@ -194,5 +203,11 @@ const styles = StyleSheet.create({
     // The maths is a box of a known size, and it must not be laid out as if
     // it were a line of text.
     overflow: "visible",
+  },
+  overflow: {
+    // A source too long to lay out, shown as written.
+    fontSize: INLINE_SIZE,
+    lineHeight: INLINE_SIZE * 1.5,
+    flexShrink: 1,
   },
 });

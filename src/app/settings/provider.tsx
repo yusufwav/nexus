@@ -41,12 +41,12 @@ import { Input } from "@/components/ui/Input";
 import { ScreenHeader } from "@/components/ui/ScreenHeader";
 import { Icon } from "@/components/icons";
 import { listModels, type ModelInfo } from "@/lib/llm";
+import { checkProviderUrl } from "@/lib/provider-url";
 import { RADIUS } from "@/theme/radius";
 import {
   deleteProvider,
   listProviders,
   newProviderId,
-  normaliseBaseUrl,
   readActiveProviderId,
   saveProvider,
   writeActiveProviderId,
@@ -146,7 +146,7 @@ export default function ProviderScreen(): React.JSX.Element {
     setNote(null);
 
     const trimmedName = name.trim();
-    const base = normaliseBaseUrl(address);
+    const checked = checkProviderUrl(address);
     const trimmedKey = key.trim();
     const trimmedModel = model.trim();
 
@@ -154,16 +154,11 @@ export default function ProviderScreen(): React.JSX.Element {
       setError("Give the provider a name, so you can tell your providers apart.");
       return;
     }
-    if (base.length === 0) {
-      setError("Give the address the text completions live at.");
+    if (!checked.ok) {
+      setError(checked.reason);
       return;
     }
-    if (!base.startsWith("https://")) {
-      // The same rule the web app's server enforces, for the same reason: an
-      // http endpoint would send the key in clear.
-      setError("The address has to be https. An http endpoint would send your key in clear.");
-      return;
-    }
+    const base = checked.url;
     if (trimmedKey.length < 8) {
       setError("That does not look like a key.");
       return;

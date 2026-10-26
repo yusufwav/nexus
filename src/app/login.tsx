@@ -46,6 +46,21 @@ import { MIN_PASSWORD_LENGTH } from "@/lib/auth-client";
 type Mode = "sign-in" | "sign-up";
 
 /**
+ * WHAT AN ADDRESS HAS TO LOOK LIKE BEFORE IT IS SENT.
+ *
+ * This is not an attempt to decide whether an address exists — only the
+ * server's verification email can do that. It is the cheap shape check that
+ * stops a typo being sent as a password reset target and stops a megabyte of
+ * text being posted to an endpoint that will only reject it. The server is
+ * still the authority.
+ */
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const MAX_EMAIL_LENGTH = 254; // RFC 5321's limit for a forward path
+const MAX_NAME_LENGTH = 80;
+/** A password longer than this is a paste accident or a denial-of-service attempt. */
+const MAX_PASSWORD_LENGTH = 1024;
+
+/**
  * The TextInput's instance type.
  *
  * React Native 0.88 types `TextInput` as a function component, so the
@@ -151,7 +166,12 @@ export default function LoginScreen(): React.JSX.Element {
      * rule guards the account, and the sign-in form lets the server
      * answer.
      */
-    if (email.trim().length === 0 || !email.includes("@")) {
+    const address = email.trim();
+    if (
+      address.length === 0 ||
+      address.length > MAX_EMAIL_LENGTH ||
+      !EMAIL_SHAPE.test(address)
+    ) {
       setLocalError("That does not look like an email address.");
       return;
     }
@@ -162,8 +182,16 @@ export default function LoginScreen(): React.JSX.Element {
         );
         return;
       }
+      if (password.length > MAX_PASSWORD_LENGTH) {
+        setLocalError("That password is too long. 1024 characters is the limit.");
+        return;
+      }
       if (name.trim().length < 2) {
         setLocalError("Your name needs to be at least 2 characters.");
+        return;
+      }
+      if (name.trim().length > MAX_NAME_LENGTH) {
+        setLocalError("That name is too long. 80 characters is the limit.");
         return;
       }
       if (confirm !== password) {

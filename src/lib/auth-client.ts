@@ -228,14 +228,36 @@ async function call<T>(path: string, options: CallOptions = {}): Promise<AuthOut
     }
   }
 
+  /*
+   * A DEADLINE, BECAUSE A HUNG SIGN-IN IS A HUNG APP.
+   *
+   * A server that accepts the connection and then says nothing would leave
+   * the button spinning and the token in a live request. Twenty seconds is
+   * long enough for a bad mobile connection and short enough to fail while
+   * the reader is still looking at the screen.
+   */
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 20_000);
+
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${path}`, {
       method: options.method ?? (options.body === undefined ? "GET" : "POST"),
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: controller.signal,
     });
   } catch {
+    clearTimeout(timer);
+    if (controller.signal.aborted) {
+      return {
+        ok: false,
+        error: {
+          kind: "offline",
+          message: "The server did not answer in time. Check your connection and try again.",
+        },
+      };
+    }
     /*
      * THE REQUEST NEVER LEFT THE DEVICE.
      *
@@ -255,11 +277,34 @@ async function call<T>(path: string, options: CallOptions = {}): Promise<AuthOut
     };
   }
 
+  /*
+   * The deadline covers the BODY as well as the headers: a server that sends
+   * a 200 and then stalls would otherwise leave the reader on a spinner with
+   * the timer already cleared.
+   */
   let payload: unknown = null;
+  let bodyFailed = false;
   try {
     payload = await response.json();
   } catch {
-    payload = null;
+    bodyFailed = true;
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (bodyFailed && controller.signal.aborted) {
+    /*
+     * The headers arrived and the body did not. This is NOT a successful
+     * empty answer, and it must not be reported as one — a sign-in that
+     * "succeeded" with no body would cache a session that does not exist.
+     */
+    return {
+      ok: false,
+      error: {
+        kind: "offline",
+        message: "The server did not answer in time. Check your connection and try again.",
+      },
+    };
   }
 
   if (response.ok) {
